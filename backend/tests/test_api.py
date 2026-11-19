@@ -122,3 +122,8 @@ def test_settings_cannot_sit_on_comfort_boundary(client):
 
 def test_admin_reset_requires_operator_key(client):
     assert client.post("/api/admin/reset").status_code == 403
+
+
+def test_notice_image_rejects_non_images(client):
+    r = client.post("/api/events/parse-image", files={"file": ("notice.txt", b"hello", "text/plain")})
+    assert r.status_code == 400

@@ -264,6 +264,35 @@ def parse_event(request: Request, body: dict = Body(...)):
     return ev
 
 
+@app.post("/api/events/parse-image")
+async def parse_event_image(request: Request, file: UploadFile = File(...)):
+    """휴강·보강 공지 캡처(이미지) -> event draft + conflict check."""
+    from . import ai
+
+    data = await file.read()
+    if len(data) > 4_000_000:
+        raise HTTPException(413, "이미지가 너무 큽니다(최대 4MB).")
+    media = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
+        (file.filename or "").lower().rsplit(".", 1)[-1])
+    if not media:
+        raise HTTPException(400, "PNG, JPG, WEBP 이미지만 받을 수 있습니다.")
+    _rate_limit(request, "parse")
+    try:
+        ev = ai.parse_event_image(data, media)
+        ai.record_status(True)
+    except ai.QuotaExceeded as e:
+        raise HTTPException(429, str(e))
+    except Exception as e:
+        ai.record_status(False, f"{type(e).__name__}: {e}")
+        raise HTTPException(503, "AI(Bedrock) 호출에 실패했습니다. 공지 내용을 글로 입력해 주세요.")
+    try:
+        chk = service.check_event(ev)
+        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
+    except Exception:
+        pass
+    return ev
+
+
 @app.get("/api/settings")
 def get_settings():
     return service.settings()

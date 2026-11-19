@@ -377,3 +377,26 @@ def copilot(history: list[dict], progress=None) -> dict:
     else:
         out["answer"] = out.get("answer") or "분석 단계가 너무 길어 중단했습니다. 질문을 좁혀 주세요."
     return out
+
+
+def parse_event_image(data: bytes, media_type: str) -> dict:
+    """A notice screenshot or photo (e.g. LMS 휴강 공지) -> event draft (same schema as parse_event)."""
+    _charge()
+    text = (
+        "이 이미지는 강의 휴강·보강·행사·강의실 변경 공지입니다. 공지 내용을 일정 이벤트 하나로 변환하세요. "
+        "이미지에 적힌 날짜·시간·강의실·과목명만 근거로 쓰고, 강의 목록에서 맞는 course_id를 고릅니다."
+    )
+    content = [{"type": "image", "source": {"type": "base64", "media_type": media_type, "data": base64.b64encode(data).decode()}},
+               {"type": "text", "text": text}]
+    today = service.now_kst().date()
+    system = (
+        f"당신은 대학 건물 냉난방 운영 시스템의 일정 입력 도우미입니다. 오늘은 {today.isoformat()}입니다. "
+        "이벤트 유형: add(보강·행사·시험), cancel(휴강: course_id 지정), move(강의실 변경), closure(휴관). "
+        "확실하지 않으면 clarification에 질문을 넣습니다.\n\n강의 목록(id|강의실|요일|시간|과목|교수):\n" + _course_catalog()
+    )
+    resp = client().with_options(timeout=50.0, max_retries=1).messages.create(
+        model=HAIKU, max_tokens=2000, system=system, messages=[{"role": "user", "content": content}],
+        output_config={"effort": "low", "format": {"type": "json_schema", "schema": EVENT_SCHEMA}},
+    )
+    ev = json.loads(_text(resp))
+    return {k: v for k, v in ev.items() if v is not None or k == "clarification"}
