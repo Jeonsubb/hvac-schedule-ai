@@ -1,0 +1,163 @@
+"""Persistence adapters.
+
+Blobs (computed day results, weather caches)  -> S3 or local directory
+Items (user/external data: courses, events, settings, audit, jobs, usage) -> DynamoDB or local JSON
+"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+import time
+from decimal import Decimal
+from pathlib import Path
+
+
+def _dumps(obj) -> str:
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"), default=str)
+
+
+class LocalStore:
+    def __init__(self, root: str):
+        self.root = Path(root)
+        (self.root / "blobs").mkdir(parents=True, exist_ok=True)
+        self._items_path = self.root / "items.json"
+        self._lock = threading.Lock()
+        self._items = json.loads(self._items_path.read_text()) if self._items_path.exists() else {}
+
+    # blobs
+    def get_blob(self, key: str):
+        p = self.root / "blobs" / key
+        return json.loads(p.read_text()) if p.exists() else None
+
+    def put_blob(self, key: str, obj) -> None:
+        p = self.root / "blobs" / key
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(_dumps(obj))
+
+    # items
+    def _flush(self):
+        self._items_path.write_text(_dumps(self._items))
+
+    def put_item(self, kind: str, item_id: str, obj: dict) -> None:
+        with self._lock:
+            self._items.setdefault(kind, {})[item_id] = obj
+            self._flush()
+
+    def get_item(self, kind: str, item_id: str):
+        return self._items.get(kind, {}).get(item_id)
+
+    def list_items(self, kind: str) -> list[dict]:
+        return list(self._items.get(kind, {}).values())
+
+    def delete_item(self, kind: str, item_id: str) -> None:
+        with self._lock:
+            self._items.get(kind, {}).pop(item_id, None)
+            self._flush()
+
+    def replace_kind(self, kind: str, items: dict[str, dict]) -> None:
+        with self._lock:
+            self._items[kind] = dict(items)
+            self._flush()
+
+    def incr(self, kind: str, item_id: str, field: str, by: int = 1) -> int:
+        with self._lock:
+            it = self._items.setdefault(kind, {}).setdefault(item_id, {})
+            it[field] = int(it.get(field, 0)) + by
+            self._flush()
+            return it[field]
+
+
+def _from_ddb(v):
+    if isinstance(v, list):
+        return [_from_ddb(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _from_ddb(x) for k, x in v.items()}
+    if isinstance(v, Decimal):
+        return int(v) if v == int(v) else float(v)
+    return v
+
+
+class AwsStore:
+    """S3 for blobs; one DynamoDB table (pk=kind, sk=id, body=JSON string) for items."""
+
+    def __init__(self, bucket: str, table: str, region: str):
+        import boto3
+
+        self.bucket = bucket
+        self.s3 = boto3.client("s3", region_name=region)
+        self.table = boto3.resource("dynamodb", region_name=region).Table(table)
+        self._cache: dict[str, tuple[float, list]] = {}
+
+    def get_blob(self, key: str):
+        try:
+            r = self.s3.get_object(Bucket=self.bucket, Key=key)
+        except self.s3.exceptions.NoSuchKey:
+            return None
+        except Exception as e:  # AccessDenied on missing keys without ListBucket
+            if "NoSuchKey" in str(e) or "AccessDenied" in str(e):
+                return None
+            raise
+        return json.loads(r["Body"].read())
+
+    def put_blob(self, key: str, obj) -> None:
+        self.s3.put_object(Bucket=self.bucket, Key=key, Body=_dumps(obj).encode(), ContentType="application/json")
+
+    def put_item(self, kind: str, item_id: str, obj: dict) -> None:
+        self.table.put_item(Item={"pk": kind, "sk": item_id, "body": _dumps(obj), "ts": int(time.time())})
+        self._cache.pop(kind, None)
+
+    def get_item(self, kind: str, item_id: str):
+        r = self.table.get_item(Key={"pk": kind, "sk": item_id}, ConsistentRead=True)
+        it = r.get("Item")
+        return json.loads(it["body"]) if it and "body" in it else (_from_ddb(it) if it else None)
+
+    def list_items(self, kind: str) -> list[dict]:
+        from boto3.dynamodb.conditions import Key
+
+        out, kw = [], {"KeyConditionExpression": Key("pk").eq(kind), "ConsistentRead": True}
+        while True:
+            r = self.table.query(**kw)
+            out.extend(json.loads(i["body"]) for i in r["Items"] if "body" in i)
+            if "LastEvaluatedKey" not in r:
+                break
+            kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+        return out
+
+    def delete_item(self, kind: str, item_id: str) -> None:
+        self.table.delete_item(Key={"pk": kind, "sk": item_id})
+
+    def replace_kind(self, kind: str, items: dict[str, dict]) -> None:
+        from boto3.dynamodb.conditions import Key
+
+        existing = self.table.query(KeyConditionExpression=Key("pk").eq(kind), ProjectionExpression="pk, sk")["Items"]
+        with self.table.batch_writer() as bw:
+            for it in existing:
+                if it["sk"] not in items:
+                    bw.delete_item(Key={"pk": kind, "sk": it["sk"]})
+            for k, v in items.items():
+                bw.put_item(Item={"pk": kind, "sk": k, "body": _dumps(v), "ts": int(time.time())})
+
+    def incr(self, kind: str, item_id: str, field: str, by: int = 1) -> int:
+        r = self.table.update_item(
+            Key={"pk": kind, "sk": item_id},
+            UpdateExpression="ADD #f :b",
+            ExpressionAttributeNames={"#f": field},
+            ExpressionAttributeValues={":b": by},
+            ReturnValues="UPDATED_NEW",
+        )
+        return int(r["Attributes"][field])
+
+
+_store = None
+
+
+def get_store():
+    global _store
+    if _store is None:
+        if os.environ.get("DATA_BUCKET") and os.environ.get("TABLE_NAME"):
+            _store = AwsStore(os.environ["DATA_BUCKET"], os.environ["TABLE_NAME"], os.environ.get("AWS_REGION", "ap-northeast-2"))
+        else:
+            root = os.environ.get("LOCAL_STORE", str(Path(__file__).resolve().parents[2] / "data" / "local"))
+            _store = LocalStore(root)
+    return _store
