@@ -160,6 +160,7 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
         s, e = blk["s"], blk["e"]
         label = blk["sessions"][0]["title"]
         humid = any(rh_f[m] >= settings["dehum_rh"] and to_f[m] >= settings["dehum_temp"] for m in range(s, min(e, 1440), 10))
+        use_weather = settings.get("ai_use_weather", True)  # ablation switch for savings attribution
 
         if carry_on:
             on_t, mode = s, COND
@@ -168,14 +169,14 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
             ta, tm, _, _ = _forward(ctx, ta, tm, cursor, td, _const(OFF))
             cursor = td
             exit_m, ta_exit = _first_exit(ctx, ta, tm, td, s, e, lo, hi)
-            if exit_m is None and not humid:
+            if use_weather and exit_m is None and not humid:
                 add_dec(blk, **{"type": "skip", "detail": "냉난방 없이도 수업 내내 쾌적 범위 유지 예측 → 가동 생략",
                                   "saved_min": (e - rule_early) - (s - rule_pre)})
                 ta, tm, _, _ = _forward(ctx, ta, tm, td, e, _const(OFF))
                 cursor = e
                 continue
             # economizer: room overheats while outdoor air is cool and dry
-            if exit_m is not None and ta_exit > hi and not humid and min(to_f[s:e] or [99]) < hi - 4:
+            if use_weather and exit_m is not None and ta_exit > hi and not humid and min(to_f[s:e] or [99]) < hi - 4:
                 ta2, tm2, _, viol = _forward(ctx, ta, tm, td, e, _switch(s, OFF, FAN), lo, hi)
                 if not viol:
                     intervals.append({"s": s, "e": e, "kind": "fan", "reason": "외기 냉방(송풍·환기) — 압축기 미가동",
@@ -184,7 +185,7 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
                                       "saved_min": (e - rule_early) - (s - rule_pre)})
                     ta, tm, cursor = ta2, tm2, e
                     continue
-            if exit_m is not None and exit_m > s + 10 and not humid:
+            if use_weather and exit_m is not None and exit_m > s + 10 and not humid:
                 on_t = exit_m - 5
                 add_dec(blk, **{"type": "late_start", "detail": f"수업 시작 후 {on_t - s}분까지 쾌적 유지 예측 → {min_to_hm(on_t)} 지연 기동",
                                   "saved_min": on_t - (s - rule_pre)})
@@ -292,7 +293,7 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
             soft_seg = {"s": on_t, "e": min(ctx.cap_until, t_off), "kind": "cond", "cap": ctx.cap_frac,
                         "reason": f"예열 (실내기 출력 {round(ctx.cap_frac * 100)}%, 실외기 용량 분담)", "sessions": []}
         ctx.cap_frac, ctx.cap_until = 1.0, -1
-        if t_off < e:
+        if e - t_off > rule_early:  # only count stops earlier than the rule would make anyway
             add_dec(blk, **{"type": "early_stop", "detail": f"건물 열관성으로 종료 {e - t_off}분 전 정지해도 쾌적 유지",
                               "saved_min": (e - t_off) - rule_early})
         if soft_seg:

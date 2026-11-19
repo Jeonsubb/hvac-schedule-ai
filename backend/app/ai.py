@@ -39,6 +39,36 @@ def client():
     return _client
 
 
+def _norm(text: str) -> str:
+    import re
+
+    return re.sub(r"\s+", " ", text.strip().lower())[:300]
+
+
+def record_status(ok: bool, err: str | None = None) -> None:
+    st = get_store().get_item("meta", "ai_status") or {}
+    now = service.now_kst().isoformat(timespec="seconds")
+    if ok:
+        st.update(last_ok=now, ok=True)
+    else:
+        st.update(last_error=now, error=(err or "")[:200], ok=False)
+    get_store().put_item("meta", "ai_status", st)
+
+
+def cache_put(kind: str, text: str, result: dict) -> None:
+    import hashlib
+
+    get_store().put_item(f"aicache-{kind}", hashlib.sha1(_norm(text).encode()).hexdigest()[:16],
+                         {"q": _norm(text), "result": result, "at": service.now_kst().isoformat(timespec="seconds")})
+
+
+def cache_get(kind: str, text: str) -> dict | None:
+    import hashlib
+
+    it = get_store().get_item(f"aicache-{kind}", hashlib.sha1(_norm(text).encode()).hexdigest()[:16])
+    return it and {**it["result"], "cached_at": it["at"], "from_cache": True}
+
+
 def _charge():
     n = get_store().incr("usage", service.now_kst().date().isoformat(), "calls")
     if n > DAILY_CALL_CAP:
@@ -262,6 +292,11 @@ def run_tool(name: str, inp: dict, out: dict) -> dict:
         return {"status": "운영자에게 적용 버튼으로 제안됨"}
     if name == "draft_event":
         ev = parse_event(inp["text"])
+        try:
+            chk = service.check_event(ev)
+            ev["check"] = {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}
+        except Exception as e:  # incomplete draft: let the operator fill it in
+            ev["check"] = {"ok": False, "error": str(e)}
         out.setdefault("event_drafts", []).append(ev)
         return {"draft": ev, "status": "운영자 확인 대기"}
     if name == "consolidation_advice":
@@ -291,7 +326,9 @@ def copilot_system(ctx_now: dict) -> str:
         "- 수치(kWh, %, 원, 온도)는 반드시 이번 대화의 도구 결과에서만 인용합니다. 추측한 수치를 쓰지 않습니다.\n"
         "- 운영 규칙 변경을 권할 때는 먼저 simulate_policy로 검증하고, 효과가 있으면 propose_policy로 제안합니다. 직접 적용했다고 말하지 않습니다.\n"
         "- 일정 추가·휴강·강의실 변경 요청은 draft_event로 초안을 만들고 운영자 확인을 요청합니다.\n"
-        "- 쾌적도를 희생하는 절감은 그 대가를 함께 밝힙니다.\n"
+        "- 쾌적도를 희생하는 절감은 그 대가를 함께 밝힙니다. 규칙 변경을 제안할 때는 시뮬레이션 결과의 전력량과 함께 "
+        "불쾌 지표(discomfort_dm)와 수업 시작 시 저온·고온 횟수(cold_starts) 변화를 반드시 적습니다. "
+        "쾌적 범위 경계에 설정온도를 맞추는 식으로 지표만 좋아 보이게 하는 제안은 하지 않습니다.\n"
         "- 원인을 더 확인할 수 있는 도구가 있으면 사용자에게 되묻지 말고 먼저 조회한 뒤 결론을 냅니다(도구 호출은 최대 5회).\n"
         "- 도구·함수 이름(get_day 등)이나 내부 키(ai, rule 등)를 답변에 쓰지 않습니다. 'AI 예측 제어', '규칙 기반', '고정 스케줄', '수동 운영'처럼 화면의 이름을 씁니다.\n"
         "- 답변은 한국어로, 시설 담당자가 바로 행동할 수 있게 짧고 구체적으로 씁니다. 표가 도움이 되면 마크다운 표를 씁니다."

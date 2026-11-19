@@ -145,7 +145,7 @@ STRATEGIES = {
     "fixed": "고정 스케줄",
     "manual": "수동 운영",
     "rule": "규칙 기반",
-    "ai": "AI 최적화",
+    "ai": "AI 예측 제어",
 }
 
 

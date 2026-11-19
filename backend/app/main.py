@@ -46,7 +46,8 @@ async def invalid_input(_request: Request, exc: InvalidInput):
     return JSONResponse({"detail": str(exc)}, status_code=400)
 
 
-AI_PER_MINUTE = int(os.environ.get("AI_PER_MINUTE", "8"))
+AI_PER_MINUTE = int(os.environ.get("AI_PER_MINUTE", "30"))
+OPERATOR_KEY = os.environ.get("OPERATOR_KEY")
 
 
 def _rate_limit(request: Request, bucket: str, limit: int = AI_PER_MINUTE) -> None:
@@ -80,6 +81,7 @@ def meta():
         "now": service.effective_now(ctx),
         "counts": {"courses": len(ctx.courses), "events": len(ctx.events)},
         "storage": getattr(service.get_store(), "status", lambda: {"mode": type(service.get_store()).__name__})(),
+        "ai": service.get_store().get_item("meta", "ai_status") or {"ok": None},
         "weather": {"fetched_at": src.get("fetched_at"), "errors": src.get("errors", {}),
                     "kma_base": (src.get("kma_forecast") or {}).get("base")},
         "models": {"sonnet": os.environ.get("MODEL_SONNET", "global.anthropic.claude-sonnet-5-5"),
@@ -172,7 +174,7 @@ async def import_file(request: Request, file: UploadFile = File(...), hint: str 
              "gif": "image/gif", "pdf": "application/pdf"}.get(lower.rsplit(".", 1)[-1])
     if not media:
         raise HTTPException(400, "지원 형식: CSV, XLSX, JSON, PNG/JPG/WEBP 이미지, PDF")
-    _rate_limit(request, "extract", 3)
+    _rate_limit(request, "extract", 10)
     job = jobs.create("extract", {"media_type": media, "filename": name[:120], "hint": hint[:500]},
                       blob={"data_b64": base64.b64encode(data).decode()})
     return {"mode": "job", "job": job["id"], "source": name}
@@ -227,6 +229,14 @@ def remove_event(event_id: str):
     return res
 
 
+@app.post("/api/events/check")
+def check_event(ev: dict = Body(...)):
+    try:
+        return service.check_event(ev)
+    except (InvalidInput, ValueError) as e:
+        raise HTTPException(400, str(e))
+
+
 @app.post("/api/events/parse")
 def parse_event(request: Request, body: dict = Body(...)):
     from . import ai
@@ -236,9 +246,22 @@ def parse_event(request: Request, body: dict = Body(...)):
         raise HTTPException(400, "text는 1~500자여야 합니다.")
     _rate_limit(request, "parse")
     try:
-        return ai.parse_event(text)
+        ev = ai.parse_event(text)
+        ai.record_status(True)
+        ai.cache_put("parse", text, ev)
     except ai.QuotaExceeded as e:
         raise HTTPException(429, str(e))
+    except Exception as e:
+        ai.record_status(False, f"{type(e).__name__}: {e}")
+        ev = ai.cache_get("parse", text)
+        if not ev:
+            raise HTTPException(503, "AI(Bedrock) 호출에 실패했습니다. 아래 양식에 직접 입력하거나 잠시 후 다시 시도하세요.")
+    try:
+        chk = service.check_event(ev)
+        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
+    except Exception:
+        pass  # incomplete draft: the form shows what is missing
+    return ev
 
 
 @app.get("/api/settings")
@@ -274,7 +297,17 @@ def audit(limit: int = 100):
 
 @app.get("/api/consolidation")
 def consolidation(weekday: int | None = None):
+    if weekday is not None and not 0 <= weekday <= 5:
+        raise HTTPException(400, "weekday는 0(월)~5(토)입니다.")
     return service.consolidation(weekday)
+
+
+@app.get("/api/attribution")
+def attribution(days: bool = False):
+    res = service.attribution(allow_stale=True)
+    if res is None:
+        return JSONResponse({"status": "computing", "detail": "절감 요인 분석을 계산 중입니다. 1~2분 뒤 다시 확인하세요."}, status_code=202)
+    return res if days else {k: v for k, v in res.items() if k != "days"}
 
 
 @app.get("/api/export/plan.csv")
@@ -314,6 +347,22 @@ def job_status(job_id: str):
         raise HTTPException(404, "job not found")
     job = {k: v for k, v in job.items() if k not in ("payload", "trace")}
     return job
+
+
+@app.post("/api/admin/reset")
+def admin_reset(request: Request):
+    """Demo reset (operator only): remove all events, restore default rules."""
+    if not OPERATOR_KEY or request.headers.get("x-operator-key") != OPERATOR_KEY:
+        raise HTTPException(403, "운영자 키가 필요합니다.")
+    st = service.get_store()
+    removed = 0
+    for ev in service.events():
+        st.delete_item("event", ev["id"])
+        removed += 1
+    st.put_item("settings", "active", config.default_settings())
+    service.audit("admin", f"데모 초기화: 이벤트 {removed}개 삭제, 운영 규칙 기본값 복원", "운영자")
+    service._queue_precompute()
+    return {"events_removed": removed, "settings": "default"}
 
 
 @app.post("/api/precompute")

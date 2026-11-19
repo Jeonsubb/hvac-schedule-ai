@@ -80,7 +80,21 @@ def run(job_id: str) -> dict:
             def progress(out):
                 job["progress"] = {"steps": out.get("steps", [])}
                 _save(job)
-            job["result"] = ai.copilot(p["messages"], progress=progress)
+            question = p["messages"][-1]["content"]
+            try:
+                job["result"] = ai.copilot(p["messages"], progress=progress)
+                ai.record_status(True)
+                if len(p["messages"]) == 1:
+                    ai.cache_put("chat", question, job["result"])
+            except ai.QuotaExceeded:
+                raise
+            except Exception as e:
+                ai.record_status(False, f"{type(e).__name__}: {e}")
+                cached = ai.cache_get("chat", question)
+                if not cached:
+                    raise RuntimeError("AI(Bedrock) 호출에 실패했습니다. 잠시 후 다시 시도하세요.") from e
+                job["result"] = {**cached, "answer": cached.get("answer", "") +
+                                 f"\n\n> 지금은 AI 연결이 불안정해서 {cached['cached_at'][:16].replace('T', ' ')}에 같은 질문으로 받은 답을 보여드립니다."}
         elif job["kind"] == "extract":
             import base64
 

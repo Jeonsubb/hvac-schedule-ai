@@ -63,21 +63,30 @@ def actual_occupancy(sessions_by_room: dict, scenario: dict) -> dict:
     return occ
 
 
-def ai_field_controls(plans: dict, scenario: dict, settings: dict):
-    """Turn the scenario into forced commands for the operated (AI) system:
-    vacancy detected 10 min after people leave -> off; override auto-off; failure retry."""
+def ai_field_controls(plans: dict, scenario: dict, settings: dict, sessions_by_room: dict | None = None,
+                      vacancy: bool = True):
+    """Turn the scenario into forced commands for the operated system:
+    vacancy (occupancy sensor) 10 min after people leave -> off, but resume early enough to
+    pre-condition the room's next class; override auto-off; command failure retry."""
     anomalies, causes = {}, {}
+    resume_lead = settings.get("vacancy_resume_lead_min", 30)
     for r, evs in scenario.items():
         lst, cs = [], []
         ivs = plans.get(r, [])
+        starts = sorted(hm_to_min(s["start"]) for s in (sessions_by_room or {}).get(r, []))
         for ev in evs:
             if ev["type"] in ("no_show", "early_dismiss"):
+                if not vacancy:
+                    continue
                 t0 = ev["s"] + 10
                 covered = [iv for iv in ivs if iv["s"] < ev["e"] and iv["e"] > t0]
                 if covered:
-                    end = max(iv["e"] for iv in covered)
+                    end = min(max(iv["e"] for iv in covered), ev["e"])
+                    nxt = next((x for x in starts if x >= ev["e"]), None)
+                    if nxt is not None and nxt - end < resume_lead:
+                        end = min(end, nxt - resume_lead)  # keep the next class's pre-heat
                     if end > t0:
-                        lst.append({"type": "forced_off", "s": t0, "e": min(end, ev["e"])})
+                        lst.append({"type": "forced_off", "s": t0, "e": end})
                         label = "재실 없음 10분 감지 → 자동 정지" if ev["type"] == "no_show" else "조기 종료 감지 → 자동 정지"
                         cs.append({"s": t0, "e": t0, "label": label, "on": False})
             elif ev["type"] == "override":
@@ -264,7 +273,8 @@ def compute_day(
 
     out = {"date": d.isoformat(), "weekday": d.weekday(), "workday": is_workday(d), "holiday": HOLIDAYS.get(d),
            "sessions": sessions, "weather": weather_day, "strategies": {}, "decisions": decisions,
-           "init": {r: [round(v[0], 2), round(v[1], 2)] for r, v in init.items()}, "scenario": scenario}
+           "init": {r: [round(v[0], 2), round(v[1], 2)] for r, v in init.items()}, "scenario": scenario,
+           "comfort_band": [settings["comfort_low"], settings["comfort_high"]]}
     season = season_of(d)
     rates = settings["tariff"][season]
     if not isinstance(rates, dict):
@@ -272,7 +282,8 @@ def compute_day(
     for st, plan in plans.items():
         anomalies, extra_causes = ({}, {})
         if st == "ai":
-            anomalies, extra_causes = ai_field_controls(plan, scenario, settings)
+            anomalies, extra_causes = ai_field_controls(plan, scenario, settings, by_room,
+                                                        vacancy=settings.get("ai_use_vacancy", True))
         sim = simulate_day(rooms, odus, plan, by_room, to_a, rh_a, ghi_a, init_states[st], settings,
                            anomalies=anomalies, clo=clo, detail=detail, occupancy=occ_actual,
                            guard=(st == "ai"), t_adj=adjacent_temp(sum(wa["t"]) / 24.0))
@@ -309,6 +320,18 @@ def warmup_dates(start: date, days: int = 7) -> list[date]:
     return [start - timedelta(days=k) for k in range(days, 0, -1)]
 
 
+def cold_starts(sim: dict, lo: float, hi: float) -> int:
+    """Occupied classes that began outside the comfort band (too cold or too hot at the start)."""
+    n = 0
+    for room in sim["rooms"].values():
+        for c in room["sessions"]:
+            if c.get("vacant") or c.get("ta_start") is None:
+                continue
+            if not (lo - 0.3 <= c["ta_start"] <= hi + 0.3):
+                n += 1
+    return n
+
+
 def summarize_day(day: dict) -> dict:
     """Compact per-day summary for calendar / energy charts."""
     out = {"date": day["date"], "weekday": day["weekday"], "workday": day["workday"], "holiday": day["holiday"],
@@ -316,8 +339,10 @@ def summarize_day(day: dict) -> dict:
            "t_mean": round(sum(day["weather"]["actual"]["t"]) / 24.0, 1),
            "t_min": min(day["weather"]["actual"]["t"]), "t_max": max(day["weather"]["actual"]["t"]),
            "strategies": {}}
+    lo, hi = day.get("comfort_band", [19.5, 26.5])
     for st, sim in day["strategies"].items():
         out["strategies"][st] = {
+            "cold_starts": cold_starts(sim, lo, hi),
             "kwh": sim["kwh"], "cost_krw": sim["cost_krw"], "co2_kg": sim["co2_kg"], "peak_kw": sim["peak_kw"],
             "comfort_pct": sim["comfort_pct"], "on_minutes": sum(x["on_minutes"] for x in sim["rooms"].values()),
             "odu_on_minutes": sum(x["on_minutes"] for x in sim["odus"].values()),

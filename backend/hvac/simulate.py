@@ -239,6 +239,9 @@ def session_comfort(sessions, ta5, tm5, rh_min, to_min, lo, hi, clo, occ=None) -
     for s in sessions:
         a, b = hm_to_min(s["start"]), hm_to_min(s["end"])
         idx = [k for k in range(a // 5, min(b // 5, len(ta5))) if occ is None or occ[min(k * 5 + 2, 1439)] > 0]
+        # include the temperature people walk into (the sample just before the start)
+        if idx and idx[0] == a // 5 and a // 5 - 1 >= 0:
+            idx = [a // 5 - 1] + idx
         if not idx:
             out.append({"id": s["id"], "start": s["start"], "end": s["end"], "minutes": 0, "in_band_minutes": 0,
                         "ta_start": ta5[max(a // 5 - 1, 0)], "ta_min": None, "ta_max": None,

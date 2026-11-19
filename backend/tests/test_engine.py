@@ -139,3 +139,33 @@ def test_history_has_on_off_pairs(courses):
         states = [h["state"] for h in day["history"] if h["device"] == dev]
         assert states[0] in ("ON", "FAN")
         assert states[-1] == "OFF"
+
+
+# ---------------------------------------------------------------- product-review regressions
+
+def test_vacancy_stop_keeps_next_class_preheat(courses):
+    from hvac.engine import ai_field_controls
+
+    plans = {"306": [{"s": 13 * 60 + 20, "e": 18 * 60, "kind": "cond", "sessions": ["a", "b"]}]}
+    sessions = {"306": [_s("306", "13:30", "15:00", "a"), _s("306", "15:00", "16:30", "b")]}
+    scenario = {"306": [{"type": "no_show", "session": "a", "s": 13 * 60 + 30, "e": 15 * 60}]}
+    st = config.default_settings()
+    anomalies, _ = ai_field_controls(plans, scenario, st, sessions)
+    off = anomalies["306"][0]
+    assert off["s"] == 13 * 60 + 40
+    assert off["e"] <= 15 * 60 - st.get("vacancy_resume_lead_min", 30)  # unit back on before class b
+
+
+def test_attribution_variants_and_waterfall(courses):
+    from hvac import attribution
+
+    st = config.default_settings()
+    d = date(2026, 12, 9)
+    day = attribution.variants_day(d, courses, [], weather_for(d, 1.0), st)
+    assert set(day["variants"]) == set(attribution.VARIANTS)
+    v = day["variants"]
+    assert v["fixed"]["kwh"] > v["rule"]["kwh"]
+    assert v["ai"]["cold_starts"] <= v["rule"]["cold_starts"]
+    agg = attribution.aggregate([day])
+    assert [w["variant"] for w in agg["waterfall"]] == ["fixed", "rule", "ai_predictive", "ai_weather", "ai"]
+    assert abs(sum(w["delta_kwh"] or 0 for w in agg["waterfall"]) - (v["ai"]["kwh"] - v["fixed"]["kwh"])) < 0.5

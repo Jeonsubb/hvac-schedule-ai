@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v11"
+ENGINE_VERSION = "v12"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST
@@ -315,6 +315,67 @@ def add_event(ev: dict, actor: str = "운영자") -> dict:
     return {"event": ev, "before": before, "after": after}
 
 
+def check_event(ev: dict) -> dict:
+    """Deterministic conflict check for a draft event: double booking and capacity, plus
+    alternative rooms ranked by the extra electricity the AI operation would need that day."""
+    from .validation import event as validate_event
+
+    ev = validate_event(ev, {c["id"] for c in courses()})
+    ctx = Ctx()
+    d = date.fromisoformat(ev["date"])
+    sessions = timetable.sessions_for_date(d, ctx.courses, ctx.events)
+    out = {"event": ev, "conflicts": [], "capacity_ok": True, "alternatives": [], "ok": True}
+    if ev["type"] not in ("add", "move"):
+        return out
+    if ev["type"] == "add":
+        room, s0, e0 = ev["room"], hm_to_min(ev["start"]), hm_to_min(ev["end"])
+        people = ev.get("expected_people") or timetable.estimate_people(room, "")
+        title = ev.get("title", "이벤트")
+    else:
+        course = next(c for c in ctx.courses if c["id"] == ev["course_id"])
+        room = ev["new_room"]
+        s0 = hm_to_min(ev.get("new_start") or course["start"])
+        e0 = hm_to_min(ev.get("new_end") or course["end"])
+        people, title = course["expected_people"], course["class_name"]
+
+    def busy(r: str) -> list[dict]:
+        return [s for s in sessions if s["room"] == r and s.get("course_id") != ev.get("course_id")
+                and hm_to_min(s["start"]) < e0 and s0 < hm_to_min(s["end"])]
+
+    out["conflicts"] = [{"room": room, "title": s["title"], "start": s["start"], "end": s["end"], "kind": s["kind"]}
+                        for s in busy(room)]
+    cap = config.ROOMS[room]["capacity"]
+    out["capacity_ok"] = people <= cap
+    out["capacity"] = {"room": room, "capacity": cap, "expected_people": people}
+    out["ok"] = not out["conflicts"] and out["capacity_ok"]
+
+    base = engine.compute_day(d, ctx.courses, ctx.events, ctx.wx, ctx.settings, detail=False, strategies=("ai",))
+    base_kwh = base["strategies"]["ai"]["kwh"]
+    odu_busy = {o: any(iv["s"] < e0 and iv["e"] > s0 for iv in v["actual"]) for o, v in base["strategies"]["ai"]["odus"].items()}
+    candidates = [r for r, info in config.ROOMS.items() if info["capacity"] >= people and not busy(r)]
+    if not candidates:
+        biggest = max(i["capacity"] for i in config.ROOMS.values())
+        out["note"] = (f"{people}명을 수용할 수 있는 빈 강의실이 없습니다(IT관 최대 정원 {biggest}명). "
+                       "분반하거나 다른 건물 강의실을 확인하세요.")
+    alts = []
+    for r in candidates:
+        trial = {"id": "CHECK", "type": "add", "date": ev["date"], "room": r, "start": timetable.min_to_hm(s0),
+                 "end": timetable.min_to_hm(e0), "title": title, "expected_people": people}
+        extra_events = list(ctx.events)
+        if ev["type"] == "move":
+            extra_events.append({"id": "CHECK-C", "type": "cancel", "date": ev["date"], "course_id": ev["course_id"]})
+        day = engine.compute_day(d, ctx.courses, extra_events + [trial], ctx.wx, ctx.settings, detail=False, strategies=("ai",))
+        alts.append({"room": r, "type": config.ROOMS[r]["type_label"], "capacity": config.ROOMS[r]["capacity"],
+                     "odu": config.ROOMS[r]["odu"], "odu_already_on": odu_busy.get(config.ROOMS[r]["odu"], False),
+                     "extra_kwh": round(day["strategies"]["ai"]["kwh"] - base_kwh, 2),
+                     "requested": r == room})
+    alts.sort(key=lambda a: (a["extra_kwh"], not a["odu_already_on"]))
+    out["alternatives"] = alts[:4]
+    out["alternatives_note"] = ("추가 전력은 그날 AI 운전을 다시 시뮬레이션한 차이입니다. "
+                                "음수는 재실자 발열로 난방이 줄거나 이미 가동 중인 실외기를 함께 쓰는 경우입니다.")
+    return out
+
+
 def delete_event(event_id: str, actor: str = "운영자") -> dict:
     ev = get_store().get_item("event", event_id)
     if not ev:
@@ -386,13 +447,15 @@ def what_if(overrides: dict, dates: list[date]) -> dict:
             day = engine.compute_day(d, ctx.courses, ctx.events, ctx.wx, s, detail=False)
             sm = engine.summarize_day(day)
             for stg, v in sm["strategies"].items():
-                t = tot.setdefault(stg, {"kwh": 0.0, "discomfort_dm": 0.0, "comfort_num": 0.0, "n": 0})
+                t = tot.setdefault(stg, {"kwh": 0.0, "discomfort_dm": 0.0, "comfort_num": 0.0, "n": 0, "cold_starts": 0})
                 t["kwh"] += v["kwh"]
                 t["discomfort_dm"] += v["discomfort_dm"]
+                t["cold_starts"] += v.get("cold_starts", 0)
                 if v["comfort_pct"] is not None:
                     t["comfort_num"] += v["comfort_pct"]
                     t["n"] += 1
         res[label] = {k: {"kwh": round(v["kwh"], 1), "discomfort_dm": round(v["discomfort_dm"], 1),
+                          "cold_starts": v["cold_starts"],
                           "comfort_pct": round(v["comfort_num"] / v["n"], 2) if v["n"] else None} for k, v in tot.items()}
     return res
 
@@ -413,9 +476,50 @@ def plan_csv(d: date, strategy: str = "ai") -> str:
     return buf.getvalue()
 
 
-def consolidation(weekday: int | None = None) -> dict:
-    ctx = Ctx()
-    return recommend(ctx.courses, ctx.events, ctx.wx, ctx.settings, weekday=weekday)
+def _inputs_key(ctx: Ctx) -> str:
+    s, e = semester_range()
+    dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
+    return _h([day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
+
+
+def consolidation(weekday: int | None = None, ctx: Ctx | None = None) -> dict:
+    """Cached per input fingerprint (re-simulates every semester date of each weekday)."""
+    ctx = ctx or Ctx()
+    if weekday is not None:
+        return recommend(ctx.courses, ctx.events, ctx.wx, ctx.settings, weekday=weekday)
+    key = f"analysis/consolidation-{_inputs_key(ctx)}.json"
+    res = get_store().get_blob(key)
+    if res is None:
+        res = recommend(ctx.courses, ctx.events, ctx.wx, ctx.settings)
+        get_store().put_blob(key, res)
+        get_store().put_blob("analysis/consolidation-latest.json", res)
+    return res
+
+
+def attribution(ctx: Ctx | None = None, allow_stale: bool = False) -> dict | None:
+    """Savings attribution + equal-comfort comparison over the whole semester (ablation runs)."""
+    from hvac import attribution as attr
+
+    ctx = ctx or Ctx()
+    key = f"analysis/attribution-{_inputs_key(ctx)}.json"
+    res = get_store().get_blob(key)
+    if res is not None:
+        return res
+    if allow_stale:
+        latest = get_store().get_blob("analysis/attribution-latest.json")
+        _queue_precompute()
+        return {**latest, "stale": True} if latest else None
+    s, e = semester_range()
+    dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
+    days = [attr.variants_day(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates]
+    today = now_kst().date().isoformat()
+    res = {"all": attr.aggregate(days), "to_date": attr.aggregate([x for x in days if x["date"] <= today]),
+           "days": days, "labels": attr.LABELS, "computed_at": now_kst().isoformat(timespec="seconds"),
+           "note": "같은 날씨·같은 현장 상황·같은 시작 상태로 기능을 하나씩 켜서 다시 시뮬레이션한 결과입니다. "
+                   "재실 감지는 강의실 재실 센서(PIR·CO₂) 또는 출결 시스템 연동을 가정합니다."}
+    get_store().put_blob(key, res)
+    get_store().put_blob("analysis/attribution-latest.json", res)
+    return res
 
 
 def live_snapshot(ctx: Ctx, at: str | None = None) -> dict:
@@ -448,5 +552,8 @@ def precompute(log=print) -> dict:
     t = time.time()
     ctx = Ctx()
     sm = semester_summary(ctx)
-    log(f"precompute done in {time.time() - t:.1f}s, days={len(sm['days'])}")
+    t1 = time.time()
+    consolidation(ctx=ctx)
+    attribution(ctx)
+    log(f"precompute done in {time.time() - t:.1f}s (summary {t1 - t:.1f}s), days={len(sm['days'])}")
     return {"seconds": round(time.time() - t, 1), "days": len(sm["days"])}

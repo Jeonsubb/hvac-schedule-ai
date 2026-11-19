@@ -4,6 +4,7 @@
 #   AWS_PROFILE=hvac ./infra/ec2-deploy.sh deploy       # code + deps + services + caddy
 #   AWS_PROFILE=hvac ./infra/ec2-deploy.sh sync-login   # after `aws login --profile hvac` on this Mac
 #   ./infra/ec2-deploy.sh status
+#   ./infra/ec2-deploy.sh demo-reset                    # remove all events, restore default rules
 #
 # The EC2 host has no IAM role (the deployer cannot create roles), so it uses the operator's
 # `aws login` session (max 12 h). When the session expires the API keeps serving from its local
@@ -34,6 +35,10 @@ deploy() {
   acc="$(aws sts get-caller-identity --query Account --output text)"
   secret="$(aws ssm get-parameter --name /hvac-ai/origin-secret --with-decryption --query Parameter.Value --output text)"
   kma="$(aws ssm get-parameter --name /hvac-ai/kma-key --with-decryption --query Parameter.Value --output text)"
+  aws ssm get-parameter --name /hvac-ai/operator-key >/dev/null 2>&1 || aws ssm put-parameter --name /hvac-ai/operator-key \
+    --type SecureString --value "$(openssl rand -hex 16)" --tags Key=project,Value=hvac-ai >/dev/null
+  local opkey
+  opkey="$(aws ssm get-parameter --name /hvac-ai/operator-key --with-decryption --query Parameter.Value --output text)"
 
   rsync -az --delete -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
     --exclude '__pycache__' --exclude '.venv' --exclude 'tests' \
@@ -48,6 +53,7 @@ TABLE_NAME=hvac-ai-data
 LOCAL_MIRROR=/var/lib/hvac/mirror
 ORIGIN_SECRET=${secret}
 KMA_KEY=${kma}
+OPERATOR_KEY=${opkey}
 AWS_PROFILE=hvac
 AWS_REGION=${AWS_REGION}
 BEDROCK_REGION=${AWS_REGION}
@@ -111,6 +117,10 @@ EOF
   echo "api host: $DOMAIN"
 }
 
+demo_reset() {
+  "${SSH[@]}" 'set -a; . /opt/hvac/env; set +a; curl -s -X POST -H "x-origin-secret: $ORIGIN_SECRET" -H "x-operator-key: $OPERATOR_KEY" http://127.0.0.1:8000/api/admin/reset; echo'
+}
+
 status() {
   "${SSH[@]}" "systemctl is-active hvac-api caddy hvac-refresh.timer; curl -s -m 5 http://127.0.0.1:8000/api/health; echo; tail -n 5 /var/log/messages 2>/dev/null | cut -c1-160 || true"
 }
@@ -119,5 +129,6 @@ case "${1:-deploy}" in
   deploy) deploy ;;
   sync-login) sync_login ;;
   status) status ;;
-  *) echo "usage: $0 deploy|sync-login|status" >&2; exit 1 ;;
+  demo-reset) demo_reset ;;
+  *) echo "usage: $0 deploy|sync-login|status|demo-reset" >&2; exit 1 ;;
 esac
