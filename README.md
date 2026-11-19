@@ -36,15 +36,19 @@ _2026-11-20T02:17+09:00 기준 배포 API에서 자동 생성 (엔진 v12)._
 
 ## 구성
 
+현재 운영 구성입니다. 배포 사용자에게 IAM 역할 생성 권한이 없어서 API만 EC2에서 실행합니다([이슈 #1](https://github.com/Jeonsubb/hvac-schedule-ai/issues/1)).
+
 ```
 브라우저 ─▶ CloudFront ─┬─ /*      ─▶ S3 (React 정적 파일, OAC)
-                        └─ /api/*  ─▶ Lambda Function URL (FastAPI, Python 3.13 arm64)
+                        └─ /api/*  ─▶ EC2 t4g.small (Caddy HTTPS → FastAPI, 비밀 헤더 검사)
                                          ├─ DynamoDB (강의·이벤트·설정·변경기록·작업)
-                                         ├─ S3 (날짜별 계산 결과, 날씨 캐시)
+                                         ├─ S3 (날짜별 계산 결과, 날씨 캐시)  + 로컬 미러(ResilientStore)
                                          ├─ Amazon Bedrock (Claude Sonnet 5.5 / Haiku 5.5)
                                          └─ 기상청 API(공공데이터포털), Open-Meteo
-EventBridge Scheduler (매시 20분) ─▶ 날씨 수집 → 예보 스냅숏 저장 → 바뀐 날짜만 재계산
+EC2 systemd 타이머 (매시 20분) ─▶ 날씨 수집 → 예보 스냅숏 저장 → 바뀐 날짜만 재계산
 ```
+
+목표 구성(`infra/template.yaml`의 `ApiMode=lambda`)은 API를 Lambda Function URL로, 매시 작업을 EventBridge Scheduler로 옮깁니다. 관리자가 `infra/admin-setup.sh`를 한 번 실행하면 `./infra/deploy.sh lambda`로 전환합니다.
 
 | 경로 | 내용 |
 |---|---|
