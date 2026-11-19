@@ -103,11 +103,11 @@ export default function Gantt({
     return (
       <div className="max-w-[300px]">
         <div className="flex items-center gap-1.5 font-semibold text-ink">
-          {s.kind === 'event' && <span className="rounded bg-[#efedfb] px-1 text-[10.5px] text-[#4a3aa7]">이벤트</span>}
+          {s.kind === 'event' && <span className="rounded-[4px] bg-event-bg px-1 text-[11px] text-event-ink">이벤트</span>}
           {s.title}
         </div>
         <div className="mt-0.5 text-ink-2">
-          {s.start}–{s.end} · {s.room}호{s.professor ? ` · ${s.professor}` : ''}
+          {s.start}–{s.end}, {s.room}호{s.professor ? `, ${s.professor}` : ''}
         </div>
         <div className="text-ink-2">
           예상 인원 {s.expected_people ?? '–'}명{s.people_estimated ? ' (추정)' : ''}
@@ -117,12 +117,12 @@ export default function Gantt({
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-2 w-2 rounded-full" style={{ background: GROUP_META[info.group].color }} />
               <b>{info.label}</b>
-              {v.comfort_pct != null && <span className="text-ink-3">· 쾌적 {v.comfort_pct.toFixed(0)}%</span>}
+              {v.comfort_pct != null && <span className="text-ink-3">쾌적 {v.comfort_pct.toFixed(0)}%</span>}
             </div>
             {v.ta_start != null && <div className="text-ink-3">시작 시 실내 {v.ta_start.toFixed(1)}℃</div>}
             {v.notes.map((n, i) => (
               <div key={i} className="text-ink-2">
-                · {n}
+                {n}
               </div>
             ))}
           </div>
@@ -142,7 +142,7 @@ export default function Gantt({
           {hours.map((h) => (
             <div
               key={h}
-              className="tnum absolute top-0 -translate-x-1/2 text-[10.5px] text-ink-3"
+              className="tnum absolute top-0 -translate-x-1/2 text-[11px] text-ink-3"
               style={{ left: `${pct(h * 60, r0, r1)}%` }}
             >
               {compact && h % 2 === 1 ? '' : `${String(h).padStart(2, '0')}시`}
@@ -155,12 +155,12 @@ export default function Gantt({
         {/* gridlines + now line overlay */}
         <div className="pointer-events-none absolute inset-y-0 right-0" style={{ left: labelW }}>
           {hours.map((h) => (
-            <div key={h} className="absolute inset-y-0 w-px bg-[#efeee9]" style={{ left: `${pct(h * 60, r0, r1)}%` }} />
+            <div key={h} className="absolute inset-y-0 w-px bg-[#edf0f4]" style={{ left: `${pct(h * 60, r0, r1)}%` }} />
           ))}
           {nowIn && (
             <div className="absolute inset-y-0 z-10" style={{ left: `${pct(nowMinute!, r0, r1)}%` }}>
-              <div className="absolute inset-y-0 -ml-px w-[2px] bg-ink/80" />
-              <div className="tnum absolute -bottom-[17px] -translate-x-1/2 rounded bg-ink px-1.5 py-[1px] text-[10px] font-semibold whitespace-nowrap text-white">
+              <div className="absolute inset-y-0 -ml-px w-[2px] bg-ink" />
+              <div className="tnum absolute -bottom-[18px] -translate-x-1/2 rounded-[4px] bg-ink px-1.5 py-[1px] text-[11px] font-semibold whitespace-nowrap text-white">
                 현재 {fmtMin(nowMinute!)}
               </div>
             </div>
@@ -181,8 +181,8 @@ export default function Gantt({
               key={room}
               className={cx(
                 'group flex border-t',
-                floorBreak ? 'border-[#d6d5ce]' : 'border-[#efeee9]',
-                sel ? 'bg-brand-50/60' : onRoomClick && 'hover:bg-[#fafaf8]',
+                floorBreak ? 'border-line-strong' : 'border-line',
+                sel ? 'bg-[#eaf0fb]' : onRoomClick && 'hover:bg-well',
               )}
               style={{ height: rowH }}
             >
@@ -195,14 +195,12 @@ export default function Gantt({
               >
                 <div className="flex items-baseline gap-1.5">
                   <span className={cx('font-bold text-ink', compact ? 'text-[12.5px]' : 'text-[13.5px]')}>{room}</span>
-                  {!compact && <span className="truncate text-[11px] text-ink-3">{rm.type_label}</span>}
+                  {!compact && <span className="truncate text-[12px] text-ink-3">{rm.type_label}</span>}
                 </div>
                 {!compact && (
-                  <div className="tnum mt-0.5 flex items-center gap-1 text-[11px] text-ink-3">
+                  <div className="tnum mt-0.5 flex items-center gap-1.5 text-[12px] whitespace-nowrap text-ink-3" title={`${rm.odu} 연결`}>
                     <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: STRATEGY[primary].color }} />
                     {fmtKwh(sp?.rooms?.[room]?.kwh ?? 0)} kWh
-                    <span className="text-[#c3c2b7]">·</span>
-                    {rm.odu.replace('ODU-', '')}
                   </div>
                 )}
               </button>
@@ -221,7 +219,7 @@ export default function Gantt({
                       key={s.id}
                       className={cx(
                         'absolute flex items-center overflow-hidden rounded-[4px] border-l-[3px] pr-1 pl-1.5',
-                        isEv ? 'border-event bg-[#efedfb]' : 'border-[#334155] bg-[#eceef2]',
+                        isEv ? 'border-event bg-event-bg' : 'border-ink bg-[#e8ecf2]',
                       )}
                       style={{
                         left: `${pct(a, r0, r1)}%`,
@@ -232,16 +230,16 @@ export default function Gantt({
                       onMouseMove={(e) => show(e, sessionTip(s))}
                       onMouseLeave={hide}
                     >
-                      <span className={cx('truncate font-medium text-ink', compact ? 'text-[10.5px]' : 'text-[11.5px]')}>
+                      <span className={cx('truncate font-medium text-ink', compact ? 'text-[11px]' : 'text-[12px]')}>
                         {s.title}
                         {!compact && <span className="ml-1 font-normal text-ink-3">{s.start}</span>}
                       </span>
                       {g !== 'normal' && (
                         <span className="ml-auto shrink-0 pl-0.5">
                           {g === 'auto' ? (
-                            <Wrench size={compact ? 9 : 11} color="#c98500" strokeWidth={2.6} />
+                            <Wrench size={compact ? 10 : 11} color="#c98500" strokeWidth={2.6} />
                           ) : (
-                            <AlertTriangle size={compact ? 9 : 11} color={GROUP_META.review.color} strokeWidth={2.6} />
+                            <AlertTriangle size={compact ? 10 : 11} color={GROUP_META.review.color} strokeWidth={2.6} />
                           )}
                         </span>
                       )}
@@ -270,7 +268,7 @@ export default function Gantt({
                             e,
                             <div>
                               <div className="font-semibold">
-                                {STRATEGY[primary].label} 계획 · {p.kind === 'fan' ? '송풍(외기 냉방)' : '냉난방'}
+                                {STRATEGY[primary].label} 계획: {p.kind === 'fan' ? '송풍(외기 냉방)' : '냉난방'}
                               </div>
                               <div className="tnum text-ink-2">
                                 {fmtMin(p.s)}–{fmtMin(p.e)} ({fmtDuration(p.e - p.s)})
@@ -305,7 +303,7 @@ export default function Gantt({
                           e,
                           <div>
                             <div className="font-semibold">
-                              {STRATEGY[primary].label} 실행 · {fan ? '송풍' : '냉난방'}
+                              {STRATEGY[primary].label} 실제 가동: {fan ? '송풍' : '냉난방'}
                             </div>
                             <div className="tnum text-ink-2">
                               {fmtMin(a.s)}–{fmtMin(a.e)} ({fmtDuration(a.e - a.s)})
@@ -340,7 +338,7 @@ export default function Gantt({
                             e,
                             <div>
                               <div className="font-semibold">
-                                {STRATEGY[overlay].label} 실행 · {a.kind === 'fan' ? '송풍' : '냉난방'}
+                                {STRATEGY[overlay].label} 실제 가동: {a.kind === 'fan' ? '송풍' : '냉난방'}
                               </div>
                               <div className="tnum text-ink-2">
                                 {fmtMin(a.s)}–{fmtMin(a.e)} ({fmtDuration(a.e - a.s)})
@@ -361,7 +359,7 @@ export default function Gantt({
                     return (
                       <div
                         key={`d${i}`}
-                        className="absolute z-[5] flex h-[18px] w-[18px] -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-ink text-white shadow-sm"
+                        className="absolute z-[5] flex h-[18px] w-[18px] -translate-x-1/2 items-center justify-center rounded-full border-2 border-white bg-ink text-white"
                         style={{ left: `${pct(m, r0, r1)}%`, top: 35 }}
                         onMouseMove={(e) =>
                           show(
@@ -369,7 +367,7 @@ export default function Gantt({
                             <div className="max-w-[280px]">
                               <div className="flex items-center gap-1.5 font-semibold">
                                 <DecisionIcon type={d.type} />
-                                AI 판단 · {DECISION[d.type]?.label ?? d.type}
+                                AI 판단: {DECISION[d.type]?.label ?? d.type}
                               </div>
                               <div className="text-ink-2">
                                 {d.title} ({d.start}–{d.end})
@@ -397,7 +395,7 @@ export default function Gantt({
 
       {tip && (
         <div
-          className="pointer-events-none fixed z-[70] rounded-lg border border-[rgba(11,11,11,0.1)] bg-white px-3 py-2 text-[12px] shadow-lg"
+          className="pointer-events-none fixed z-[70] rounded-[8px] border border-line bg-surface px-3 py-2 text-[12.5px] leading-relaxed shadow-[var(--shadow-float)]"
           style={{
             left: Math.min(tip.x + 14, window.innerWidth - 320),
             top: tip.y + 16 + 160 > window.innerHeight ? tip.y - 12 : tip.y + 16,
@@ -413,13 +411,13 @@ export default function Gantt({
 
 export function GanttLegend({ primary, overlay, compact = false }: { primary: StrategyKey; overlay?: StrategyKey | null; compact?: boolean }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-ink-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-ink-2" aria-label="타임라인 범례">
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3 w-5 rounded-[3px] border-l-[3px] border-[#334155] bg-[#eceef2]" />
+        <span className="inline-block h-3 w-5 rounded-[3px] border-l-[3px] border-ink bg-[#e8ecf2]" />
         강의
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-3 w-5 rounded-[3px] border-l-[3px] border-event bg-[#efedfb]" />
+        <span className="inline-block h-3 w-5 rounded-[3px] border-l-[3px] border-event bg-event-bg" />
         이벤트
       </span>
       {!compact && (
@@ -433,7 +431,7 @@ export function GanttLegend({ primary, overlay, compact = false }: { primary: St
       )}
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2 w-5 rounded-[2px]" style={{ background: STRATEGY[primary].color }} />
-        {STRATEGY[primary].short} 실행(냉난방)
+        {STRATEGY[primary].short} 실제 가동(냉난방)
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2 w-5 rounded-[2px]" style={{ background: STRATEGY[primary].color, opacity: 0.4 }} />

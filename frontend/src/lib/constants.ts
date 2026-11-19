@@ -1,4 +1,4 @@
-import type { StrategyKey } from './types'
+import type { DaySummary, StrategyKey } from './types'
 
 export const STRATEGY_KEYS: StrategyKey[] = ['fixed', 'manual', 'rule', 'ai']
 
@@ -6,15 +6,15 @@ export const STRATEGY: Record<StrategyKey, { label: string; short: string; color
   fixed: {
     label: '고정 스케줄',
     short: '고정',
-    color: '#52514e',
-    wash: 'rgba(82,81,78,0.14)',
+    color: '#565a60',
+    wash: 'rgba(86,90,96,0.14)',
     desc: '평일 전 강의실 08:30–22:30 가동',
   },
   manual: {
     label: '수동 운영',
     short: '수동',
-    color: '#eda100',
-    wash: 'rgba(237,161,0,0.16)',
+    color: '#e09a00',
+    wash: 'rgba(224,154,0,0.16)',
     desc: '첫 강의에 켜고 마지막 강의 30분 뒤 끔',
   },
   rule: {
@@ -22,27 +22,29 @@ export const STRATEGY: Record<StrategyKey, { label: string; short: string; color
     short: '규칙',
     color: '#2a78d6',
     wash: 'rgba(42,120,214,0.14)',
-    desc: '시작 10분 전 On · 종료 5분 전 Off · 15분 이내 공백 유지',
+    desc: '시작 10분 전 켜고 종료 5분 전 끔, 15분 이내 공백은 유지',
   },
   ai: {
     label: 'AI 예측 제어',
     short: 'AI',
-    color: '#1baf7a',
-    wash: 'rgba(27,175,122,0.16)',
-    desc: '열모델+예보: 최적 기동·생략·외기냉방·관성정지·재실감지·피드백 보정',
+    color: '#14a673',
+    wash: 'rgba(20,166,115,0.15)',
+    desc: '열모델과 예보로 최적 기동, 가동 생략, 외기 냉방, 관성 정지, 재실 감지, 피드백 보정',
   },
 }
 
 export const CHART = {
-  ink: '#0b0b0b',
-  ink2: '#52514e',
-  muted: '#898781',
-  grid: '#e1e0d9',
-  axis: '#c3c2b7',
-  surface: '#fcfcfb',
-  outdoor: '#898781',
-  comfortBand: 'rgba(27,175,122,0.08)',
+  ink: '#142033',
+  ink2: '#4a5668',
+  muted: '#667183',
+  grid: '#e6eaef',
+  axis: '#c9d1db',
+  surface: '#ffffff',
+  outdoor: '#8a94a3',
+  comfortBand: 'rgba(20,32,51,0.05)',
+  comfortInk: '#4a5668',
   event: '#6250d6',
+  lecture: '#334155',
 }
 
 export const STATUS_COLOR = {
@@ -71,10 +73,10 @@ export function statusInfo(s: string): { label: string; group: StatusGroup } {
   return VALIDATION_STATUS[s] ?? { label: s, group: 'review' }
 }
 
-export const GROUP_META: Record<StatusGroup, { label: string; color: string; ink: string; bg: string }> = {
-  normal: { label: '정상', color: STATUS_COLOR.good, ink: '#006300', bg: '#ecf8ec' },
-  auto: { label: '자동 조치', color: STATUS_COLOR.warn, ink: '#7a5000', bg: '#fff6e0' },
-  review: { label: '확인 필요', color: STATUS_COLOR.crit, ink: '#a12a2a', bg: '#fdeeee' },
+export const GROUP_META: Record<StatusGroup, { label: string; color: string; ink: string; bg: string; icon: string }> = {
+  normal: { label: '정상', color: STATUS_COLOR.good, ink: '#0a6b0a', bg: '#eaf6ea', icon: '#0ca30c' },
+  auto: { label: '자동 조치', color: STATUS_COLOR.warn, ink: '#8a5a00', bg: '#fff4dc', icon: '#c98500' },
+  review: { label: '확인 필요', color: STATUS_COLOR.crit, ink: '#a12a2a', bg: '#fdeeee', icon: '#d03b3b' },
 }
 
 export const DECISION: Record<string, { label: string; desc: string; at: 'start' | 'end' }> = {
@@ -129,4 +131,23 @@ export const SETTING_LABEL: Record<string, string> = {
   fixed_off: '고정 스케줄 종료',
   manual_off_delay_min: '수동 운영 정지 지연(분)',
   auto_off_after_min: '빈 강의실 자동 정지(분)',
+}
+
+/** Per-day counts: the API now returns them; older responses only had match_rate + anomalies. */
+export function splitCounts(d: DaySummary): { review: number; auto: number } {
+  if (d.needs_review != null && d.auto_actions != null) return { review: d.needs_review, auto: d.auto_actions }
+  const review = d.match_rate != null && d.match_rate < 100 ? Math.round(d.sessions * (1 - d.match_rate / 100)) : 0
+  return { review, auto: Math.max(0, d.anomalies - review) }
+}
+
+/** cold_starts in the API counts classes that began too cold OR too hot, so the Korean label avoids "저온". */
+export const COLD_START = {
+  label: '시작 시 쾌적 이탈',
+  short: '시작 이탈',
+  desc: '강의가 시작될 때 실내온도가 쾌적 범위(±0.3℃)를 벗어나 있던 횟수입니다. 너무 춥거나 더운 교실에서 수업이 시작된 경우를 셉니다.',
+}
+
+/** Sum a per-day strategy field over the days of a scope (summary totals omit cold_starts). */
+export function sumDays(days: DaySummary[], k: StrategyKey, field: 'cold_starts', until?: string): number {
+  return days.filter((d) => !until || d.date <= until).reduce((a, d) => a + (d.strategies[k]?.[field] ?? 0), 0)
 }

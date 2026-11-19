@@ -1,13 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { CopilotProvider, MetaProvider } from './lib/context'
-import Overview from './pages/Overview'
-import Schedule from './pages/Schedule'
-import Validation from './pages/Validation'
-import Energy from './pages/Energy'
-import DataPage from './pages/Data'
-import SettingsPage from './pages/Settings'
-import NotFound from './pages/NotFound'
+import { PageSkeleton } from './components/ui'
+
+const Overview = lazy(() => import('./pages/Overview'))
+const Schedule = lazy(() => import('./pages/Schedule'))
+const Validation = lazy(() => import('./pages/Validation'))
+const Energy = lazy(() => import('./pages/Energy'))
+const DataPage = lazy(() => import('./pages/Data'))
+const SettingsPage = lazy(() => import('./pages/Settings'))
+const NotFound = lazy(() => import('./pages/NotFound'))
+
+function page(el: React.ReactNode) {
+  return <Suspense fallback={<PageSkeleton label="화면을 불러오는 중…" />}>{el}</Suspense>
+}
 
 export default function App() {
   return (
@@ -15,13 +22,13 @@ export default function App() {
       <CopilotProvider>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<Overview />} />
-            <Route path="schedule" element={<Schedule />} />
-            <Route path="validation" element={<Validation />} />
-            <Route path="energy" element={<Energy />} />
-            <Route path="data" element={<DataPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
+            <Route index element={page(<Overview />)} />
+            <Route path="schedule" element={page(<Schedule />)} />
+            <Route path="validation" element={page(<Validation />)} />
+            <Route path="energy" element={page(<Energy />)} />
+            <Route path="data" element={page(<DataPage />)} />
+            <Route path="settings" element={page(<SettingsPage />)} />
+            <Route path="*" element={page(<NotFound />)} />
           </Route>
         </Routes>
       </CopilotProvider>

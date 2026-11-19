@@ -1,21 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ClipboardCheck, CalendarSearch, ListChecks, ArrowUpRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
-import type { Day, DaySummary, Summary } from '../lib/types'
-import { CHART, GROUP_META, ROOM_ORDER, STATUS_COLOR, decisionLabel, statusInfo, type StatusGroup } from '../lib/constants'
+import type { Day, Summary } from '../lib/types'
+import { CHART, GROUP_META, ROOM_ORDER, STATUS_COLOR, decisionLabel, splitCounts, statusInfo, type StatusGroup } from '../lib/constants'
 import { cx, fmtDateK, fmtDateShort, fmtNum, fmtPct } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
-import { Badge, Card, CardHeader, ChartCard, Empty, ErrorBox, GroupIcon, LegendItem, Loading, PageHeader, Segmented, StatTile, StatusBadge, inputBase } from '../components/ui'
+import { Badge, Card, CardHeader, ChartCard, Empty, ErrorBox, Facts, GroupIcon, IconButton, LegendItem, Loading, PageHeader, PageSkeleton, Segmented, StatStrip, StatTile, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
 import { DecisionIcon } from '../components/Gantt'
 import RoomDrawer from '../components/RoomDrawer'
 
-function splitCounts(d: DaySummary) {
-  const review = d.match_rate != null && d.match_rate < 100 ? Math.round(d.sessions * (1 - d.match_rate / 100)) : 0
-  const auto = Math.max(0, d.anomalies - review)
-  return { review, auto }
-}
 
 export default function Validation() {
   const { meta } = useMeta()
@@ -56,18 +51,18 @@ export default function Validation() {
       tooltip: {
         ...baseTooltip,
         trigger: 'axis',
-        axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(11,11,11,0.04)' } },
+        axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(20,32,51,0.05)' } },
         formatter: (ps: unknown) => {
           const arr = ps as { dataIndex: number }[]
           const d = past[arr[0].dataIndex]
           const c = splitCounts(d)
           return (
             ttTitle(fmtDateK(d.date)) +
-            ttRow('#0b0b0b', '정합성', fmtPct(d.match_rate), 'rect') +
+            ttRow(CHART.ink, '정합성', fmtPct(d.match_rate), 'rect') +
             ttRow(STATUS_COLOR.crit, '확인 필요', `${c.review}건`, 'rect') +
             ttRow(STATUS_COLOR.warn, '자동 조치', `${c.auto}건`, 'rect') +
-            ttRow('#c3c2b7', '검증 강의', `${d.sessions}건`, 'rect') +
-            '<div style="color:#898781;margin-top:4px">막대를 누르면 그날 상세</div>'
+            ttRow(CHART.axis, '검증 강의', `${d.sessions}건`, 'rect') +
+            '<div style="color:#667183;margin-top:4px">눌러서 그날 강의별 결과 보기</div>'
           )
         },
       },
@@ -77,7 +72,7 @@ export default function Validation() {
         ...axisCommon,
         axisLabel: { ...axisCommon.axisLabel, formatter: (v: string) => fmtDateShort(v) },
       },
-      yAxis: { type: 'value', minInterval: 1, name: '건', nameTextStyle: { color: CHART.muted, fontSize: 11 }, ...axisCommon, axisLine: { show: false } },
+      yAxis: { type: 'value', minInterval: 1, name: '건', ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 11 }, axisLine: { show: false } },
       series: [
         {
           name: '확인 필요',
@@ -85,6 +80,7 @@ export default function Validation() {
           stack: 'n',
           barMaxWidth: 14,
           itemStyle: { color: STATUS_COLOR.crit, borderColor: '#ffffff', borderWidth: 1 },
+          emphasis: { itemStyle: { color: '#b52e2e' } },
           data: past.map((d) => ({
             value: splitCounts(d).review,
             itemStyle: { opacity: d.date === date ? 1 : 0.85 },
@@ -95,7 +91,8 @@ export default function Validation() {
           type: 'bar',
           stack: 'n',
           barMaxWidth: 14,
-          itemStyle: { color: STATUS_COLOR.warn, borderRadius: [3, 3, 0, 0], borderColor: '#ffffff', borderWidth: 1 },
+          itemStyle: { color: STATUS_COLOR.warn, borderRadius: [4, 4, 0, 0], borderColor: '#ffffff', borderWidth: 1 },
+          emphasis: { itemStyle: { color: '#e09a00' } },
           data: past.map((d) => splitCounts(d).auto),
           markLine:
             date && cats.includes(date)
@@ -113,7 +110,7 @@ export default function Validation() {
   }, [past, date])
 
   if (summary.error) return <ErrorBox error={summary.error} onRetry={summary.reload} />
-  if (!summary.data || !meta || !date) return <Loading label="검증 결과를 불러오는 중…" />
+  if (!summary.data || !meta || !date) return <PageSkeleton label="학기 검증 결과를 불러오는 중…" />
 
   const setDate = (d: string) => {
     const p = new URLSearchParams(params)
@@ -134,45 +131,49 @@ export default function Validation() {
   const gcount = (g: StatusGroup) => (V?.sessions ?? []).filter((v) => statusInfo(v.status).group === g).length
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="정합성 검증"
-        desc="강의가 있는 시간에 냉난방이 계획대로 켜지고 꺼졌는지 매일 자동으로 확인합니다."
-      />
+    <div className="space-y-4">
+      <PageHeader title="정합성 검증" desc="강의가 있는 시간에 냉난방이 계획대로 켜지고 꺼졌는지 매일 자동으로 확인합니다." />
 
-      <div className="flex items-start gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[13px] text-ink-2">
-        <ClipboardCheck size={18} className="mt-0.5 shrink-0 text-brand" />
-        <p>
-          <b className="text-ink">검증 방법</b> — ① <b className="text-ink">계획 검증</b>: 모든 강의가 운전 계획에 들어 있는지(계획 반영률) ②{' '}
-          <b className="text-ink">실행 검증</b>: 강의 중 실내기가 실제로 가동됐고 시작 시점에 쾌적 범위({meta.settings.comfort_low}~{meta.settings.comfort_high}℃)였는지(실행률·시작 온도).
-          무단 휴강·명령 실패·수동 가동·예보 오차 같은 현장 이상은 시스템이 <b className="text-ink">자동 조치</b>하고 기록하며, 사람이 봐야 할 것만 <b className="text-ink">확인 필요</b>로 올립니다.
-        </p>
-      </div>
+      {/* the method is a real sequence: plan check, then execution check, then triage */}
+      <section className="overflow-hidden rounded-[10px] border border-line bg-line" aria-label="검증 방법">
+        <ol className="grid grid-cols-1 gap-px md:grid-cols-3">
+          {[
+            ['계획 검증', '모든 강의가 운전 계획에 들어 있는지 봅니다.', '계획 반영률'],
+            ['실행 검증', `강의 중 실내기가 실제로 가동했고, 시작 시점에 쾌적 범위(${meta.settings.comfort_low}–${meta.settings.comfort_high}℃)였는지 봅니다.`, '실행률, 시작 온도'],
+            ['이상 처리', '무단 휴강, 명령 실패, 수동 가동, 예보 오차는 시스템이 바로잡고 기록합니다. 사람이 봐야 할 것만 확인 필요로 올립니다.', '자동 조치, 확인 필요'],
+          ].map(([t, d, m], i) => (
+            <li key={t} className="flex gap-3 bg-surface px-5 py-4">
+              <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] font-semibold text-white" aria-hidden>
+                {i + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-semibold text-ink">{t}</div>
+                <p className="mt-0.5 text-[12.5px] leading-relaxed text-ink-2">{d}</p>
+                <div className="mt-1 text-[12px] text-ink-3">지표: {m}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="정합성 (일치율)" value={kpi.match != null ? kpi.match.toFixed(2) : '–'} unit="%" sub={`학기 시작 ~ 오늘 · ${kpi.days}일`} />
-        <StatTile label="계획 반영률" value={kpi.cov != null ? kpi.cov.toFixed(1) : '–'} unit="%" sub="강의 중 계획에서 빠진 비율 0%" />
-        <StatTile label="검증한 강의" value={fmtNum(kpi.sessions)} unit="건" sub="강의·이벤트 세션 단위" />
-        <StatTile
-          label="자동 조치"
-          icon={<GroupIcon group="auto" size={13} />}
-          value={fmtNum(kpi.auto)}
-          unit="건"
-          sub="재실 감지 정지·재전송·피드백 보정"
-        />
+      <StatStrip>
+        <StatTile label="정합성 (일치율)" value={kpi.match != null ? kpi.match.toFixed(2) : '–'} unit="%" sub={`학기 시작부터 오늘까지 강의일 ${kpi.days}일`} />
+        <StatTile label="계획 반영률" value={kpi.cov != null ? kpi.cov.toFixed(1) : '–'} unit="%" sub={kpi.cov != null ? `계획에서 빠진 강의 ${(100 - kpi.cov).toFixed(1)}%` : undefined} />
+        <StatTile label="검증한 강의" value={fmtNum(kpi.sessions)} unit="건" sub="강의와 이벤트를 회차별로 셈" />
+        <StatTile label="자동 조치" icon={<GroupIcon group="auto" size={13} />} value={fmtNum(kpi.auto)} unit="건" sub="재실 감지 정지, 명령 재전송, 예보 보정" />
         <StatTile
           label="확인 필요"
           icon={<GroupIcon group="review" size={13} />}
           value={fmtNum(kpi.review)}
           unit="건"
-          sub={kpi.sessions ? `전체의 ${((kpi.review / kpi.sessions) * 100).toFixed(2)}% · 주로 선행 가동 부족` : undefined}
+          sub={kpi.sessions ? `검증한 강의의 ${((kpi.review / kpi.sessions) * 100).toFixed(2)}%` : undefined}
         />
-      </div>
+      </StatStrip>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
         <ChartCard
-          title="일별 자동 조치 · 확인 필요 건수"
-          sub="학기 시작부터 오늘까지 강의일 · 막대를 누르면 아래에 그날의 강의별 검증 결과가 나옵니다"
+          title="일별 자동 조치와 확인 필요 건수"
+          sub="학기 시작부터 오늘까지의 강의일입니다. 막대를 누르면 아래에 그날의 강의별 결과가 나옵니다."
           legend={
             <>
               <LegendItem color={STATUS_COLOR.crit} label="확인 필요" />
@@ -199,7 +200,7 @@ export default function Validation() {
           />
         </ChartCard>
         <Card>
-          <CardHeader title="이상이 있었던 날" icon={<CalendarSearch size={15} />} sub={`${issueDays.length}일 · 최근 순`} />
+          <CardHeader title="이상이 있었던 날" sub={`${issueDays.length}일, 최근 날짜부터`} />
           <ul className="thin-scroll -mx-1 max-h-[268px] overflow-y-auto px-1">
             {issueDays.map((d) => {
               const c = splitCounts(d)
@@ -208,8 +209,8 @@ export default function Validation() {
                   <button
                     onClick={() => setDate(d.date)}
                     className={cx(
-                      'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[12.5px] hover:bg-[#f6f6f3]',
-                      d.date === date && 'bg-[#f0efec]',
+                      'flex w-full items-center justify-between rounded-[6px] px-2.5 py-1.5 text-left text-[13px] hover:bg-hover',
+                      d.date === date && 'bg-well ring-1 ring-line-strong ring-inset',
                     )}
                   >
                     <span className="font-medium text-ink">{fmtDateK(d.date)}</span>
@@ -230,53 +231,53 @@ export default function Validation() {
         <CardHeader
           title={
             <span className="flex flex-wrap items-center gap-2">
-              <ListChecks size={16} className="text-ink-2" />
               {fmtDateK(date)} 강의별 검증 결과
               {date > today && <Badge tone="info">예상</Badge>}
             </span>
           }
           sub={
-            V
-              ? `강의 ${V.total}건 · 정합성 ${fmtPct(V.match_rate)} · 계획 반영 ${fmtPct(V.plan_coverage, 0)} · 자동 조치 ${V.auto_actions}건`
-              : '불러오는 중…'
+            V ? (
+              <Facts>
+                {`강의 ${V.total}건`}
+                {`정합성 ${fmtPct(V.match_rate)}`}
+                {`계획 반영 ${fmtPct(V.plan_coverage, 0)}`}
+                {`자동 조치 ${V.auto_actions}건`}
+              </Facts>
+            ) : (
+              '불러오는 중…'
+            )
           }
           right={
             <div className="flex items-center gap-1.5">
-              <button
-                className="rounded-md border border-[#dcdbd4] p-1.5 text-ink-2 hover:bg-[#f6f6f3] disabled:opacity-30"
-                disabled={idx <= 0}
-                onClick={() => idx > 0 && setDate(past[idx - 1].date)}
-                aria-label="이전 강의일"
-              >
+              <IconButton label="이전 강의일" disabled={idx <= 0} onClick={() => idx > 0 && setDate(past[idx - 1].date)} className="border border-line-strong">
                 <ChevronLeft size={15} />
-              </button>
+              </IconButton>
               <input
                 type="date"
-                className={cx(inputBase, 'h-8 w-[150px]')}
+                aria-label="검증 날짜"
+                className={cx(inputBase, 'tnum h-8 w-[150px]')}
                 value={date}
                 min={meta.semester.start}
                 max={meta.semester.end}
                 onChange={(e) => e.target.value && setDate(e.target.value)}
               />
-              <button
-                className="rounded-md border border-[#dcdbd4] p-1.5 text-ink-2 hover:bg-[#f6f6f3] disabled:opacity-30"
+              <IconButton
+                label="다음 강의일"
                 disabled={idx < 0 || idx >= past.length - 1}
                 onClick={() => idx >= 0 && idx < past.length - 1 && setDate(past[idx + 1].date)}
-                aria-label="다음 강의일"
+                className="border border-line-strong"
               >
                 <ChevronRight size={15} />
-              </button>
-              <Link
-                to={`/schedule?date=${date}`}
-                className="ml-1 inline-flex h-8 shrink-0 items-center gap-1 rounded-lg whitespace-nowrap border border-[#dcdbd4] px-2.5 text-[12.5px] font-medium text-ink hover:bg-[#f6f6f3]"
-              >
-                타임라인 <ArrowUpRight size={13} />
+              </IconButton>
+              <Link to={`/schedule?date=${date}`} className={btnCls('secondary', 'md', 'ml-1')}>
+                이 날 타임라인 보기
               </Link>
             </div>
           }
         />
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <Segmented
+            label="검증 결과 필터"
             value={group}
             onChange={setGroup}
             options={[
@@ -300,20 +301,23 @@ export default function Validation() {
         ) : !V ? (
           <Loading />
         ) : rows.length === 0 ? (
-          <Empty title={V.sessions.length ? '조건에 맞는 강의가 없습니다' : '이 날은 강의가 없습니다'} />
+          <Empty
+            title={V.sessions.length ? '조건에 맞는 강의가 없습니다' : '이 날은 강의가 없습니다'}
+            desc={V.sessions.length ? '위의 결과 필터나 강의실 필터를 바꿔 보세요.' : '달력이나 위 화살표로 강의가 있는 날을 고르세요.'}
+          />
         ) : (
-          <div className={cx('overflow-hidden rounded-lg border border-line', day.loading && 'opacity-60')}>
-            <table className="tnum w-full text-[12.5px]">
-              <thead className="bg-[#f6f6f3] text-ink-2">
+          <div className={cx(tbl.frame, 'transition-opacity', day.loading && 'opacity-60')}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold">강의실</th>
-                  <th className="px-3 py-2 text-left font-semibold">시간</th>
-                  <th className="px-3 py-2 text-left font-semibold">강의</th>
-                  <th className="px-3 py-2 text-left font-semibold">검증 결과</th>
-                  <th className="px-3 py-2 text-left font-semibold">계획</th>
-                  <th className="w-[130px] px-3 py-2 text-left font-semibold">실행률</th>
-                  <th className="px-3 py-2 text-right font-semibold">시작 온도</th>
-                  <th className="px-3 py-2 text-right font-semibold">쾌적</th>
+                  <th className={tbl.th}>강의실</th>
+                  <th className={tbl.th}>시간</th>
+                  <th className={tbl.th}>강의</th>
+                  <th className={tbl.th}>검증 결과</th>
+                  <th className={tbl.th}>계획</th>
+                  <th className={cx(tbl.th, 'w-[130px]')}>실행률</th>
+                  <th className={tbl.thR}>시작 온도</th>
+                  <th className={tbl.thR}>쾌적</th>
                 </tr>
               </thead>
               <tbody>
@@ -323,8 +327,11 @@ export default function Validation() {
                   return (
                     <tr
                       key={v.session}
-                      className="cursor-pointer border-t border-line align-top hover:bg-[#fafaf8]"
+                      className={cx(tbl.tr, 'cursor-pointer align-top hover:bg-well')}
                       onClick={() => setDrawer(v.room)}
+                      tabIndex={0}
+                      aria-label={`${v.room}호 ${v.title} 상세 보기`}
+                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setDrawer(v.room))}
                       style={{ boxShadow: info.group !== 'normal' ? `inset 3px 0 0 ${GROUP_META[info.group].color}` : undefined }}
                     >
                       <td className="px-3 py-2 font-semibold text-ink">{v.room}</td>
@@ -347,7 +354,7 @@ export default function Validation() {
                       <td className="px-3 py-2">
                         <StatusBadge group={info.group} label={info.label} />
                         {v.notes.map((n, i) => (
-                          <div key={i} className="mt-1 max-w-[340px] text-[11.5px] text-ink-2">
+                          <div key={i} className="mt-1 max-w-[340px] text-[12px] text-ink-2">
                             {n}
                           </div>
                         ))}
@@ -356,8 +363,8 @@ export default function Validation() {
                       <td className="px-3 py-2">
                         {v.exec_ratio != null ? (
                           <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-16 rounded-full bg-[#e7e6e0]">
-                              <div className="h-1.5 rounded-full bg-ink" style={{ width: `${Math.min(100, er * 100)}%` }} />
+                            <div className="h-1.5 w-16 rounded-full bg-[#e3e8ee]">
+                              <div className="h-1.5 rounded-full bg-ink-2" style={{ width: `${Math.min(100, er * 100)}%` }} />
                             </div>
                             <span className="text-ink-2">{(er * 100).toFixed(0)}%</span>
                           </div>

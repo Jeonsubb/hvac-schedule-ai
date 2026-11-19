@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
-import { ArrowRight, Building, FileText, Leaf, MoveRight, Sparkles, Printer } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { MoveRight, Sparkles, Printer } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
-import type { Consolidation, StrategyKey, Summary, TotalsRow } from '../lib/types'
-import { CHART, DECISION, STRATEGY, STRATEGY_KEYS } from '../lib/constants'
+import type { AttributionScope, AttributionVariant, Consolidation, StrategyKey, Summary, TotalsRow } from '../lib/types'
+import { CHART, COLD_START, DECISION, STRATEGY, STRATEGY_KEYS, sumDays } from '../lib/constants'
 import { cx, fmtDateShort, fmtKwh, fmtNum, fmtPct, pctSaving } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
-import { Badge, Button, Card, CardHeader, ChartCard, ErrorBox, LegendItem, Loading, PageHeader, Segmented } from '../components/ui'
+import { Badge, Button, Card, CardHeader, ChartCard, ErrorBox, LegendItem, Loading, PageHeader, PageSkeleton, Segmented, Skeleton, Spinner, StrategyName } from '../components/ui'
+import { Waterfall, WaterfallLegend, splitNote, useAttribution, waterfallTable } from '../components/Attribution'
 import { DecisionIcon } from '../components/Gantt'
 
 type Scope = 'to_date' | 'all'
@@ -14,20 +15,37 @@ type Scope = 'to_date' | 'all'
 export default function Energy() {
   const { meta } = useMeta()
   const summary = useApi<Summary>('/api/summary')
+  const attr = useAttribution()
   const [scope, setScope] = useState<Scope>('to_date')
 
-  if (summary.error) return <ErrorBox error={summary.error} onRetry={summary.reload} />
-  if (!summary.data || !meta) return <Loading label="학기 전체 시뮬레이션 결과를 불러오는 중…" />
+  if (summary.error) return <ErrorBox title="학기 비교 결과를 불러오지 못했습니다" error={summary.error} onRetry={summary.reload} />
+  if (!summary.data || !meta) return <PageSkeleton label="학기 전체 시뮬레이션 결과를 불러오는 중…" />
   const S = summary.data
   const T = S.totals[scope]
+  const until = scope === 'to_date' ? S.today : undefined
+  const cold = Object.fromEntries(STRATEGY_KEYS.map((k) => [k, sumDays(S.days, k, 'cold_starts', until)])) as Record<StrategyKey, number>
+  // only use the attribution scope when its shape is complete; otherwise keep the computing state
+  const rawA = attr.data?.[scope]
+  const okRow = (r: unknown) => !!r && typeof (r as { kwh?: unknown }).kwh === 'number'
+  const A =
+    rawA &&
+    Array.isArray(rawA.waterfall) &&
+    rawA.waterfall.length > 1 &&
+    rawA.waterfall.every((w) => okRow(w) && typeof w.label === 'string') &&
+    okRow(rawA.variants?.ai) &&
+    okRow(rawA.variants?.rule30)
+      ? rawA
+      : undefined
+  const attrBroken = !!rawA && !A && !attr.computing
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="절감 효과"
-        desc="같은 시간표·같은 날씨로 4가지 운전 방식을 시뮬레이션해 전력·요금·탄소·쾌적도를 비교합니다."
+        desc="같은 시간표와 같은 날씨로 운전 방식을 시뮬레이션해 전력, 요금, 탄소, 쾌적도를 비교합니다. 비교 기준이 공정한지, 절감이 어디서 오는지까지 보여 줍니다."
         right={
           <Segmented
+            label="집계 범위"
             value={scope}
             onChange={setScope}
             options={[
@@ -38,22 +56,49 @@ export default function Energy() {
         }
       />
 
-      <Hero T={T} scope={scope} />
+      <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((k) => (
-          <StrategyTile key={k} k={k} T={T} />
-        ))}
-      </div>
+      <ChartCard
+        title="AI 절감은 어디서 오는가"
+        sub={
+          attr.data
+            ? `${splitNote(attr.data.note ?? '').method} 막대 위 숫자는 앞 단계 대비 전력 변화입니다.`
+            : '같은 날씨와 같은 현장 상황에서 기능을 하나씩 켜며 다시 시뮬레이션합니다.'
+        }
+        right={attr.stale ? <Badge tone="info">이전 결과, 다시 계산 중</Badge> : undefined}
+        legend={A ? <WaterfallLegend /> : undefined}
+        table={A ? waterfallTable(A) : undefined}
+      >
+        {A && attr.data ? (
+          <div className={cx('transition-opacity', attr.stale && 'opacity-70')}>
+            <Waterfall A={A} note={attr.data.note ?? ''} />
+          </div>
+        ) : attr.error || attrBroken ? (
+          <ErrorBox
+            title="기능별 절감 분석을 불러오지 못했습니다"
+            error={attr.error ?? '서버 응답에 필요한 값이 빠져 있습니다. 잠시 뒤 다시 시도하세요.'}
+            onRetry={attr.reload}
+          />
+        ) : (
+          <div className="space-y-3" role="status">
+            <div className="flex items-center gap-2 text-[13px] text-ink-2">
+              <Spinner size={14} /> 학기 전체를 기능별로 다시 시뮬레이션하는 중입니다. 처음 한 번은 1분 정도 걸리고, 10초마다 확인합니다.
+            </div>
+            <Skeleton className="h-[300px]" />
+          </div>
+        )}
+      </ChartCard>
+
+      <StrategyTable T={T} cold={cold} />
 
       <DailyChart S={S} />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <CumulativeChart S={S} />
-        <ScatterChart T={T} scope={scope} />
+        <ScatterChart T={T} A={A} scope={scope} />
       </div>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <DecisionChart S={S} />
         <ConsolidationReport />
       </div>
@@ -61,96 +106,204 @@ export default function Energy() {
   )
 }
 
-function Hero({ T, scope }: { T: Record<StrategyKey, TotalsRow>; scope: Scope }) {
+function Hero({
+  T,
+  A,
+  cold,
+  scope,
+  computing,
+}: {
+  T: Record<StrategyKey, TotalsRow>
+  A: AttributionScope | undefined
+  cold: Record<StrategyKey, number>
+  scope: Scope
+  computing: boolean
+}) {
   const vsFixed = pctSaving(T.fixed.kwh, T.ai.kwh) ?? 0
   const vsRule = pctSaving(T.rule.kwh, T.ai.kwh) ?? 0
+  const r30 = A?.variants.rule30
+  const ai = A?.variants.ai
+  const vs30 = r30 && ai ? pctSaving(r30.kwh, ai.kwh) : null
+  const max = r30 && ai ? Math.max(r30.kwh, ai.kwh) : 1
   return (
-    <Card className="overflow-hidden" pad={false}>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="border-b border-line p-6 lg:border-r lg:border-b-0">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-ink-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-s-ai" />
-            AI 예측 제어 · 고정 스케줄 대비 전력 절감 {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
+    <section className="overflow-hidden rounded-[10px] border border-line bg-surface">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+        <div className="border-b border-line px-6 py-6 lg:border-r lg:border-b-0">
+          <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-ink-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-s-ai" aria-hidden />
+            같은 쾌적도라면, AI 예측 제어가 규칙 기반보다 덜 쓴 전력
+            {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-[56px] leading-none font-bold tracking-tight text-ink">{vsFixed.toFixed(1)}</span>
-            <span className="text-[22px] font-semibold text-ink-3">%</span>
-          </div>
-          <p className="mt-3 max-w-[520px] text-[13.5px] leading-relaxed text-ink-2">
-            고정 스케줄로 운영했다면 <b className="text-ink">{fmtNum(T.fixed.kwh)} kWh</b>를 썼을 IT관 10개 강의실을{' '}
-            <b className="text-ink">{fmtNum(T.ai.kwh)} kWh</b>로 운영했습니다. 강의 중 쾌적 유지율은{' '}
-            <b className="text-ink">{fmtPct(T.ai.comfort_pct, 2)}</b>입니다.
-          </p>
+          {r30 && ai && vs30 != null ? (
+            <>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="pnum text-[56px] leading-none font-[650] tracking-[-0.035em] text-ink">{vs30 >= 0 ? '−' : '+'}{Math.abs(vs30).toFixed(1)}</span>
+                <span className="text-[24px] font-semibold text-ink-3">%</span>
+              </div>
+              <p className="mt-3 text-[14px] leading-relaxed text-ink">
+                규칙 기반(30분 전 가동) <b className="tnum font-[650]">{fmtNum(r30.kwh, 1)} kWh</b> vs AI 예측 제어 <b className="tnum font-[650]">{fmtNum(ai.kwh, 1)} kWh</b>
+              </p>
+              <div className="mt-3 max-w-[540px] space-y-1.5" aria-hidden>
+                {[
+                  { name: '규칙 30분 전', v: r30.kwh, c: STRATEGY.rule.color },
+                  { name: 'AI 예측 제어', v: ai.kwh, c: STRATEGY.ai.color },
+                ].map((b) => (
+                  <div key={b.name} className="flex items-center gap-2 text-[12px]">
+                    <span className="w-[84px] shrink-0 text-ink-2">{b.name}</span>
+                    <div className="h-2.5 flex-1 rounded-full bg-[#eceff3]">
+                      <div className="h-2.5 rounded-full" style={{ width: `${(b.v / max) * 100}%`, background: b.c }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <table className="tnum mt-4 w-full max-w-[540px] text-[12.5px]">
+                <thead>
+                  <tr className="text-[12px] text-ink-3">
+                    <th className="py-1 text-left font-medium">같은 기간</th>
+                    <th className="py-1 text-right font-medium">규칙 30분 전</th>
+                    <th className="py-1 text-right font-medium">AI 예측 제어</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['강의 중 쾌적 유지율', fmtPct(r30.comfort_pct, 2), fmtPct(ai.comfort_pct, 2), (ai.comfort_pct ?? 0) >= (r30.comfort_pct ?? 0)],
+                    [COLD_START.label, `${fmtNum(r30.cold_starts)}회`, `${fmtNum(ai.cold_starts)}회`, ai.cold_starts <= r30.cold_starts],
+                    ['불쾌 누적', `${fmtNum(r30.discomfort_dm)} ℃·분`, `${fmtNum(ai.discomfort_dm)} ℃·분`, ai.discomfort_dm <= r30.discomfort_dm],
+                  ].map(([k, a, b, aiBetter]) => (
+                    <tr key={k as string} className="border-t border-line">
+                      <th className="py-1.5 text-left font-medium text-ink-2" title={k === COLD_START.label ? COLD_START.desc : undefined}>
+                        {k}
+                      </th>
+                      <td className={cx('py-1.5 text-right', aiBetter ? 'text-ink-2' : 'font-semibold text-ink')}>{a}</td>
+                      <td className={cx('py-1.5 text-right', aiBetter ? 'font-semibold text-ink' : 'text-ink-2')}>{b}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-3 max-w-[560px] text-[12.5px] leading-relaxed text-ink-3">
+                {T.rule.kwh < T.ai.kwh
+                  ? `10분 전에 켜는 규칙은 AI보다 ${fmtNum(T.ai.kwh - T.rule.kwh, 1)} kWh 적게 쓰지만, 강의 ${fmtNum(cold.rule)}건이 쾌적하지 않은 교실에서 시작합니다(AI ${fmtNum(cold.ai)}건). 규칙을 30분 앞당겨 쾌적도를 맞추면 AI보다 더 씁니다.`
+                  : `10분 전에 켜는 규칙보다도 ${fmtNum(T.rule.kwh - T.ai.kwh, 1)} kWh 적게 쓰면서, 쾌적하지 않게 시작한 강의를 ${fmtNum(cold.rule)}건에서 ${fmtNum(cold.ai)}건으로 줄였습니다.`}
+              </p>
+            </>
+          ) : (
+            <div className="mt-4 space-y-2" role="status">
+              <div className="flex items-center gap-2 text-[13px] text-ink-2">
+                {computing && <Spinner size={14} />} {computing ? '같은 쾌적도의 규칙 기반과 비교하는 시뮬레이션을 계산하는 중…' : '같은 쾌적도 비교 결과를 불러오지 못했습니다. 아래 기능별 분석의 다시 시도를 눌러 보세요.'}
+              </div>
+              {computing && (
+                <>
+                  <Skeleton className="h-[56px] w-[220px]" />
+                  <Skeleton className="h-[64px] max-w-[540px]" />
+                </>
+              )}
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-2 gap-px bg-line">
+          <HeroCell label="고정 스케줄(08:30–22:30) 대비" value={`−${vsFixed.toFixed(1)}%`} sub={`${fmtNum(T.fixed.kwh)} → ${fmtNum(T.ai.kwh)} kWh`} />
           <HeroCell
-            label="규칙 기반 대비 추가 절감"
-            value={`${vsRule.toFixed(1)}%`}
-            sub={`${fmtNum(T.rule.kwh - T.ai.kwh)} kWh · 쾌적 ${fmtPct(T.rule.comfort_pct, 2)} → ${fmtPct(T.ai.comfort_pct, 2)}`}
+            label="규칙 기반(10분 전 가동) 대비"
+            value={`${vsRule >= 0 ? '−' : '+'}${Math.abs(vsRule).toFixed(1)}%`}
+            sub={`${COLD_START.short} ${fmtNum(cold.rule)}회 → ${fmtNum(cold.ai)}회`}
           />
-          <HeroCell label="절감 요금 (고정 대비)" value={`${fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원`} sub="한전 교육용(을) 고압A 선택I" />
-          <HeroCell
-            label="감축 탄소 (고정 대비)"
-            value={`${((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)} tCO₂`}
-            sub="배출계수 0.4173 kgCO₂/kWh"
-            border
-          />
-          <HeroCell
-            label="가동 시간 (실내기 기준)"
-            value={`−${fmtNum(((T.fixed.on_minutes - T.ai.on_minutes) / 60))}시간`}
-            sub={`고정 ${fmtNum(T.fixed.on_minutes / 60)}h → AI ${fmtNum(T.ai.on_minutes / 60)}h`}
-            border
-          />
+          <HeroCell label="아낀 전기요금 (고정 대비)" value={`${fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원`} sub="한전 교육용(을) 고압A 선택I 기준" />
+          <HeroCell label="줄인 탄소 (고정 대비)" value={`${((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)} tCO₂`} sub="배출계수 0.4173 kgCO₂/kWh" />
         </div>
       </div>
-    </Card>
+    </section>
   )
 }
 
-function HeroCell({ label, value, sub, border }: { label: string; value: string; sub: string; border?: boolean }) {
+function HeroCell({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className={cx('p-5 odd:border-r odd:border-line', border && 'border-t border-line')}>
+    <div className="flex flex-col justify-center bg-surface px-5 py-5">
       <div className="text-[12.5px] font-medium text-ink-2">{label}</div>
-      <div className="mt-1 text-[24px] font-semibold tracking-tight text-ink">{value}</div>
-      <div className="mt-1 text-[11.5px] text-ink-3">{sub}</div>
+      <div className="pnum mt-2 text-[26px] leading-none font-[650] tracking-[-0.02em] text-ink">{value}</div>
+      <div className="tnum mt-2 text-[12px] text-ink-3">{sub}</div>
     </div>
   )
 }
 
-function StrategyTile({ k, T }: { k: StrategyKey; T: Record<StrategyKey, TotalsRow> }) {
-  const v = T[k]
-  const sv = pctSaving(T.fixed.kwh, v.kwh)
-  const rows: [string, string][] = [
-    ['요금', `${fmtNum(v.cost_krw)}원`],
-    ['탄소', `${(v.co2_kg / 1000).toFixed(2)} tCO₂`],
-    ['최대 전력', `${v.peak_kw.toFixed(1)} kW`],
-    ['쾌적 유지율', fmtPct(v.comfort_pct, 2)],
-    ['불쾌 누적', `${fmtNum(v.discomfort_dm, 0)} ℃·분`],
+/** Strategies as columns: one comparison table instead of four identical cards. */
+function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: Record<StrategyKey, number> }) {
+  const order: StrategyKey[] = ['ai', 'rule', 'manual', 'fixed']
+  const maxKwh = Math.max(...order.map((k) => T[k].kwh))
+  const minOf = (f: (k: StrategyKey) => number) => Math.min(...order.map(f))
+  const rows: { label: string; cell: (k: StrategyKey) => React.ReactNode; best?: (k: StrategyKey) => boolean }[] = [
+    {
+      label: '전력량',
+      cell: (k) => (
+        <div>
+          <div>
+            <b className="text-[15px] font-[650] text-ink">{fmtNum(T[k].kwh)}</b> <span className="text-ink-3">kWh</span>
+          </div>
+          <div className="mt-1.5 h-1.5 rounded-full bg-[#eceff3]" aria-hidden>
+            <div className="h-1.5 rounded-full" style={{ width: `${(T[k].kwh / maxKwh) * 100}%`, background: STRATEGY[k].color }} />
+          </div>
+        </div>
+      ),
+    },
+    { label: '고정 스케줄 대비', cell: (k) => (k === 'fixed' ? <span className="text-ink-3">비교 기준</span> : <span className="font-semibold text-good-ink">−{pctSaving(T.fixed.kwh, T[k].kwh)?.toFixed(1)}%</span>) },
+    { label: '전기요금', cell: (k) => `${fmtNum(T[k].cost_krw)}원`, best: (k) => T[k].cost_krw === minOf((x) => T[x].cost_krw) },
+    { label: '탄소 배출', cell: (k) => `${(T[k].co2_kg / 1000).toFixed(2)} tCO₂`, best: (k) => T[k].co2_kg === minOf((x) => T[x].co2_kg) },
+    { label: '최대 전력', cell: (k) => `${T[k].peak_kw.toFixed(1)} kW`, best: (k) => T[k].peak_kw === minOf((x) => T[x].peak_kw) },
+    { label: '강의 중 쾌적 유지율', cell: (k) => fmtPct(T[k].comfort_pct, 2) },
+    { label: COLD_START.label, cell: (k) => `${fmtNum(cold[k])}회`, best: (k) => cold[k] === Math.min(...order.map((x) => cold[x])) },
+    { label: '불쾌 누적', cell: (k) => `${fmtNum(T[k].discomfort_dm, 0)} ℃·분`, best: (k) => T[k].discomfort_dm === minOf((x) => T[x].discomfort_dm) },
   ]
   return (
-    <div className={cx('rounded-xl border bg-white p-4', k === 'ai' ? 'border-s-ai shadow-[0_0_0_1px_#1baf7a]' : 'border-line')}>
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
-          <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: STRATEGY[k].color }} />
-          {STRATEGY[k].label}
-        </span>
-        {k === 'ai' ? <Badge tone="brand">운영 중</Badge> : k === 'fixed' ? <Badge>비교 기준</Badge> : null}
+    <Card pad={false} className="overflow-hidden">
+      <div className="px-5 pt-4">
+        <CardHeader title="운전 방식 비교" sub="같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다. 시작 시 쾌적 이탈은 강의가 너무 춥거나 더운 교실에서 시작한 횟수입니다." className="mb-3" />
       </div>
-      <div className="mt-2 flex items-baseline gap-1">
-        <span className="text-[24px] font-semibold tracking-tight text-ink">{fmtNum(v.kwh)}</span>
-        <span className="text-[12px] text-ink-3">kWh</span>
-        {k !== 'fixed' && sv != null && <span className="ml-auto text-[12.5px] font-semibold text-good-ink">−{sv.toFixed(1)}%</span>}
+      <div className="overflow-x-auto">
+        <table className="tnum w-full min-w-[760px] table-fixed text-[13px]">
+          <colgroup>
+            <col className="w-[180px]" />
+            {order.map((k) => (
+              <col key={k} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="border-b border-line px-5 py-2.5 text-left text-[12.5px] font-medium text-ink-3">
+                <span className="sr-only">항목</span>
+              </th>
+              {order.map((k) => (
+                <th key={k} className={cx('relative border-b border-line px-4 py-2.5 text-left align-bottom', k === 'ai' && 'bg-[#f1f9f5]')}>
+                  {k === 'ai' && <span className="absolute inset-x-0 top-0 h-[3px] bg-s-ai" aria-hidden />}
+                  <div className="flex items-center justify-between gap-2">
+                    <StrategyName k={k} />
+                    {k === 'ai' && <Badge tone="ai">운영 중</Badge>}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} className="border-b border-line last:border-b-0">
+                <th className="px-5 py-2.5 text-left text-[12.5px] font-medium text-ink-2">{r.label}</th>
+                {order.map((k) => (
+                  <td key={k} className={cx('px-4 py-2.5 text-ink', k === 'ai' && 'bg-[#f1f9f5]', r.best?.(k) && 'font-semibold')}>
+                    {r.cell(k)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <th className="px-5 py-3 text-left align-top text-[12.5px] font-medium text-ink-2">운전 방식</th>
+              {order.map((k) => (
+                <td key={k} className={cx('px-4 py-3 align-top text-[12px] leading-snug text-ink-3', k === 'ai' && 'bg-[#f1f9f5]')}>
+                  {STRATEGY[k].desc}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <dl className="tnum mt-2 space-y-1 border-t border-line pt-2 text-[12px]">
-        {rows.map(([a, b]) => (
-          <div key={a} className="flex justify-between">
-            <dt className="text-ink-3">{a}</dt>
-            <dd className="font-medium text-ink">{b}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-2 text-[11px] leading-snug text-ink-3">{STRATEGY[k].desc}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -165,7 +318,7 @@ function DailyChart({ S }: { S: Summary }) {
         { left: 48, right: 20, top: 16, height: 230 },
         { left: 48, right: 20, top: 290, height: 80 },
       ],
-      axisPointer: { link: [{ xAxisIndex: 'all' }], lineStyle: { color: '#898781' } },
+      axisPointer: { link: [{ xAxisIndex: 'all' }], lineStyle: { color: CHART.muted } },
       tooltip: {
         ...baseTooltip,
         trigger: 'axis',
@@ -173,7 +326,7 @@ function DailyChart({ S }: { S: Summary }) {
           const arr = ps as { seriesName: string; value: number; color: string; dataIndex: number }[]
           if (!arr.length) return ''
           const d = days[arr[0].dataIndex]
-          let h = ttTitle(`${fmtDateShort(d.date)} (${'월화수목금토일'[d.weekday]})${d.date > S.today ? ' · 예상' : ''}`)
+          let h = ttTitle(`${fmtDateShort(d.date)} (${'월화수목금토일'[d.weekday]})${d.date > S.today ? ', 예상' : ''}`)
           for (const k of ['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]) h += ttRow(STRATEGY[k].color, STRATEGY[k].label, `${fmtKwh(d.strategies[k].kwh)} kWh`)
           h += ttRow(CHART.outdoor, '외기 평균', `${d.t_mean.toFixed(1)}℃ (${d.t_min.toFixed(0)}~${d.t_max.toFixed(0)})`)
           return h
@@ -190,13 +343,13 @@ function DailyChart({ S }: { S: Summary }) {
         },
       ],
       yAxis: [
-        { type: 'value', gridIndex: 0, name: 'kWh/일', nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' }, ...axisCommon, axisLine: { show: false } },
+        { type: 'value', gridIndex: 0, name: 'kWh/일', ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' }, axisLine: { show: false } },
         {
           type: 'value',
           gridIndex: 1,
           name: '외기 ℃',
-          nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
           ...axisCommon,
+          nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
           axisLine: { show: false },
           splitNumber: 2,
         },
@@ -216,7 +369,7 @@ function DailyChart({ S }: { S: Summary }) {
             ? {
                 markArea: {
                   silent: true,
-                  itemStyle: { color: 'rgba(137,135,129,0.07)' },
+                  itemStyle: { color: 'rgba(20,32,51,0.035)' },
                   label: { show: true, position: 'insideTop' as const, color: CHART.muted, fontSize: 11, formatter: '예보·평년 기반 예상' },
                   data: [[{ xAxis: futureStart }, { xAxis: cats[cats.length - 1] }]] as never,
                 },
@@ -242,7 +395,7 @@ function DailyChart({ S }: { S: Summary }) {
           stack: 'tband',
           showSymbol: false,
           lineStyle: { opacity: 0 },
-          areaStyle: { color: 'rgba(137,135,129,0.18)' },
+          areaStyle: { color: 'rgba(138,148,163,0.22)' },
           data: days.map((d) => +(d.t_max - d.t_min).toFixed(1)),
           tooltip: { show: false },
         },
@@ -263,13 +416,13 @@ function DailyChart({ S }: { S: Summary }) {
   return (
     <ChartCard
       title="일별 전력량과 외기온도"
-      sub="강의일 기준 · 냉방철(9월)과 난방철(11~12월) 사이 간절기에는 AI가 외기 냉방·가동 생략으로 전력을 크게 줄입니다"
+      sub="강의일만 표시합니다. 냉방철(9월)과 난방철(11~12월) 사이 간절기에는 AI가 외기 냉방과 가동 생략으로 전력을 크게 줄입니다."
       legend={
         <>
           {(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((k) => (
             <LegendItem key={k} color={STRATEGY[k].color} label={STRATEGY[k].label} kind="line" />
           ))}
-          <LegendItem color={CHART.outdoor} label="외기 평균(띠: 최저~최고) — 아래 칸" kind="line" />
+          <LegendItem color={CHART.outdoor} label="외기 평균, 띠는 최저~최고 (아래 칸)" kind="line" />
         </>
       }
       table={{
@@ -318,9 +471,9 @@ function CumulativeChart({ S }: { S: Summary }) {
       yAxis: {
         type: 'value',
         name: '누적 절감 kWh',
-        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
         min: (v: { min: number }) => Math.floor(Math.min(0, v.min) / 100) * 100,
         ...axisCommon,
+        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
         axisLine: { show: false },
       },
       series: [
@@ -330,7 +483,7 @@ function CumulativeChart({ S }: { S: Summary }) {
           showSymbol: false,
           lineStyle: { width: 2, color: STRATEGY.fixed.color },
           itemStyle: { color: STRATEGY.fixed.color },
-          areaStyle: { color: 'rgba(82,81,78,0.06)' },
+          areaStyle: { color: 'rgba(86,90,96,0.06)' },
           data: vsFixed,
           endLabel: { show: true, formatter: (p: { value: number }) => `${fmtNum(p.value)}`, color: CHART.ink, fontSize: 11, fontWeight: 600 },
           markLine: {
@@ -357,7 +510,7 @@ function CumulativeChart({ S }: { S: Summary }) {
   return (
     <ChartCard
       title="AI 누적 절감량"
-      sub="AI 예측 제어가 각 방식보다 덜 쓴 전력의 누적 · 오늘 이후는 예상"
+      sub="AI 예측 제어가 각 방식보다 덜 쓴 전력을 쌓아 올린 값입니다. 오늘 이후는 예상입니다."
       legend={
         <>
           <LegendItem color={STRATEGY.fixed.color} label="고정 스케줄 대비" kind="line" />
@@ -382,105 +535,128 @@ function CumulativeChart({ S }: { S: Summary }) {
   )
 }
 
-function ScatterChart({ T, scope }: { T: Record<StrategyKey, TotalsRow>; scope: Scope }) {
+type Pt = { key: string; name: string; short: string; kwh: number; comfort: number; cold: number | null; dm: number; color: string; symbol: string; pos: string }
+
+const RULE_VARIANTS: { v: AttributionVariant; name: string; short: string; symbol: string; pos: string }[] = [
+  { v: 'rule', name: '규칙 기반(10분 전)', short: '규칙 10분 전', symbol: 'circle', pos: 'top' },
+  { v: 'rule_vacancy', name: '규칙 기반 + 재실 감지', short: '+재실 감지', symbol: 'triangle', pos: 'bottom' },
+  { v: 'rule30', name: '규칙 기반(30분 전)', short: '규칙 30분 전', symbol: 'diamond', pos: 'right' },
+]
+
+function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: AttributionScope | undefined; scope: Scope }) {
+  // with the attribution run: fixed, three rule variants and AI (same comfort metric everywhere); otherwise the four strategies
+  const pts = useMemo<Pt[]>(() => {
+    if (A) {
+      const V = A.variants
+      return [
+        ...(V.fixed ? [{ key: 'fixed', name: '고정 스케줄', short: '고정', kwh: V.fixed.kwh, comfort: V.fixed.comfort_pct ?? 0, cold: V.fixed.cold_starts, dm: V.fixed.discomfort_dm, color: STRATEGY.fixed.color, symbol: 'circle', pos: 'left' }] : []),
+        ...RULE_VARIANTS.filter((r) => V[r.v]).map((r) => ({
+          key: r.v,
+          name: r.name,
+          short: r.short,
+          kwh: V[r.v].kwh,
+          comfort: V[r.v].comfort_pct ?? 0,
+          cold: V[r.v].cold_starts,
+          dm: V[r.v].discomfort_dm,
+          color: STRATEGY.rule.color,
+          symbol: r.symbol,
+          pos: r.pos,
+        })),
+        { key: 'ai', name: 'AI 예측 제어', short: 'AI', kwh: V.ai.kwh, comfort: V.ai.comfort_pct ?? 0, cold: V.ai.cold_starts, dm: V.ai.discomfort_dm, color: STRATEGY.ai.color, symbol: 'circle', pos: 'top' },
+      ]
+    }
+    return STRATEGY_KEYS.map((k) => ({
+      key: k,
+      name: STRATEGY[k].label,
+      short: STRATEGY[k].short,
+      kwh: T[k].kwh,
+      comfort: T[k].comfort_pct ?? 0,
+      cold: null,
+      dm: T[k].discomfort_dm,
+      color: STRATEGY[k].color,
+      symbol: 'circle',
+      pos: k === 'fixed' ? 'left' : k === 'rule' ? 'right' : 'top',
+    }))
+  }, [A, T])
   const option = useMemo<EChartsOption>(() => {
-    const ks = STRATEGY_KEYS
-    const minC = Math.min(...ks.map((k) => T[k].comfort_pct ?? 100))
+    const minC = Math.min(...pts.map((p) => p.comfort))
+    const ai = pts.find((p) => p.key === 'ai')
     return {
-      grid: { left: 44, right: 16, top: 24, bottom: 44 },
+      grid: { left: 44, right: 24, top: 28, bottom: 44 },
       tooltip: {
         ...baseTooltip,
         trigger: 'item',
         formatter: (p: unknown) => {
-          const q = p as { data: { k: StrategyKey; value: number[] } }
-          const k = q.data.k
+          const q = (p as { data: { p: Pt } }).data.p
           return (
-            ttTitle(STRATEGY[k].label) +
-            ttRow(STRATEGY[k].color, '전력량', `${fmtNum(T[k].kwh)} kWh`, 'rect') +
-            ttRow(STRATEGY[k].color, '쾌적 유지율', fmtPct(T[k].comfort_pct, 2), 'rect') +
-            ttRow(STRATEGY[k].color, '불쾌 누적', `${fmtNum(T[k].discomfort_dm)} ℃·분`, 'rect')
+            ttTitle(q.name) +
+            ttRow(q.color, '전력량', `${fmtNum(q.kwh, 1)} kWh`, 'rect') +
+            ttRow(q.color, '쾌적 유지율', fmtPct(q.comfort, 2), 'rect') +
+            (q.cold != null ? ttRow(q.color, COLD_START.label, `${fmtNum(q.cold)}회`, 'rect') : '') +
+            ttRow(q.color, '불쾌 누적', `${fmtNum(q.dm)} ℃·분`, 'rect')
           )
         },
       },
-      xAxis: {
-        type: 'value',
-        name: '전력량 (kWh) →  적을수록 좋음',
-        nameLocation: 'middle',
-        nameGap: 28,
-        nameTextStyle: { color: CHART.muted, fontSize: 11 },
-        min: 0,
-        ...axisCommon,
-      },
+      xAxis: { type: 'value', name: '전력량 (kWh), 적을수록 좋음', nameLocation: 'middle', nameGap: 28, min: 0, ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 11 } },
       yAxis: {
         type: 'value',
-        name: '쾌적 유지율 (%) ↑ 높을수록 좋음',
-        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
-        min: Math.floor(minC - 0.5),
+        name: '강의 중 쾌적 유지율 (%), 높을수록 좋음',
+        min: Math.floor(minC - 0.4),
         max: 100.4,
         ...axisCommon,
+        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
         axisLabel: { ...axisCommon.axisLabel, formatter: (v: number) => (v > 100 ? '' : `${v}`) },
       },
       series: [
         {
           type: 'scatter',
-          symbolSize: 16,
+          symbolSize: (_: unknown, p: { data: { p: Pt } }) => (p.data.p.symbol === 'circle' ? 14 : 16),
           itemStyle: { borderColor: '#ffffff', borderWidth: 2 },
-          data: ks.map((k) => ({
-            k,
-            value: [T[k].kwh, T[k].comfort_pct ?? 0],
-            itemStyle: { color: STRATEGY[k].color },
-            label: {
-              show: true,
-              formatter: STRATEGY[k].short,
-              position: k === 'fixed' ? 'left' : k === 'rule' ? 'right' : 'top',
-              color: CHART.ink,
-              fontSize: 11.5,
-              lineHeight: 15,
-              fontWeight: k === 'ai' ? 600 : 400,
-              distance: 10,
-            },
+          data: pts.map((q) => ({
+            p: q,
+            value: [q.kwh, q.comfort],
+            symbol: q.symbol,
+            itemStyle: { color: q.color },
+            label: { show: true, formatter: q.short, position: q.pos, color: CHART.ink, fontSize: 11.5, fontWeight: q.key === 'ai' ? 650 : 400, distance: 9 },
           })),
-          markArea: {
-            silent: true,
-            itemStyle: { color: 'rgba(27,175,122,0.06)' },
-            label: { show: true, position: 'insideBottomLeft', color: '#0d7a55', fontSize: 11, formatter: '이상적인 영역: 적게 쓰고 쾌적' },
-            data: [[{ xAxis: 0, yAxis: 99.5 }, { xAxis: T.ai.kwh * 1.15, yAxis: 100.4 }]] as never,
-          },
+          markArea: ai
+            ? {
+                silent: true,
+                itemStyle: { color: 'rgba(20,166,115,0.07)' },
+                label: { show: true, position: 'insideBottomLeft', color: CHART.ink2, fontSize: 11, formatter: '적게 쓰고 쾌적한 영역' },
+                data: [[{ xAxis: 0, yAxis: 99.5 }, { xAxis: ai.kwh * 1.12, yAxis: 100.4 }]] as never,
+              }
+            : undefined,
         },
       ] as never,
     }
-  }, [T])
+  }, [pts])
   return (
     <ChartCard
-      title="전력 vs 쾌적 — 절감이 쾌적을 희생했는가?"
-      sub={`${scope === 'all' ? '학기 전체(예상)' : '오늘까지'} · 왼쪽 위로 갈수록 좋은 운전 방식`}
-      legend={STRATEGY_KEYS.map((k) => (
-        <LegendItem key={k} color={STRATEGY[k].color} label={STRATEGY[k].label} kind="dot" />
-      ))}
+      title="전기를 아끼느라 쾌적을 포기했는가"
+      sub={`${scope === 'all' ? '학기 전체(예상)' : '오늘까지'} 기준입니다. 왼쪽 위로 갈수록 적게 쓰고 쾌적한 운전이며, 규칙 기반은 켜는 시점과 재실 감지를 바꾼 경우도 함께 놓았습니다.`}
+      legend={
+        <>
+          <LegendItem color={STRATEGY.fixed.color} label="고정 스케줄" kind="dot" />
+          {RULE_VARIANTS.map((r) => (
+            <span key={r.v} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>
+                {r.symbol === 'circle' && <circle cx="6" cy="6" r="5" fill={STRATEGY.rule.color} />}
+                {r.symbol === 'diamond' && <path d="M6 0.5 11.5 6 6 11.5 0.5 6z" fill={STRATEGY.rule.color} />}
+                {r.symbol === 'triangle' && <path d="M6 1 11.5 11H0.5z" fill={STRATEGY.rule.color} />}
+              </svg>
+              {r.name}
+            </span>
+          ))}
+          <LegendItem color={STRATEGY.ai.color} label="AI 예측 제어" kind="dot" />
+        </>
+      }
       table={{
-        columns: ['전략', '전력량 kWh', '쾌적 유지율 %', '불쾌 누적 ℃·분'],
-        rows: STRATEGY_KEYS.map((k) => [STRATEGY[k].label, T[k].kwh, T[k].comfort_pct, T[k].discomfort_dm]),
+        columns: ['운전 방식', '전력량 kWh', '쾌적 유지율 %', `${COLD_START.label}(회)`, '불쾌 누적 ℃·분'],
+        rows: pts.map((q) => [q.name, q.kwh, q.comfort, q.cold, q.dm]),
       }}
     >
-      <div className="flex gap-3">
-        <div className="min-w-0 flex-1">
-          <EChart option={option} height={286} />
-        </div>
-        <ul className="tnum w-[150px] shrink-0 space-y-2 self-center text-[12px]">
-          {(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((k) => (
-            <li key={k} className={cx('rounded-lg border px-2.5 py-1.5', k === 'ai' ? 'border-s-ai' : 'border-line')}>
-              <div className="flex items-center gap-1.5 font-medium text-ink">
-                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: STRATEGY[k].color }} />
-                {STRATEGY[k].label}
-              </div>
-              <div className="mt-0.5 flex justify-between text-ink-2">
-                <span>{fmtNum(T[k].kwh)} kWh</span>
-                <span className="font-semibold text-ink">{fmtPct(T[k].comfort_pct, 2)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <EChart option={option} height={300} />
     </ChartCard>
   )
 }
@@ -492,25 +668,25 @@ function DecisionChart({ S }: { S: Summary }) {
   return (
     <ChartCard
       title="AI 판단 유형별 횟수"
-      sub={`학기 전체 ${fmtNum(total)}회 · 강의마다 열모델로 판단`}
+      sub={`학기 전체 ${fmtNum(total)}회입니다. 강의마다 열모델로 판단합니다.`}
       table={{ columns: ['판단', '횟수'], rows: entries.map(([k, v]) => [DECISION[k]?.label ?? k, v]) }}
     >
-      <ul className="space-y-3">
+      <ul className="space-y-4">
         {entries.map(([k, v]) => (
           <li key={k}>
-            <div className="mb-1 flex items-center justify-between text-[12.5px]">
-              <span className="flex items-center gap-1.5 font-medium text-ink">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-white">
+            <div className="mb-1.5 flex items-center justify-between text-[13px]">
+              <span className="flex items-center gap-2 font-semibold text-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-white" aria-hidden>
                   <DecisionIcon type={k} size={10} />
                 </span>
                 {DECISION[k]?.label ?? k}
               </span>
               <span className="tnum font-semibold text-ink">{fmtNum(v)}회</span>
             </div>
-            <div className="h-2 rounded-full bg-[#f0efec]" title={`${DECISION[k]?.label}: ${v}회`}>
+            <div className="h-2 rounded-full bg-[#eceff3]" title={`${DECISION[k]?.label}: ${v}회`}>
               <div className="h-2 rounded-full bg-s-ai" style={{ width: `${(v / max) * 100}%` }} />
             </div>
-            <div className="mt-0.5 text-[11px] text-ink-3">{DECISION[k]?.desc}</div>
+            <div className="mt-1 text-[12px] text-ink-3">{DECISION[k]?.desc}</div>
           </li>
         ))}
       </ul>
@@ -520,19 +696,31 @@ function DecisionChart({ S }: { S: Summary }) {
 
 function ConsolidationReport() {
   const c = useApi<Consolidation>('/api/consolidation', { maxAgeMs: 10 * 60_000 })
+  // stale: the previous result is shown while the backend recomputes; check again shortly
+  const stale = !!c.data?.stale
+  const { reload: reloadC } = c
+  useEffect(() => {
+    if (!stale) return
+    const t = window.setTimeout(reloadC, 10_000)
+    return () => window.clearTimeout(t)
+  }, [stale, reloadC, c.data])
   const { ask } = useCopilot()
   const { meta } = useMeta()
-  const withMoves = c.data?.weekdays.filter((w) => w.moves.length > 0) ?? []
+  const withMoves = (Array.isArray(c.data?.weekdays) ? c.data.weekdays : []).filter((w) => Array.isArray(w.moves) && w.moves.length > 0)
   return (
     <Card>
       <CardHeader
-        title="강의실 재배치 권고 (학사 부서 검토용)"
-        icon={<FileText size={15} />}
-        sub="같은 유형·정원 충족·시간이 빈 강의실로 옮겨 실외기 가동을 줄이는 방안"
+        title="강의실 재배치 권고"
+        sub="학사 부서 검토용입니다. 같은 유형이고 정원이 맞으며 그 시간에 비어 있는 강의실로 옮겨, 같은 실외기에 강의를 모읍니다."
         right={
           <>
+            {stale && (
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-3" title="이전 결과를 보여 주면서 최신 시간표로 다시 계산하고 있습니다">
+                <Spinner size={12} /> 갱신 중
+              </span>
+            )}
             <Button size="sm" variant="ghost" onClick={() => ask('금요일 강의실 재배치로 얼마나 절감돼? 이유와 함께 설명해줘')}>
-              <Sparkles size={13} /> 코파일럿 설명
+              <Sparkles size={13} /> 코파일럿에게 설명 듣기
             </Button>
             <Button size="sm" onClick={() => window.print()}>
               <Printer size={13} /> 인쇄
@@ -543,40 +731,39 @@ function ConsolidationReport() {
       {c.error ? (
         <ErrorBox error={c.error} onRetry={c.reload} />
       ) : !c.data ? (
-        <Loading label="요일별 재배치 시나리오를 학기 전체로 다시 시뮬레이션하는 중… (약 5초)" />
+        <Loading label="요일별 재배치안을 학기 전체로 다시 시뮬레이션하는 중… (5초 정도 걸립니다)" />
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4 rounded-lg bg-brand-50 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[6px] bg-well px-4 py-3 ring-1 ring-line ring-inset">
             <div>
-              <div className="text-[12px] font-medium text-brand">학기 예상 추가 절감</div>
-              <div className="text-[24px] font-semibold text-ink">
-                {fmtNum(c.data.semester_kwh_saving, 1)} <span className="text-[13px] font-normal text-ink-3">kWh</span>
+              <div className="text-[12.5px] font-medium text-ink-2">학기 예상 추가 절감</div>
+              <div className="pnum mt-1 text-[26px] leading-none font-[650] tracking-[-0.02em] text-ink">
+                {fmtNum(c.data.semester_kwh_saving, 1)} <span className="text-[13px] font-medium text-ink-3">kWh</span>
               </div>
             </div>
-            <div className="h-10 w-px bg-[#bfe6d6]" />
-            <div className="text-[12.5px] text-ink-2">
+            <div className="hidden h-10 w-px bg-line-strong sm:block" />
+            <div className="text-[13px] text-ink-2">
               <div>
-                권고 이동 <b className="text-ink">{withMoves.reduce((a, w) => a + w.moves.length, 0)}건</b> · 대상 요일{' '}
-                <b className="text-ink">{withMoves.map((w) => w.weekday_label).join('·') || '없음'}</b>
+                권고 이동 <b className="font-semibold text-ink">{withMoves.reduce((a, w) => a + w.moves.length, 0)}건</b>, 대상 요일{' '}
+                <b className="font-semibold text-ink">{withMoves.map((w) => w.weekday_label).join('·') || '없음'}</b>
               </div>
-              <div className="text-ink-3">쾌적 유지율 변화 없음 · AI 운전 기준 재시뮬레이션</div>
+              <div className="text-[12.5px] text-ink-3">쾌적 유지율은 그대로이고, AI 운전 기준으로 다시 시뮬레이션한 값입니다.</div>
             </div>
           </div>
-          {withMoves.length === 0 && <div className="text-[13px] text-ink-3">현재 시간표로는 권고할 재배치가 없습니다.</div>}
+          {withMoves.length === 0 && <div className="text-[13px] text-ink-2">현재 시간표에서는 옮겨서 아낄 수 있는 강의가 없습니다.</div>}
           {withMoves.map((w) => (
-            <div key={w.weekday} className="rounded-lg border border-line">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-[#fafaf8] px-4 py-2.5">
+            <div key={w.weekday} className="rounded-[6px] border border-line">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-well px-4 py-2.5">
                 <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                  <Building size={14} className="text-ink-3" />
                   매주 {w.weekday_label}요일
-                  <span className="font-normal text-ink-3">· 학기 중 {w.dates}회</span>
+                  <span className="font-normal text-ink-3">학기 중 {w.dates}회</span>
                 </div>
                 <div className="tnum flex items-center gap-3 text-[12px] text-ink-2">
                   <span>
                     {fmtNum(w.kwh_before, 1)} → <b className="text-ink">{fmtNum(w.kwh_after, 1)} kWh</b>
                   </span>
                   <Badge tone="good">
-                    <Leaf size={11} /> −{fmtNum(w.kwh_saving, 1)} kWh ({fmtPct(w.saving_pct)})
+                    −{fmtNum(w.kwh_saving, 1)} kWh ({fmtPct(w.saving_pct)})
                   </Badge>
                   {w.odu_minutes_before != null && w.odu_minutes_after != null && (
                     <span className="text-ink-3">
@@ -585,8 +772,8 @@ function ConsolidationReport() {
                   )}
                 </div>
               </div>
-              <table className="tnum w-full text-[12.5px]">
-                <thead className="text-ink-3">
+              <table className="tnum w-full text-[13px]">
+                <thead className="text-[12px] text-ink-3">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">강의</th>
                     <th className="px-2 py-2 text-left font-medium">시간</th>
@@ -600,7 +787,7 @@ function ConsolidationReport() {
                     <tr key={m.course_id + m.start} className="border-t border-line">
                       <td className="px-4 py-2">
                         <div className="font-medium text-ink">{m.title}</div>
-                        <div className="text-[11.5px] text-ink-3">{m.professor}</div>
+                        <div className="text-[12px] text-ink-3">{m.professor}</div>
                       </td>
                       <td className="px-2 py-2 text-ink-2">
                         {m.start}–{m.end}
@@ -609,10 +796,10 @@ function ConsolidationReport() {
                         <span className="inline-flex items-center gap-1.5 font-semibold text-ink">
                           {m.from_room}호 <MoveRight size={13} className="text-ink-3" /> {m.to_room}호
                         </span>
-                        <div className="text-[11px] text-ink-3">{meta?.rooms[m.to_room]?.type_label}</div>
+                        <div className="text-[12px] text-ink-3">{meta?.rooms[m.to_room]?.type_label}</div>
                       </td>
-                      <td className="px-2 py-2 text-[11.5px] text-ink-2">
-                        {m.from_odu.replace('ODU-', '')} <ArrowRight size={10} className="inline" /> {m.to_odu.replace('ODU-', '')}
+                      <td className="px-2 py-2 text-[12px] whitespace-nowrap text-ink-2">
+                        {m.from_odu.replace('ODU-', '')} <MoveRight size={11} className="inline text-ink-3" aria-label="에서" /> {m.to_odu.replace('ODU-', '')}
                       </td>
                       <td className="px-4 py-2 text-right text-ink-2">
                         {m.expected_people}/{m.capacity}명
@@ -623,7 +810,7 @@ function ConsolidationReport() {
               </table>
             </div>
           ))}
-          <p className="text-[11.5px] leading-relaxed text-ink-3">{c.data.note}</p>
+          <p className="text-[12px] leading-relaxed text-ink-3">{c.data.note}</p>
         </div>
       )}
     </Card>

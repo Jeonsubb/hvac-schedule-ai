@@ -81,6 +81,10 @@ export interface Meta {
   counts: { courses: number; events: number }
   weather: { fetched_at: string | null; errors: Record<string, string>; kma_base: string | null }
   models: Record<string, string>
+  /** Bedrock health: last success / last failure */
+  ai?: { ok: boolean | null; last_ok?: string | null; last_error?: string | null; error?: string | null }
+  /** 'aws' | 'local-fallback' in production; a class name (e.g. 'LocalStore') in local development */
+  storage?: { mode: string; last_error?: string | null }
 }
 
 export interface Session {
@@ -99,6 +103,8 @@ export interface Session {
 }
 
 export interface StrategyDayTotals {
+  /** classes that began outside the comfort band (days only; totals omit it) */
+  cold_starts?: number
   kwh: number
   cost_krw: number
   co2_kg: number
@@ -123,6 +129,9 @@ export interface DaySummary {
   match_rate: number | null
   plan_coverage: number | null
   anomalies: number
+  /** present in current backend; older responses only had `anomalies` */
+  auto_actions?: number
+  needs_review?: number
   decisions: Record<string, number>
 }
 
@@ -352,6 +361,76 @@ export interface EventDraft {
   course_id?: string | null
   new_room?: string | null
   clarification?: string | null
+  /** conflict / capacity check returned with parsed drafts */
+  check?: EventCheck | null
+  /** parse result reused from today's cache because the AI was unavailable */
+  from_cache?: boolean
+  cached_at?: string
+}
+
+export interface EventConflict {
+  room: string
+  title: string
+  start: string
+  end: string
+  kind: string
+}
+
+export interface EventAlternative {
+  room: string
+  type: string
+  capacity: number
+  odu: string
+  odu_already_on: boolean
+  extra_kwh: number
+  requested: boolean
+}
+
+export interface EventCheck {
+  ok: boolean
+  conflicts: EventConflict[]
+  capacity_ok: boolean
+  capacity: { room: string; capacity: number; expected_people: number | null } | null
+  alternatives: EventAlternative[]
+  /** why ok=false when there is no conflict/capacity problem (e.g. the class does not meet that day) */
+  note?: string | null
+  alternatives_note?: string | null
+  /** cancel/move: the class that will be cancelled or moved */
+  target?: { room: string; title: string; start: string; end: string }[]
+}
+
+export type AttributionVariant = 'fixed' | 'rule' | 'rule30' | 'rule_vacancy' | 'ai_predictive' | 'ai_weather' | 'ai'
+
+export interface AttributionRow {
+  label: string
+  kwh: number
+  discomfort_dm: number
+  cold_starts: number
+  peak_kw: number
+  comfort_pct: number | null
+}
+
+export interface WaterfallStep {
+  label: string
+  variant: AttributionVariant
+  kwh: number
+  delta_kwh: number | null
+  cold_starts: number
+  comfort_pct: number | null
+}
+
+export interface AttributionScope {
+  variants: Record<AttributionVariant, AttributionRow>
+  waterfall: WaterfallStep[]
+}
+
+export interface Attribution {
+  all: AttributionScope
+  to_date: AttributionScope
+  labels: Record<string, string>
+  note: string
+  computed_at: string
+  stale?: boolean
 }
 
 export interface EventRec extends EventDraft {
@@ -382,6 +461,7 @@ export interface ImportResponse {
 }
 
 export interface WhatIfRow {
+  cold_starts?: number
   kwh: number
   discomfort_dm: number
   comfort_pct: number | null
@@ -427,6 +507,8 @@ export interface ConsolidationDay {
 }
 
 export interface Consolidation {
+  /** previous result shown while it recomputes */
+  stale?: boolean
   weekdays: ConsolidationDay[]
   semester_kwh_saving: number
   note: string
@@ -455,6 +537,9 @@ export interface Proposal {
 }
 
 export interface ChatResult {
+  /** answered from the cache because Bedrock failed */
+  from_cache?: boolean
+  cached_at?: string
   answer?: string
   steps?: ChatStep[]
   proposals?: Proposal[]

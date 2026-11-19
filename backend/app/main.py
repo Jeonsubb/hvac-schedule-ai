@@ -261,7 +261,7 @@ def parse_event(request: Request, body: dict = Body(...)):
         ai.cache_put("parse", text, ev)
     try:
         chk = service.check_event(ev)
-        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
+        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note", "target")}}
     except Exception:
         pass  # incomplete draft: the form shows what is missing
     return ev
@@ -301,7 +301,7 @@ async def parse_event_image(request: Request, file: UploadFile = File(...)):
     ai.record_status(True)
     try:
         chk = service.check_event(ev)
-        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
+        ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note", "target")}}
     except Exception:
         pass
     return ev

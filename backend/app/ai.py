@@ -319,7 +319,7 @@ def run_tool(name: str, inp: dict, out: dict) -> dict:
         ev = parse_event(inp["text"])
         try:
             chk = service.check_event(ev)
-            ev["check"] = {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}
+            ev["check"] = {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note", "target")}
         except Exception as e:  # incomplete draft: same shape, explained in the note
             ev["check"] = {**EMPTY_CHECK, "note": f"초안을 확인하지 못했습니다: {str(e)[:120]}"}
         out.setdefault("event_drafts", []).append(ev)

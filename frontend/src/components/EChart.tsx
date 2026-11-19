@@ -1,53 +1,26 @@
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
-import { BarChart, LineChart, ScatterChart, CustomChart, HeatmapChart } from 'echarts/charts'
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  MarkAreaComponent,
-  MarkLineComponent,
-  MarkPointComponent,
-  AxisPointerComponent,
-  DataZoomComponent,
-  VisualMapComponent,
-  TitleComponent,
-} from 'echarts/components'
+import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, AxisPointerComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { EChartsOption } from 'echarts'
 import { CHART } from '../lib/constants'
 
-echarts.use([
-  BarChart,
-  LineChart,
-  ScatterChart,
-  CustomChart,
-  HeatmapChart,
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  MarkAreaComponent,
-  MarkLineComponent,
-  MarkPointComponent,
-  AxisPointerComponent,
-  DataZoomComponent,
-  VisualMapComponent,
-  TitleComponent,
-  CanvasRenderer,
-])
+// only what the screens draw: lines, bars, one scatter; legends are HTML (see ChartCard)
+echarts.use([BarChart, LineChart, ScatterChart, GridComponent, TooltipComponent, MarkAreaComponent, MarkLineComponent, AxisPointerComponent, CanvasRenderer])
 
 export type { EChartsOption }
 
-export const FONT = 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif'
+export const FONT = '"Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif'
 
 /** Shared chrome: recessive hairline grid, muted axis text, white tooltip with value-first rows. */
 export const baseTooltip = {
   backgroundColor: '#ffffff',
-  borderColor: 'rgba(11,11,11,0.10)',
+  borderColor: '#e1e6ec',
   borderWidth: 1,
-  padding: [8, 10],
+  padding: [8, 11],
   textStyle: { color: CHART.ink, fontSize: 12, fontFamily: FONT },
-  extraCssText: 'box-shadow: 0 4px 16px rgba(11,11,11,0.10); border-radius: 8px;',
+  extraCssText: 'box-shadow: 0 8px 24px rgba(20,32,51,0.12); border-radius: 8px;',
 }
 
 export const axisCommon = {
@@ -64,15 +37,19 @@ export function ttRow(color: string, label: string, value: string, kind: 'line' 
       ? `<span style="display:inline-block;width:12px;height:3px;border-radius:2px;background:${color};margin-right:6px;vertical-align:middle"></span>`
       : `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${color};margin-right:6px;vertical-align:middle"></span>`
   return `<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;line-height:1.7">
-    <span style="color:#52514e">${key}${escapeHtml(label)}</span><b style="color:#0b0b0b;font-variant-numeric:tabular-nums">${value}</b></div>`
+    <span style="color:#4a5668">${key}${escapeHtml(label)}</span><b style="color:#142033;font-weight:650;font-variant-numeric:tabular-nums">${value}</b></div>`
 }
 
 export function ttTitle(t: string) {
-  return `<div style="font-weight:600;color:#0b0b0b;margin-bottom:3px">${escapeHtml(t)}</div>`
+  return `<div style="font-weight:650;color:#142033;margin-bottom:4px">${escapeHtml(t)}</div>`
 }
 
 export function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
+}
+
+function reducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 
 export default function EChart({
@@ -91,7 +68,7 @@ export default function EChart({
   return (
     <ReactEChartsCore
       echarts={echarts}
-      option={{ animationDuration: 400, textStyle: { fontFamily: FONT }, ...option }}
+      option={{ animation: !reducedMotion(), animationDuration: 350, textStyle: { fontFamily: FONT }, ...option }}
       notMerge={notMerge}
       lazyUpdate
       style={{ height, width: '100%' }}

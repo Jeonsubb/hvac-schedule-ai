@@ -10,25 +10,44 @@ export class ApiError extends Error {
 }
 
 async function parseError(res: Response): Promise<ApiError> {
-  let msg = `${res.status} ${res.statusText}`
+  let detail = ''
+  let fromApp = false // a JSON body means the backend itself answered (not a proxy error page)
   try {
     const body = await res.json()
-    if (body && typeof body.detail === 'string') msg = body.detail
-    else if (body && body.detail) msg = JSON.stringify(body.detail)
+    if (body && typeof body.detail === 'string') detail = body.detail
+    else if (body && Array.isArray(body.detail)) detail = body.detail.map((d: { msg?: string }) => d.msg ?? '').filter(Boolean).join(', ')
+    else if (body && body.detail) detail = JSON.stringify(body.detail)
+    fromApp = true
   } catch {
     /* not json */
   }
-  return new ApiError(res.status, msg)
+  if (!fromApp && (res.status === 502 || res.status === 503 || res.status === 504))
+    return new ApiError(res.status, `백엔드 서버에 연결하지 못했습니다 (${res.status}). 서버가 실행 중인지 확인한 뒤 다시 시도하세요.`)
+  if (detail && res.status >= 500) return new ApiError(res.status, detail)
+  if (res.status >= 500) return new ApiError(res.status, `서버가 요청을 처리하다 실패했습니다 (${res.status}).${detail ? ` ${detail}` : ''} 잠시 뒤 다시 시도하세요.`)
+  if (res.status === 404) return new ApiError(404, detail || '요청한 데이터가 없습니다 (404).')
+  return new ApiError(res.status, detail || `요청이 거절되었습니다 (${res.status} ${res.statusText}).`)
+}
+
+const OFFLINE = '서버에 연결하지 못했습니다. 백엔드가 실행 중인지, 네트워크가 연결되어 있는지 확인한 뒤 다시 시도하세요.'
+
+async function request(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e
+    throw new ApiError(0, OFFLINE)
+  }
 }
 
 export async function apiGet<T>(url: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+  const res = await request(url, { signal, headers: { Accept: 'application/json' } })
   if (!res.ok) throw await parseError(res)
   return (await res.json()) as T
 }
 
 export async function apiSend<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
+  const res = await request(url, {
     method,
     headers: body instanceof FormData ? undefined : { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
@@ -148,11 +167,11 @@ export async function pollJob<R>(
   const { intervalMs = 1500, timeoutMs = 180_000, signal } = opts
   const t0 = Date.now()
   for (;;) {
-    if (signal?.aborted) throw new Error('취소되었습니다.')
+    if (signal?.aborted) throw new Error('작업을 취소했습니다.')
     const job = await apiGet<Job<R>>(`/api/jobs/${id}`)
     onProgress?.(job)
     if (job.status === 'done' || job.status === 'error') return job
-    if (Date.now() - t0 > timeoutMs) throw new Error('응답 시간이 초과되었습니다.')
+    if (Date.now() - t0 > timeoutMs) throw new Error(`${Math.round(timeoutMs / 1000)}초 안에 끝나지 않아 기다리기를 멈췄습니다. 잠시 뒤 다시 시도하세요.`)
     await new Promise((r) => setTimeout(r, intervalMs))
   }
 }

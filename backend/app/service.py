@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v13"
+ENGINE_VERSION = "v14"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST
@@ -244,7 +244,8 @@ def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
     for stg in config.STRATEGIES:
         for scope in ("all", "to_date"):
             sel = [x for x in days if scope == "all" or x["date"] <= today]
-            agg = {"kwh": 0.0, "cost_krw": 0, "co2_kg": 0.0, "on_minutes": 0, "odu_on_minutes": 0, "discomfort_dm": 0.0}
+            agg = {"kwh": 0.0, "cost_krw": 0, "co2_kg": 0.0, "on_minutes": 0, "odu_on_minutes": 0, "discomfort_dm": 0.0,
+                   "cold_starts": 0}
             comfort_num = comfort_den = 0.0
             peak = 0.0
             for x in sel:
@@ -252,7 +253,7 @@ def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
                 if not v:
                     continue
                 for k in agg:
-                    agg[k] += v[k]
+                    agg[k] += v.get(k, 0)
                 peak = max(peak, v["peak_kw"])
                 if v["comfort_pct"] is not None:
                     comfort_num += v["comfort_pct"] * x["sessions"]

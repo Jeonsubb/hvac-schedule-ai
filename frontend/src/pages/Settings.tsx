@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FlaskConical, RotateCcw, Save, Cpu, Receipt, Leaf, Info, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react'
+import { FlaskConical, RotateCcw, Save, Info, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react'
 import { apiSend, invalidateAll, useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
 import type { Settings, StrategyKey, WhatIf } from '../lib/types'
-import { ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
-import { addDays, cx, fmtDateK, fmtKwh, fmtNum, fmtPct, weekdayOf } from '../lib/format'
-import { Badge, Button, Card, CardHeader, ErrorBox, Field, Loading, Modal, PageHeader, Spinner, StrategyName, inputBase, inputCls, toast } from '../components/ui'
+import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
+import { addDays, cx, fmtDateK, fmtKwh, fmtPct, weekdayOf } from '../lib/format'
+import { Badge, Button, Card, CardHeader, ErrorBox, Field, Modal, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast } from '../components/ui'
 
 type NumKey =
   | 'pre_on_min'
@@ -29,7 +29,7 @@ const SECTIONS: { title: string; desc: string; fields: { k: NumKey; step: number
     ],
   },
   {
-    title: '설정온도 · 쾌적 범위',
+    title: '설정온도와 쾌적 범위',
     desc: '실내기 설정온도와 "쾌적"으로 판정하는 실내온도 범위',
     fields: [
       { k: 'sp_heat', step: 0.5, min: 16, max: 24, unit: '℃', help: '난방 설정온도' },
@@ -87,7 +87,19 @@ export default function SettingsPage() {
     return out
   }, [form, cur.data])
   const nChanged = Object.keys(changes).length
-  const invalid = (form.comfort_low ?? 0) >= (form.comfort_high ?? 99) || (form.sp_heat ?? 0) >= (form.sp_cool ?? 99)
+  // mirrors the backend rule: setpoints must sit at least 0.3 ℃ inside the comfort band
+  const MARGIN = 0.3
+  const lo = form.comfort_low ?? 0
+  const hi = form.comfort_high ?? 99
+  const problems: Partial<Record<NumKey, string>> = {}
+  if (lo >= hi) problems.comfort_low = '쾌적 하한은 상한보다 낮아야 합니다.'
+  if ((form.sp_heat ?? 0) >= (form.sp_cool ?? 99)) problems.sp_heat = '난방 설정온도는 냉방 설정온도보다 낮아야 합니다.'
+  else if (form.sp_heat != null && form.sp_heat < lo + MARGIN - 1e-9)
+    problems.sp_heat = `쾌적 하한(${lo}℃)보다 ${MARGIN}℃ 이상 높아야 합니다. ${(lo + MARGIN).toFixed(1)}℃ 이상으로 정하세요.`
+  if (form.sp_cool != null && form.sp_cool > hi - MARGIN + 1e-9)
+    problems.sp_cool = `쾌적 상한(${hi}℃)보다 ${MARGIN}℃ 이상 낮아야 합니다. ${(hi - MARGIN).toFixed(1)}℃ 이하로 정하세요.`
+  const invalid = Object.keys(problems).length > 0
+  const [saveErr, setSaveErr] = useState<string | null>(null)
 
   useEffect(() => {
     setWi(null)
@@ -108,13 +120,15 @@ export default function SettingsPage() {
 
   const save = async () => {
     setSaving(true)
+    setSaveErr(null)
     try {
       await apiSend('PUT', '/api/settings', changes)
       invalidateAll()
       reloadMeta()
       toast('운영 규칙을 저장했습니다. 학기 전체 운전 계획을 다시 계산합니다.')
     } catch (e) {
-      toast((e as Error).message, 'crit')
+      // e.g. 400 with a Korean detail (setpoint too close to the comfort band): show it on the page
+      setSaveErr((e as Error).message)
     } finally {
       setSaving(false)
       setConfirm(null)
@@ -136,29 +150,34 @@ export default function SettingsPage() {
     }
   }
 
-  if (cur.error) return <ErrorBox error={cur.error} onRetry={cur.reload} />
-  if (!cur.data || !meta) return <Loading />
+  if (cur.error) return <ErrorBox title="운영 규칙을 불러오지 못했습니다" error={cur.error} onRetry={cur.reload} />
+  if (!cur.data || !meta) return <PageSkeleton label="운영 규칙을 불러오는 중…" />
   const S = cur.data
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="운영 규칙"
-        desc="운전 규칙을 바꾸기 전에 시뮬레이션으로 효과를 먼저 확인하고 저장합니다. 모든 변경은 변경 기록에 남습니다."
+        desc="규칙을 바꾸기 전에 시뮬레이션으로 효과를 먼저 확인한 뒤 저장합니다. 모든 변경은 변경 기록에 남습니다."
         right={
           <>
             <Button variant="ghost" onClick={() => setConfirm('reset')}>
-              <RotateCcw size={14} /> 기본값으로
+              <RotateCcw size={14} /> 기본값으로 되돌리기
             </Button>
             <Button variant="primary" disabled={!nChanged || invalid || saving} onClick={() => setConfirm('save')}>
-              <Save size={14} /> 저장 {nChanged > 0 && `(${nChanged})`}
+              <Save size={14} /> {nChanged > 0 ? `변경 ${nChanged}개 저장` : '저장'}
             </Button>
           </>
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <div className="space-y-5">
+      {saveErr && (
+        <div className="mb-4">
+          <ErrorBox title="저장하지 못했습니다" error={saveErr} />
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="space-y-4">
           {SECTIONS.map((sec) => (
             <Card key={sec.title}>
               <CardHeader title={sec.title} sub={sec.desc} />
@@ -171,7 +190,7 @@ export default function SettingsPage() {
                       label={SETTING_LABEL[f.k] ?? f.k}
                       hint={
                         changed ? (
-                          <span className="font-medium text-[#1c5cab]">
+                          <span className="tnum font-semibold text-info-ink">
                             현재 {String(S[f.k])}
                             {f.unit} → {String(form[f.k])}
                             {f.unit}
@@ -187,29 +206,39 @@ export default function SettingsPage() {
                           step={f.step}
                           min={f.min}
                           max={f.max}
-                          className={cx(inputCls, 'pr-9', changed && 'border-[#2a78d6] bg-[#f3f8fe]')}
+                          aria-invalid={!!problems[f.k]}
+                          className={cx(inputCls, 'tnum pr-9', changed && 'border-s-rule bg-info-bg', problems[f.k] && 'border-crit bg-crit-bg')}
                           value={(form[f.k] as number | undefined) ?? ''}
                           onChange={(e) => setForm((x) => ({ ...x, [f.k]: e.target.value === '' ? undefined : Number(e.target.value) }))}
                         />
-                        <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[12px] text-ink-3">{f.unit}</span>
+                        <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[12.5px] text-ink-3">{f.unit}</span>
                       </div>
                     </Field>
                   )
                 })}
               </div>
-              {sec.title.startsWith('설정온도') && invalid && (
-                <div className="mt-3 flex items-center gap-1.5 text-[12px] text-crit-ink">
-                  <AlertTriangle size={13} /> 하한은 상한보다, 난방 설정온도는 냉방 설정온도보다 낮아야 합니다.
-                </div>
+              {sec.fields.some((f) => problems[f.k]) && (
+                <ul className="mt-3 space-y-1 text-[12.5px] text-crit-ink" role="alert">
+                  {sec.fields
+                    .filter((f) => problems[f.k])
+                    .map((f) => (
+                      <li key={f.k} className="flex items-start gap-1.5">
+                        <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+                        <span>
+                          <b className="font-semibold">{SETTING_LABEL[f.k]}</b>: {problems[f.k]}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
               )}
             </Card>
           ))}
           <Card>
-            <CardHeader title="비교 · 시연 옵션" sub="절감률 계산 기준과 현장 이상 상황 시뮬레이션" />
+            <CardHeader title="비교 기준과 시연 옵션" sub="절감률을 무엇과 비교할지, 현장 이상 상황을 시뮬레이션에 넣을지 정합니다." />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Field label={SETTING_LABEL.baseline} hint="절감률(%)을 무엇과 비교할지">
                 <select
-                  className={cx(inputCls, 'baseline' in changes && 'border-[#2a78d6] bg-[#f3f8fe]')}
+                  className={cx(inputCls, 'baseline' in changes && 'border-s-rule bg-info-bg')}
                   value={String(form.baseline ?? 'fixed')}
                   onChange={(e) => setForm((x) => ({ ...x, baseline: e.target.value }))}
                 >
@@ -221,11 +250,11 @@ export default function SettingsPage() {
                 </select>
               </Field>
               <div>
-                <span className="mb-1 block text-[12.5px] font-medium text-ink-2">{SETTING_LABEL.anomalies}</span>
+                <span className="mb-1.5 block text-[12.5px] font-medium text-ink-2">{SETTING_LABEL.anomalies}</span>
                 <label
                   className={cx(
-                    'flex h-9 cursor-pointer items-center justify-between rounded-lg border px-3',
-                    'anomalies' in changes ? 'border-[#2a78d6] bg-[#f3f8fe]' : 'border-[#dcdbd4]',
+                    'flex h-[34px] cursor-pointer items-center justify-between rounded-[6px] border px-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus',
+                    'anomalies' in changes ? 'border-s-rule bg-info-bg' : 'border-line-strong',
                   )}
                 >
                   <span className="text-[13px] text-ink">{form.anomalies ? '켜짐' : '꺼짐'}</span>
@@ -235,16 +264,16 @@ export default function SettingsPage() {
                     checked={!!form.anomalies}
                     onChange={(e) => setForm((x) => ({ ...x, anomalies: e.target.checked }))}
                   />
-                  <span className={cx('relative h-5 w-9 rounded-full transition', form.anomalies ? 'bg-brand' : 'bg-[#d6d5ce]')}>
-                    <span className={cx('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition', form.anomalies ? 'left-[18px]' : 'left-0.5')} />
+                  <span className={cx('relative h-5 w-9 rounded-full transition-colors', form.anomalies ? 'bg-ink' : 'bg-line-strong')} aria-hidden>
+                    <span className={cx('absolute top-0.5 h-4 w-4 rounded-full bg-surface shadow-[0_1px_2px_rgb(20_32_51/0.25)] transition-[left]', form.anomalies ? 'left-[18px]' : 'left-0.5')} />
                   </span>
                 </label>
-                <span className="mt-1 block text-[11.5px] text-ink-3">
-                  무단 휴강·명령 실패({fmtPct(S.failure_rate * 100, 0)})·수동 가동({fmtPct(S.override_rate * 100, 0)}) 등을 넣어 자동 조치를 검증
+                <span className="mt-1 block text-[12px] text-ink-3">
+                  무단 휴강, 명령 실패({fmtPct(S.failure_rate * 100, 0)}), 수동 가동({fmtPct(S.override_rate * 100, 0)}) 같은 상황을 넣어 자동 조치를 검증합니다.
                 </span>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-lg bg-[#f6f6f3] p-3 text-[12px] text-ink-2">
+            <div className="tnum mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[6px] bg-well p-3 text-[12.5px] text-ink-2 ring-1 ring-line ring-inset">
               <div>
                 고정 스케줄 <b className="text-ink">{S.fixed_on}–{S.fixed_off}</b>
               </div>
@@ -261,16 +290,15 @@ export default function SettingsPage() {
           </Card>
         </div>
 
-        <div className="space-y-5">
-          <Card className="xl:sticky xl:top-[76px]">
+        <div className="space-y-4">
+          <Card className="xl:sticky xl:top-[72px]">
             <CardHeader
               title="시뮬레이션으로 미리보기"
-              icon={<FlaskConical size={15} />}
-              sub="바꾼 규칙으로 실제 시간표·날씨를 다시 돌려 현재 규칙과 비교합니다 (저장 전, 운영에 영향 없음)"
+              sub="바꾼 규칙으로 실제 시간표와 날씨를 다시 돌려 현재 규칙과 비교합니다. 저장하기 전이라 운영에는 영향이 없습니다."
             />
             <div className="flex flex-wrap items-end gap-2">
               <Field label="시작일">
-                <input type="date" className={cx(inputBase, 'w-[150px]')} value={wiStart} min={meta.semester.start} max={meta.semester.end} onChange={(e) => setWiStart(e.target.value)} />
+                <input type="date" className={cx(inputBase, 'tnum w-[150px]')} value={wiStart} min={meta.semester.start} max={meta.semester.end} onChange={(e) => setWiStart(e.target.value)} />
               </Field>
               <Field label="기간">
                 <select className={cx(inputBase, 'w-[90px]')} value={wiDays} onChange={(e) => setWiDays(Number(e.target.value))}>
@@ -286,12 +314,12 @@ export default function SettingsPage() {
                 미리보기 실행
               </Button>
             </div>
-            <div className="mt-1.5 text-[11.5px] text-ink-3">
+            <div className="tnum mt-1.5 text-[12px] text-ink-3">
               {fmtDateK(wiStart)} ~ {fmtDateK(addDays(wiStart, wiDays - 1))}
             </div>
             {!nChanged && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-[#f6f6f3] px-3 py-2.5 text-[12.5px] text-ink-2">
-                <Info size={14} className="mt-0.5 shrink-0" /> 왼쪽에서 값을 바꾸면 미리보기를 실행할 수 있습니다.
+              <div className="mt-4 flex items-start gap-2 rounded-[6px] bg-well px-3 py-2.5 text-[12.5px] text-ink-2 ring-1 ring-line ring-inset">
+                <Info size={14} className="mt-0.5 shrink-0 text-ink-3" /> 왼쪽에서 값을 하나 이상 바꾸면 미리보기를 실행할 수 있습니다.
               </div>
             )}
             {nChanged > 0 && (
@@ -319,16 +347,18 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Tariff s={S} />
         <Card>
-          <CardHeader title="탄소 배출계수" icon={<Leaf size={15} />} sub="전력 사용량 → 온실가스 환산" />
+          <CardHeader title="탄소 배출계수" sub="전력 사용량을 온실가스 배출량으로 바꾸는 값입니다." />
           <div className="flex items-baseline gap-2">
-            <span className="text-[30px] font-semibold tracking-tight text-ink">{S.co2_kg_per_kwh}</span>
+            <span className="pnum text-[30px] font-[650] tracking-[-0.02em] text-ink">{S.co2_kg_per_kwh}</span>
             <span className="text-[13px] text-ink-3">kgCO₂eq / kWh</span>
           </div>
           <div className="mt-3 space-y-1.5 text-[12.5px] text-ink-2">
             <div>
-              <b className="text-ink">출처</b> · 2023년도 국가 전력배출계수 0.4173 tCO₂eq/MWh (기후에너지환경부 공표 기준)
+              <b className="font-semibold text-ink">출처</b> 2023년도 국가 전력배출계수 0.4173 tCO₂eq/MWh (기후에너지환경부 공표 기준)
             </div>
-            <div>적용 · 전략별 전력량(kWh) × 계수 = 배출량. 절감 효과 화면의 tCO₂ 값에 쓰입니다.</div>
+            <div>
+              <b className="font-semibold text-ink">적용</b> 운전 방식별 전력량(kWh) × 계수 = 배출량. 절감 효과 화면의 tCO₂ 값에 쓰입니다.
+            </div>
           </div>
         </Card>
       </div>
@@ -352,7 +382,7 @@ export default function SettingsPage() {
             <p>다음 변경을 저장하면 오늘 이후 운전 계획과 학기 비교 결과가 다시 계산됩니다.</p>
             <ul className="space-y-1">
               {Object.entries(changes).map(([k, v]) => (
-                <li key={k} className="flex justify-between rounded-md bg-[#f6f6f3] px-3 py-1.5">
+                <li key={k} className="flex justify-between rounded-[6px] bg-well px-3 py-1.5">
                   <span>{SETTING_LABEL[k] ?? k}</span>
                   <span className="tnum font-medium text-ink">
                     {String(S[k])} → {String(v)}
@@ -360,10 +390,10 @@ export default function SettingsPage() {
                 </li>
               ))}
             </ul>
-            {!wi && <p className="text-[12px] text-warn-ink">아직 시뮬레이션으로 미리보지 않았습니다.</p>}
+            {!wi && <p className="text-[12.5px] text-warn-ink">아직 미리보기를 실행하지 않았습니다. 오른쪽 패널에서 효과를 먼저 확인할 수 있습니다.</p>}
           </div>
         ) : (
-          <p className="text-[13px] text-ink-2">모든 운영 규칙을 초기값(선행 10분 · 조기 정지 5분 · 공백 15분 · 난방 20℃ · 냉방 26℃ …)으로 되돌립니다.</p>
+          <p className="text-[13px] text-ink-2">모든 운영 규칙을 초기값(선행 가동 10분, 조기 정지 5분, 공백 유지 15분, 난방 20℃, 냉방 26℃ 등)으로 되돌리고 운전 계획을 다시 계산합니다.</p>
         )}
       </Modal>
     </div>
@@ -372,16 +402,26 @@ export default function SettingsPage() {
 
 export function WhatIfTable({ wi, compact = false }: { wi: WhatIf; compact?: boolean }) {
   const keys: StrategyKey[] = ['ai', 'rule', 'manual', 'fixed']
+  const cell = (b: string, n: string, d: number, good: boolean, fmt: (x: number) => string) => (
+    <td className="py-1.5 text-right align-top">
+      <div className="whitespace-nowrap">
+        <span className="text-ink-3">{b} →</span> {n}
+      </div>
+      <Change v={d} good={good} fmt={fmt} />
+    </td>
+  )
   return (
     <div className={cx('fade-in', compact ? 'mt-2' : 'mt-4')}>
-      {!compact && <div className="mb-1.5 text-[12px] text-ink-3">{wi.dates.length}일 합계 · 현재 규칙 → 변경 규칙</div>}
+      {!compact && <div className="mb-1.5 text-[12.5px] text-ink-3">{wi.dates.length}일 합계, 현재 규칙 → 바꾼 규칙</div>}
       <table className="tnum w-full text-[12.5px]">
-        <thead className="text-ink-3">
+        <thead className="text-[12px] text-ink-3">
           <tr>
-            <th className="py-1.5 text-left font-medium">전략</th>
+            <th className="py-1.5 text-left font-medium">운전 방식</th>
             <th className="py-1.5 text-right font-medium">전력량 kWh</th>
             <th className="py-1.5 text-right font-medium">쾌적 %</th>
-            <th className="py-1.5 text-right font-medium">불쾌 ℃·분</th>
+            <th className="py-1.5 text-right font-medium whitespace-nowrap" title={COLD_START.desc}>
+              {COLD_START.short}(회)
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -392,50 +432,47 @@ export function WhatIfTable({ wi, compact = false }: { wi: WhatIf; compact?: boo
               const n = wi.new[k]
               const dk = n.kwh - b.kwh
               const dc = (n.comfort_pct ?? 0) - (b.comfort_pct ?? 0)
+              const hasCold = b.cold_starts != null && n.cold_starts != null
+              const dcs = (n.cold_starts ?? 0) - (b.cold_starts ?? 0)
               return (
                 <tr key={k} className={cx('border-t border-line', k === 'ai' && 'font-medium')}>
-                  <td className="py-1.5">
+                  <td className="py-1.5 align-top">
                     <StrategyName k={k} short={compact} />
                   </td>
-                  <td className="py-1.5 text-right">
-                    <span className="text-ink-3">{fmtKwh(b.kwh)} →</span> {fmtKwh(n.kwh)}
-                    <Delta v={dk} good={dk < 0} fmt={(x) => fmtKwh(x)} />
-                  </td>
-                  <td className="py-1.5 text-right">
-                    {fmtPct(n.comfort_pct)}
-                    <Delta v={dc} good={dc > 0} fmt={(x) => x.toFixed(1)} />
-                  </td>
-                  <td className="py-1.5 text-right">{fmtNum(n.discomfort_dm, 1)}</td>
+                  {cell(fmtKwh(b.kwh), fmtKwh(n.kwh), dk, dk < 0, (x) => fmtKwh(x))}
+                  {cell(fmtPct(b.comfort_pct), fmtPct(n.comfort_pct), dc, dc > 0, (x) => x.toFixed(1))}
+                  {hasCold ? cell(String(b.cold_starts), String(n.cold_starts), dcs, dcs < 0, (x) => String(Math.round(x))) : <td className="py-1.5 text-right align-top">–</td>}
                 </tr>
               )
             })}
         </tbody>
       </table>
       {!compact && (
-        <p className="mt-2 text-[11.5px] text-ink-3">
-          규칙 값은 주로 &lsquo;규칙 기반&rsquo; 전략에, 설정온도·쾌적 범위는 모든 전략에 영향을 줍니다. AI는 쾌적 범위를 지키는 선에서 스스로 최적화합니다.
+        <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
+          규칙 값은 주로 &lsquo;규칙 기반&rsquo;에, 설정온도와 쾌적 범위는 모든 방식에 영향을 줍니다. 시작 이탈은 강의가 시작될 때 실내가 쾌적 범위 밖(너무 춥거나 더움)이었던 횟수입니다.
         </p>
       )}
     </div>
   )
 }
 
-function Delta({ v, good, fmt }: { v: number; good: boolean; fmt: (x: number) => string }) {
-  if (Math.abs(v) < 0.05) return <span className="ml-1.5 inline-block w-14 text-right text-[11px] text-ink-3">±0</span>
+function Change({ v, good, fmt }: { v: number; good: boolean; fmt: (x: number) => string }) {
+  if (Math.abs(v) < 0.05) return <div className="text-[11.5px] text-ink-4">변화 없음</div>
   return (
-    <span className={cx('ml-1.5 inline-block w-14 text-right text-[11px] font-semibold', good ? 'text-good-ink' : 'text-crit-ink')}>
+    <div className={cx('text-[11.5px] font-semibold', good ? 'text-good-ink' : 'text-crit-ink')}>
       {v > 0 ? '+' : '−'}
       {fmt(Math.abs(v))}
-    </span>
+    </div>
   )
 }
+
 
 function CopilotHint() {
   const { ask } = useCopilot()
   return (
     <Card>
       <div className="flex items-start gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] bg-ink text-[#7fd6a8]" aria-hidden>
           <Sparkles size={16} />
         </span>
         <div className="flex-1">
@@ -443,7 +480,7 @@ function CopilotHint() {
           <div className="mt-0.5 text-[12.5px] text-ink-2">AI 코파일럿이 여러 값을 시뮬레이션해 보고 근거와 함께 제안합니다. 적용은 담당자가 직접 누릅니다.</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {['선행 가동을 5분으로 줄이면 어떻게 돼? 시뮬레이션해줘', '쾌적도를 지키면서 이번 주 전력을 더 줄일 규칙을 제안해줘'].map((p) => (
-              <button key={p} onClick={() => ask(p)} className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:border-[#c3c2b7] hover:text-ink">
+              <button key={p} onClick={() => ask(p)} className="rounded-[6px] border border-line px-2.5 py-1 text-left text-[12.5px] text-ink-2 hover:border-line-strong hover:text-ink">
                 {p}
               </button>
             ))}
@@ -458,38 +495,39 @@ function Equipment() {
   const { meta } = useMeta()
   if (!meta) return null
   const rooms = ROOM_ORDER.map((r) => meta.rooms[r]).filter(Boolean)
+  // when every row is an assumption, say it once in the header instead of on every row
+  const allAssumed = rooms.every((r) => r.assumption)
   return (
     <Card>
       <CardHeader
         title="설비 정보"
-        icon={<Cpu size={15} />}
-        sub="강의실·실내기(IDU)·실외기(ODU) 구성 · 현장 실측 전 값은 '가정값'으로 표시합니다"
+        sub="강의실, 실내기(IDU), 실외기(ODU) 구성입니다. 현장에서 확인하기 전의 값은 가정값으로 표시합니다."
         right={
           <Badge tone="warn" title="설비 대장 확인 전 추정치">
-            가정값 = 설비 대장 확인 필요
+            {allAssumed ? '모든 값이 가정값: 설비 대장과 대조 필요' : '가정값: 설비 대장과 대조 필요'}
           </Badge>
         }
       />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-lg border border-line">
-          <table className="tnum w-full text-[12.5px]">
-            <thead className="bg-[#f6f6f3] text-ink-2">
+        <div className={tbl.frame}>
+          <table className={tbl.table}>
+            <thead className={tbl.thead}>
               <tr>
-                <th className="px-3 py-2 text-left font-semibold">강의실</th>
-                <th className="px-3 py-2 text-left font-semibold">유형</th>
-                <th className="px-3 py-2 text-right font-semibold">면적</th>
-                <th className="px-3 py-2 text-right font-semibold">정원</th>
-                <th className="px-3 py-2 text-right font-semibold">PC</th>
-                <th className="px-3 py-2 text-left font-semibold">실내기 (냉방/난방 kW)</th>
-                <th className="px-3 py-2 text-left font-semibold">실외기</th>
+                <th className={tbl.th}>강의실</th>
+                <th className={tbl.th}>유형</th>
+                <th className={tbl.thR}>면적</th>
+                <th className={tbl.thR}>정원</th>
+                <th className={tbl.thR}>PC</th>
+                <th className={tbl.th}>실내기 (냉방/난방 kW)</th>
+                <th className={tbl.th}>실외기</th>
               </tr>
             </thead>
             <tbody>
               {rooms.map((r) => (
-                <tr key={r.id} className="border-t border-line">
+                <tr key={r.id} className={tbl.tr}>
                   <td className="px-3 py-1.5 font-semibold">
                     {r.id}
-                    {r.assumption && (
+                    {r.assumption && !allAssumed && (
                       <Badge tone="warn" className="ml-1.5">
                         가정값
                       </Badge>
@@ -512,26 +550,28 @@ function Equipment() {
             </tbody>
           </table>
         </div>
-        <div className="space-y-2">
+        <div>
+          <ul className="divide-y divide-line overflow-hidden rounded-[6px] border border-line">
           {Object.values(meta.odus).map((o) => {
             const rs = rooms.filter((r) => r.odu === o.id)
             const idu = rs.reduce((a, r) => a + r.idus.reduce((b, i) => b + i.cool_kw, 0), 0)
             return (
-              <div key={o.id} className="rounded-lg border border-line p-3">
+              <li key={o.id} className="px-3.5 py-3">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-ink">{o.id}</span>
-                  <Badge tone="warn">가정값</Badge>
+                  {!allAssumed && <Badge tone="warn">가정값</Badge>}
                 </div>
-                <div className="mt-0.5 text-[12px] text-ink-2">
-                  {o.label} · 용량 {o.cap_kw} kW
+                <div className="tnum mt-0.5 text-[12.5px] text-ink-2">
+                  {o.label}, 용량 {o.cap_kw} kW
                 </div>
-                <div className="mt-1.5 text-[12px] text-ink-3">
-                  연결: {rs.map((r) => r.id).join(', ')}호 · 실내기 {rs.reduce((a, r) => a + r.idus.length, 0)}대 (합계 냉방 {idu.toFixed(1)} kW)
+                <div className="tnum mt-1 text-[12px] text-ink-3">
+                  {rs.map((r) => r.id).join(', ')}호 연결, 실내기 {rs.reduce((a, r) => a + r.idus.length, 0)}대 (냉방 합계 {idu.toFixed(1)} kW)
                 </div>
-              </div>
+              </li>
             )
           })}
-          <p className="text-[11.5px] leading-relaxed text-ink-3">
+          </ul>
+          <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
             실외기는 연결된 실내기가 하나라도 켜져 있으면 가동하고, 모두 꺼지면 정지합니다. 같은 실외기에 묶인 강의실끼리 강의를 모으면 실외기 가동 시간이 줄어듭니다(절감 효과 → 재배치 권고).
           </p>
         </div>
@@ -548,9 +588,9 @@ function Tariff({ s }: { s: Settings }) {
   ]
   return (
     <Card>
-      <CardHeader title="전기요금 (시간대별)" icon={<Receipt size={15} />} sub="전력량요금 원/kWh · 기본요금 제외" />
-      <table className="tnum w-full text-[12.5px]">
-        <thead className="text-ink-3">
+      <CardHeader title="시간대별 전기요금" sub="전력량요금(원/kWh)이며 기본요금은 제외했습니다." />
+      <table className="tnum w-full text-[13px]">
+        <thead className="text-[12px] text-ink-3">
           <tr>
             <th className="py-1.5 text-left font-medium">계절</th>
             <th className="py-1.5 text-right font-medium">경부하</th>
@@ -562,7 +602,7 @@ function Tariff({ s }: { s: Settings }) {
           {seasons.map((x) => (
             <tr key={x.k} className="border-t border-line">
               <td className="py-1.5">
-                <span className="font-medium text-ink">{x.label}</span> <span className="text-[11px] text-ink-3">{x.months}</span>
+                <span className="font-medium text-ink">{x.label}</span> <span className="text-[12px] text-ink-3">{x.months}</span>
               </td>
               <td className="py-1.5 text-right">{s.tariff[x.k].light}</td>
               <td className="py-1.5 text-right">{s.tariff[x.k].mid}</td>
@@ -571,11 +611,11 @@ function Tariff({ s }: { s: Settings }) {
           ))}
         </tbody>
       </table>
-      <div className="mt-3 space-y-1 text-[12px] text-ink-2">
+      <div className="mt-3 space-y-1 text-[12.5px] text-ink-2">
         <div>
-          <b className="text-ink">출처</b> · 한국전력공사 전기요금표 교육용전력(을) 고압A 선택I, 2023-05-16 게시본
+          <b className="font-semibold text-ink">출처</b> 한국전력공사 전기요금표 교육용전력(을) 고압A 선택I, 2023-05-16 게시본
         </div>
-        <div>경부하 23~09시 · 최대부하: 겨울 10~12, 17~20, 22~23시 / 그 외 계절 10~12, 13~17시 · 나머지 중간부하</div>
+        <div>경부하는 23~09시입니다. 최대부하는 겨울 10~12시, 17~20시, 22~23시, 그 외 계절 10~12시, 13~17시이고 나머지는 중간부하입니다.</div>
       </div>
     </Card>
   )

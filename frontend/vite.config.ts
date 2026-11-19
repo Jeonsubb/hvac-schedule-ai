@@ -17,6 +17,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    chunkSizeWarningLimit: 2000,
+    // ECharts (~560 kB) only loads with the screens that draw charts
+    chunkSizeWarningLimit: 650,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'echarts', test: /node_modules[\\/](echarts|zrender|echarts-for-react)[\\/]/ }],
+        },
+      },
+    },
   },
 })
