@@ -1,11 +1,30 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: HVAC Schedule AI (ThermoPlan) - CloudFront + S3 web, Lambda API (FastAPI), DynamoDB, S3 data, Bedrock, hourly scheduler
+Description: >-
+  HVAC Schedule AI (ThermoPlan) - CloudFront + S3 web, DynamoDB + S3 data.
+  ApiMode=lambda runs the FastAPI backend on Lambda (execution roles are created by an
+  account admin with infra/admin-setup.sh); ApiMode=external routes /api/* to an external origin.
 
 Parameters:
+  ApiMode:
+    Type: String
+    AllowedValues: [external, lambda]
+    Default: external
+  ExternalApiDomain:
+    Type: String
+    Default: example.com
+    Description: Host name of the external API origin (ApiMode=external)
+  FunctionRoleArn:
+    Type: String
+    Default: ""
+  SchedulerRoleArn:
+    Type: String
+    Default: ""
   CodeBucket:
     Type: String
+    Default: ""
   CodeKey:
     Type: String
+    Default: ""
   OriginSecret:
     Type: String
     NoEcho: true
@@ -16,9 +35,13 @@ Parameters:
     Type: String
     Default: hvac-ai-api
 
+Conditions:
+  UseLambda: !Equals [!Ref ApiMode, lambda]
+
 Resources:
   DataBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
     Properties:
       BucketName: !Sub hvac-ai-data-${AWS::AccountId}
       PublicAccessBlockConfiguration:
@@ -41,6 +64,7 @@ Resources:
 
   Table:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
     Properties:
       TableName: hvac-ai-data
       BillingMode: PAY_PER_REQUEST
@@ -52,47 +76,10 @@ Resources:
         - { AttributeName: sk, KeyType: RANGE }
       Tags: [{ Key: project, Value: hvac-ai }]
 
-  FunctionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: hvac-ai-api-role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: { Service: lambda.amazonaws.com }
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: hvac-ai-api
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: [s3:GetObject, s3:PutObject]
-                Resource: !Sub ${DataBucket.Arn}/*
-              - Effect: Allow
-                Action: s3:ListBucket
-                Resource: !GetAtt DataBucket.Arn
-              - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:UpdateItem, dynamodb:Query, dynamodb:BatchWriteItem]
-                Resource: !GetAtt Table.Arn
-              - Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${KmaKeyParam}
-              - Effect: Allow
-                Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
-                Resource:
-                  - arn:aws:bedrock:*::foundation-model/anthropic.*
-                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
-              - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}
-      Tags: [{ Key: project, Value: hvac-ai }]
-
+  # ---------------------------------------------------------------- Lambda mode only
   ApiFunction:
     Type: AWS::Lambda::Function
+    Condition: UseLambda
     Properties:
       FunctionName: !Ref FunctionName
       Runtime: python3.13
@@ -100,7 +87,7 @@ Resources:
       Handler: app.handler.handler
       MemorySize: 2048
       Timeout: 600
-      Role: !GetAtt FunctionRole.Arn
+      Role: !Ref FunctionRoleArn
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
@@ -118,6 +105,7 @@ Resources:
 
   ApiAsyncConfig:
     Type: AWS::Lambda::EventInvokeConfig
+    Condition: UseLambda
     Properties:
       FunctionName: !Ref ApiFunction
       Qualifier: $LATEST
@@ -126,12 +114,14 @@ Resources:
 
   ApiFunctionUrl:
     Type: AWS::Lambda::Url
+    Condition: UseLambda
     Properties:
       TargetFunctionArn: !GetAtt ApiFunction.Arn
       AuthType: NONE
 
   ApiFunctionUrlPermission:
     Type: AWS::Lambda::Permission
+    Condition: UseLambda
     Properties:
       FunctionName: !Ref ApiFunction
       Action: lambda:InvokeFunctionUrl
@@ -140,33 +130,16 @@ Resources:
 
   ApiFunctionUrlInvokePermission:
     Type: AWS::Lambda::Permission
+    Condition: UseLambda
     Properties:
       FunctionName: !Ref ApiFunction
       Action: lambda:InvokeFunction
       Principal: "*"
       InvokedViaFunctionUrl: true
 
-  SchedulerRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: hvac-ai-scheduler-role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: { Service: scheduler.amazonaws.com }
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: invoke
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !GetAtt ApiFunction.Arn
-
   HourlySchedule:
     Type: AWS::Scheduler::Schedule
+    Condition: UseLambda
     Properties:
       Name: hvac-ai-hourly
       Description: Fetch KMA/Open-Meteo weather, keep forecast snapshots, recompute changed days
@@ -175,9 +148,10 @@ Resources:
       FlexibleTimeWindow: { Mode: "OFF" }
       Target:
         Arn: !GetAtt ApiFunction.Arn
-        RoleArn: !GetAtt SchedulerRole.Arn
+        RoleArn: !Ref SchedulerRoleArn
         Input: '{"task":"hourly"}'
 
+  # ---------------------------------------------------------------- web
   WebOAC:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -198,8 +172,7 @@ Resources:
       FunctionCode: |
         function handler(event) {
           var req = event.request;
-          var uri = req.uri;
-          if (!uri.includes('.') ) { req.uri = '/index.html'; }
+          if (!req.uri.includes('.')) { req.uri = '/index.html'; }
           return req;
         }
 
@@ -218,7 +191,10 @@ Resources:
             S3OriginConfig: { OriginAccessIdentity: "" }
             OriginAccessControlId: !GetAtt WebOAC.Id
           - Id: api
-            DomainName: !Select [2, !Split ["/", !GetAtt ApiFunctionUrl.FunctionUrl]]
+            DomainName: !If
+              - UseLambda
+              - !Select [2, !Split ["/", !GetAtt ApiFunctionUrl.FunctionUrl]]
+              - !Ref ExternalApiDomain
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols: [TLSv1.2]
@@ -270,5 +246,5 @@ Outputs:
     Value: !Ref WebBucket
   DataBucketName:
     Value: !Ref DataBucket
-  FunctionUrl:
-    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+  TableName:
+    Value: !Ref Table

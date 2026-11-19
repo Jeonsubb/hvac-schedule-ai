@@ -19,3 +19,4 @@ data/cache/
 *.pem
 .claude/settings.local.json
 .DS_Store
+infra/.run/
