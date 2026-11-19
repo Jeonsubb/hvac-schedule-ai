@@ -115,6 +115,16 @@ def refresh_weather(save_snapshots: bool = True) -> dict:
             src.setdefault("stale_sources", []).append(name)
     if not src.get("archive") and not src.get("om_forecast") and prev:
         return prev  # nothing usable fetched: keep the previous snapshot untouched
+    # Freeze settled history: weather for dates two or more days ago keeps the values that were
+    # first used, so past results (and every number quoted from them) stay stable across refreshes.
+    cutoff = (now_kst().date() - timedelta(days=2)).isoformat()
+    for name in ("archive", "prev_day1"):
+        old = prev.get(name) or {}
+        new = src.get(name) or {}
+        for k, v in old.items():
+            if k[:10] <= cutoff:
+                new[k] = v
+        src[name] = new
     get_store().put_blob("weather/sources.json", src)
     if save_snapshots and src.get("kma_forecast", {}).get("hourly"):
         # keep the KMA forecast that was valid before each future day started (planner view)
