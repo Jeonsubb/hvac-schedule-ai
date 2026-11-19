@@ -61,11 +61,12 @@ def plan_rule(sessions_by_room: dict, rooms: dict, settings: dict) -> dict:
 # ---------------------------------------------------------------- predictive (AI)
 
 class _Ctx:
-    __slots__ = ("rp", "to", "ghi", "occ", "sp_h", "sp_c", "t_adj")
+    __slots__ = ("rp", "to", "ghi", "occ", "sp_h", "sp_c", "t_adj", "cap_frac", "cap_until")
 
     def __init__(self, rp, to, ghi, occ, sp_h, sp_c, t_adj):
         self.rp, self.to, self.ghi, self.occ, self.sp_h, self.sp_c = rp, to, ghi, occ, sp_h, sp_c
         self.t_adj = t_adj
+        self.cap_frac, self.cap_until = 1.0, -1  # soft-start output limit before cap_until
 
 
 def _forward(ctx: _Ctx, ta: float, tm: float, m0: int, m1: int, mode_at, lo=None, hi=None):
@@ -80,7 +81,8 @@ def _forward(ctx: _Ctx, ta: float, tm: float, m0: int, m1: int, mode_at, lo=None
         c = mode_at(m)
         passive = (rp.gam * (tm - ta) + (rp.gao + rp.vent_g(people, c == FAN)) * (to - ta)
                    + rp.internal_gain(people) + rp.solar_gain(ctx.ghi[m]))
-        q = thermostat_q(rp, ta, passive, ctx.sp_h, ctx.sp_c) if c == COND else 0.0
+        q = thermostat_q(rp, ta, passive, ctx.sp_h, ctx.sp_c,
+                         ctx.cap_frac if m < ctx.cap_until else 1.0) if c == COND else 0.0
         if q > 0:
             e_wh += q / cop_heat(to) / 60.0
         elif q < 0:
@@ -119,7 +121,8 @@ def _first_exit(ctx, ta, tm, m0, s, e, lo, hi):
     return None, ta
 
 
-def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tuple[float, float], settings: dict):
+def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tuple[float, float], settings: dict,
+                 odu_share: float = 1.0):
     rp = RoomPhys(room)
     occ = occupancy_array(sessions)
     ctx = _Ctx(rp, to_f, ghi_f, occ, settings["sp_heat"], settings["sp_cool"], adjacent_temp(sum(to_f) / len(to_f)))
@@ -193,25 +196,42 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
                     t_a, _, _, _ = _forward(ctx, ta, tm, td, s, _switch(s - lead, OFF, COND))
                     return band_lo <= t_a <= band_hi
 
-                lo_l, hi_l = 0, max(0, s - td)
-                if ok(0):
-                    lead = 0
-                elif not ok(hi_l):
-                    lead = hi_l
-                else:
+                def search():
+                    lo_l, hi_l = 0, max(0, s - td)
+                    if ok(0):
+                        return 0, True
+                    if not ok(hi_l):
+                        return hi_l, False
                     while hi_l - lo_l > 1:
                         mid = (lo_l + hi_l) // 2
                         if ok(mid):
                             hi_l = mid
                         else:
                             lo_l = mid
-                    lead = hi_l
+                    return hi_l, True
+
+                # Pre-conditioning output: the room cannot count on more than its share of the
+                # outdoor unit (rooms on one ODU usually pre-heat together). Try a soft start
+                # (efficient part-load range) and the ODU share; keep the feasible option with
+                # the lower predicted electricity.
+                share = odu_share
+                options = []
+                for frac in sorted({min(settings.get("ai_softstart_frac", 0.6), share), share}):
+                    ctx.cap_frac, ctx.cap_until = frac, s
+                    ld, feas = search()
+                    _, _, e_wh, _ = _forward(ctx, ta, tm, td, s, _switch(s - ld, OFF, COND))
+                    options.append((not feas, e_wh, ld, frac))
+                options.sort()
+                infeasible, _, lead, frac = options[0]
+                feasible = not infeasible
+                ctx.cap_frac, ctx.cap_until = (frac, s) if frac < 1.0 else (1.0, -1)
                 if lead > 0:
                     lead = min(lead + settings.get("ai_lead_buffer_min", 3), max(0, s - td))
                 on_t = s - lead
                 why = "제습 필요(고습)" if humid else ("난방" if ta < band_lo else "냉방")
-                add_dec(blk, **{"type": "optimal_start", "detail": f"예측 실내 {ta:.1f}℃ → {why} {lead}분 선행 가동이면 시작 시 설정온도 도달",
-                                  "lead_min": lead, "saved_min": rule_pre - lead})
+                how = f"출력 {round(ctx.cap_frac * 100)}%로 " if ctx.cap_frac < 1.0 and lead > 0 else ""
+                add_dec(blk, **{"type": "optimal_start", "detail": f"예측 실내 {ta:.1f}℃ → {why} {how}{lead}분 선행 가동이면 시작 시 설정온도 도달",
+                                  "lead_min": lead, "saved_min": rule_pre - lead, "soft": bool(how)})
             mode = COND
             ta, tm, _, _ = _forward(ctx, ta, tm, td, on_t, _const(OFF))
             cursor = on_t
@@ -253,6 +273,9 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
                 add_dec(blk, **{"type": "bridge", "detail": f"공백 {gap}분: 계속 가동({e_a:.0f}Wh)이 재기동({(best_b or 0):.0f}Wh)보다 효율적",
                                   "saved_min": 0})
         if bridge:
+            if soft_seg:
+                intervals.append(soft_seg)
+                on_t = soft_seg["e"]
             # extend through the gap; next block starts with carry_on
             ta, tm, _, _ = _forward(ctx, ta, tm, t_check, e, _const(mode))
             cursor = e
@@ -264,10 +287,17 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
             carry_on = True
             continue
 
+        soft_seg = None
+        if ctx.cap_frac < 1.0 and ctx.cap_until > on_t:
+            soft_seg = {"s": on_t, "e": min(ctx.cap_until, t_off), "kind": "cond", "cap": ctx.cap_frac,
+                        "reason": f"예열 (실내기 출력 {round(ctx.cap_frac * 100)}%, 실외기 용량 분담)", "sessions": []}
+        ctx.cap_frac, ctx.cap_until = 1.0, -1
         if t_off < e:
             add_dec(blk, **{"type": "early_stop", "detail": f"건물 열관성으로 종료 {e - t_off}분 전 정지해도 쾌적 유지",
                               "saved_min": (e - t_off) - rule_early})
-        intervals.append({"s": on_t, "e": t_off, "kind": "cond",
+        if soft_seg:
+            intervals.append(soft_seg)
+        intervals.append({"s": soft_seg["e"] if soft_seg else on_t, "e": t_off, "kind": "cond",
                           "reason": "예측 최적화 (최적 기동·관성 정지)",
                           "sessions": [x["id"] for x in blk["sessions"]]})
         ta, tm = ta_off, tm_off
@@ -278,12 +308,22 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
     merged: list[dict] = []
     for iv in sorted(intervals, key=lambda x: x["s"]):
         iv.pop("_bridge", None)
-        if merged and iv["kind"] == merged[-1]["kind"] and iv["s"] <= merged[-1]["e"]:
+        if (merged and iv["kind"] == merged[-1]["kind"] and iv.get("cap", 1.0) == merged[-1].get("cap", 1.0)
+                and iv["s"] <= merged[-1]["e"]):
             merged[-1]["e"] = max(merged[-1]["e"], iv["e"])
             merged[-1]["sessions"] = merged[-1].get("sessions", []) + iv.get("sessions", [])
         else:
             merged.append(iv)
     return merged, decisions
+
+
+def _odu_share(rooms: dict, r: str) -> float:
+    """Fraction of rated IDU output a room can rely on when every room on its ODU runs at once."""
+    from .config import ODUS
+
+    odu = rooms[r]["odu"]
+    connected = sum(sum(i["heat_kw"] for i in v["idus"]) for v in rooms.values() if v["odu"] == odu)
+    return min(1.0, ODUS[odu]["cap_kw"] / connected) if connected else 1.0
 
 
 def plan_ai(sessions_by_room: dict, rooms: dict, weather_f: dict, init: dict, settings: dict):
@@ -293,7 +333,8 @@ def plan_ai(sessions_by_room: dict, rooms: dict, weather_f: dict, init: dict, se
         if not ss:
             plans[r] = []
             continue
-        p, d = plan_ai_room(rooms[r], ss, weather_f["to"], weather_f["rh"], weather_f["ghi"], init[r], settings)
+        p, d = plan_ai_room(rooms[r], ss, weather_f["to"], weather_f["rh"], weather_f["ghi"], init[r], settings,
+                            odu_share=_odu_share(rooms, r))
         plans[r] = p
         decisions.extend(d)
     return plans, decisions

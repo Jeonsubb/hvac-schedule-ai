@@ -61,15 +61,17 @@ class RoomPhys:
         return g * 2.0 if economizer else g * (1.0 - ERV_EFF)
 
 
-def thermostat_q(rp: RoomPhys, ta: float, passive: float, sp_heat: float, sp_cool: float) -> float:
-    """Ideal capacity-limited thermostat: heat/cool just enough to stay inside [sp_heat, sp_cool]."""
+def thermostat_q(rp: RoomPhys, ta: float, passive: float, sp_heat: float, sp_cool: float,
+                 cap_frac: float = 1.0) -> float:
+    """Ideal capacity-limited thermostat: heat/cool just enough to stay inside [sp_heat, sp_cool].
+    cap_frac limits IDU output (soft start)."""
     ta_free = ta + DT * passive / rp.ca
     if ta_free < sp_heat:
         q = rp.ca * (sp_heat - ta) / DT - passive
-        return min(max(q, 0.0), rp.cap_heat)
+        return min(max(q, 0.0), rp.cap_heat * cap_frac)
     if ta_free > sp_cool:
         q = rp.ca * (sp_cool - ta) / DT - passive
-        return max(min(q, 0.0), -rp.cap_cool)
+        return max(min(q, 0.0), -rp.cap_cool * cap_frac)
     return 0.0
 
 

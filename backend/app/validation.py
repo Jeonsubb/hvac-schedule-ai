@@ -119,7 +119,7 @@ _INT_BOUNDS = {
 _FLOAT_BOUNDS = {
     "sp_heat": (15.0, 25.0), "sp_cool": (22.0, 30.0), "comfort_low": (14.0, 24.0), "comfort_high": (23.0, 31.0),
     "dehum_rh": (40.0, 100.0), "dehum_temp": (10.0, 35.0), "override_rate": (0.0, 0.3), "failure_rate": (0.0, 0.3),
-    "co2_kg_per_kwh": (0.0, 2.0), "ai_margin_k": (0.0, 2.0),
+    "co2_kg_per_kwh": (0.0, 2.0), "ai_margin_k": (0.0, 2.0), "ai_softstart_frac": (0.3, 1.0),
 }
 
 

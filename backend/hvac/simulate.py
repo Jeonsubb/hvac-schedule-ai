@@ -33,6 +33,17 @@ def plan_to_cmd(intervals: list[dict]) -> list[int]:
     return cmd
 
 
+def plan_to_cap(intervals: list[dict]) -> list[float]:
+    """Per-minute IDU output limit (fraction of rated capacity); soft-start segments use < 1."""
+    cap = [1.0] * 1440
+    for iv in intervals:
+        f = float(iv.get("cap", 1.0))
+        if f < 1.0:
+            for m in range(max(0, iv["s"]), min(1440, iv["e"])):
+                cap[m] = min(cap[m], f)
+    return cap
+
+
 def cmd_to_intervals(cmd: list[int]) -> list[dict]:
     out = []
     cur, start = OFF, 0
@@ -69,6 +80,7 @@ def simulate_day(
     ids = sorted(rooms)
     phys = {r: RoomPhys(rooms[r]) for r in ids}
     cmds = {r: plan_to_cmd(plans.get(r, [])) for r in ids}
+    caps = {r: plan_to_cap(plans.get(r, [])) for r in ids}
     anomalies = anomalies or {}
     for r, lst in anomalies.items():
         for a in lst:
@@ -102,6 +114,7 @@ def simulate_day(
         to = to_min[m]
         ghi = ghi_min[m]
         q = {}
+        passive_of = {}
         for r in ids:
             rp = phys[r]
             a, b = ta[r], tm[r]
@@ -119,9 +132,20 @@ def simulate_day(
                     guard_events[r][-1]["e"] = m + 1
             passive = (rp.gam * (b - a) + (rp.gao + rp.vent_g(people, c == FAN)) * (to - a)
                        + rp.internal_gain(people) + rp.solar_gain(ghi))
-            qq = thermostat_q(rp, a, passive, sp_h, sp_c) if c == COND else 0.0
-            q[r] = qq
-            ta[r] = a + DT * (passive + qq) / rp.ca
+            passive_of[r] = passive
+            q[r] = thermostat_q(rp, a, passive, sp_h, sp_c, caps[r][m]) if c == COND else 0.0
+        # outdoor-unit capacity: connected indoor units cannot draw more than the ODU delivers
+        for o, rlist in odu_rooms.items():
+            cap_w = odus[o]["cap_kw"] * 1000.0
+            req = sum(abs(q[r]) for r in rlist)
+            if req > cap_w > 0:
+                f = cap_w / req
+                for r in rlist:
+                    q[r] *= f
+        for r in ids:
+            rp = phys[r]
+            a, b, qq = ta[r], tm[r], q[r]
+            ta[r] = a + DT * (passive_of[r] + qq) / rp.ca
             tm[r] = b + DT * (rp.gam * (a - b) + rp.gmo * (to - b) + rp.gadj * (t_adj - b)) / rp.cm
             if qq > 0:
                 q_room_heat[r] += qq * DT / 3.6e6

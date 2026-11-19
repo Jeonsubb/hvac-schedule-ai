@@ -120,7 +120,8 @@ DEFAULT_SETTINGS = {
     "manual_off_delay_min": 30,
     "baseline": "fixed",
     # AI optimiser bounds
-    "ai_max_lead_min": 90,
+    "ai_max_lead_min": 120,
+    "ai_softstart_frac": 0.6,
     "ai_max_early_off_min": 15,
     "ai_gap_eval_max_min": 120,
     "dehum_rh": 75.0,
