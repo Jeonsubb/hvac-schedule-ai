@@ -130,9 +130,14 @@ DEFAULT_SETTINGS = {
     "override_rate": 0.02,
     "failure_rate": 0.01,
     "auto_off_after_min": 10,
-    # economics (approximate; see docs/research)
-    "tariff": {"summer": 140.0, "spring_fall": 100.0, "winter": 125.0},
-    "co2_kg_per_kwh": 0.4594,
+    # economics: KEPCO 교육용(을) 고압A 선택I (요금표 2023-05-16 게시본), 원/kWh
+    "tariff": {
+        "summer": {"light": 76.5, "mid": 121.2, "peak": 187.1},
+        "spring_fall": {"light": 76.5, "mid": 90.9, "peak": 111.4},
+        "winter": {"light": 80.5, "mid": 119.7, "peak": 158.4},
+    },
+    # 국가 전력배출계수 2023년도 0.4173 tCO2eq/MWh (기후에너지환경부 2025-12 공표, 보도 기준)
+    "co2_kg_per_kwh": 0.4173,
 }
 
 STRATEGIES = {
@@ -145,3 +150,16 @@ STRATEGIES = {
 
 def default_settings() -> dict:
     return copy.deepcopy(DEFAULT_SETTINGS)
+
+
+# KEPCO time-of-use bands by hour (0-23)
+def tou_band(season: str, hour: int) -> str:
+    if hour >= 23 or hour < 9:
+        return "light"
+    if season == "winter":
+        if hour in (10, 11, 17, 18, 19, 22):
+            return "peak"
+        return "mid"
+    if hour in (10, 11, 13, 14, 15, 16):
+        return "peak"
+    return "mid"

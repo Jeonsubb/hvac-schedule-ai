@@ -8,7 +8,7 @@ ai     : predictive optimisation with the room thermal model and the weather for
 """
 from __future__ import annotations
 
-from .model import DT, RoomPhys, cop_cool, cop_heat, thermostat_q
+from .model import DT, RoomPhys, adjacent_temp, cop_cool, cop_heat, thermostat_q
 from .simulate import COND, FAN, OFF, occupancy_array
 from .timetable import hm_to_min, min_to_hm
 
@@ -61,10 +61,11 @@ def plan_rule(sessions_by_room: dict, rooms: dict, settings: dict) -> dict:
 # ---------------------------------------------------------------- predictive (AI)
 
 class _Ctx:
-    __slots__ = ("rp", "to", "ghi", "occ", "sp_h", "sp_c")
+    __slots__ = ("rp", "to", "ghi", "occ", "sp_h", "sp_c", "t_adj")
 
-    def __init__(self, rp, to, ghi, occ, sp_h, sp_c):
+    def __init__(self, rp, to, ghi, occ, sp_h, sp_c, t_adj):
         self.rp, self.to, self.ghi, self.occ, self.sp_h, self.sp_c = rp, to, ghi, occ, sp_h, sp_c
+        self.t_adj = t_adj
 
 
 def _forward(ctx: _Ctx, ta: float, tm: float, m0: int, m1: int, mode_at, lo=None, hi=None):
@@ -87,7 +88,7 @@ def _forward(ctx: _Ctx, ta: float, tm: float, m0: int, m1: int, mode_at, lo=None
         if c != OFF:
             e_wh += 60.0 * rp.n_idu / 60.0
         ta_new = ta + DT * (passive + q) / rp.ca
-        tm = tm + DT * (rp.gam * (ta - tm) + rp.gmo * (to - tm)) / rp.cm
+        tm = tm + DT * (rp.gam * (ta - tm) + rp.gmo * (to - tm) + rp.gadj * (ctx.t_adj - tm)) / rp.cm
         ta = ta_new
         if lo is not None and people > 0 and not (lo <= ta <= hi):
             violated = True
@@ -111,7 +112,7 @@ def _first_exit(ctx, ta, tm, m0, s, e, lo, hi):
         passive = (rp.gam * (tm - ta) + (rp.gao + rp.vent_g(people, False)) * (to - ta)
                    + rp.internal_gain(people) + rp.solar_gain(ctx.ghi[m]))
         ta_new = ta + DT * passive / rp.ca
-        tm = tm + DT * (rp.gam * (ta - tm) + rp.gmo * (to - tm)) / rp.cm
+        tm = tm + DT * (rp.gam * (ta - tm) + rp.gmo * (to - tm) + rp.gadj * (ctx.t_adj - tm)) / rp.cm
         ta = ta_new
         if m >= s and not (lo <= ta <= hi):
             return m, ta
@@ -121,7 +122,7 @@ def _first_exit(ctx, ta, tm, m0, s, e, lo, hi):
 def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tuple[float, float], settings: dict):
     rp = RoomPhys(room)
     occ = occupancy_array(sessions)
-    ctx = _Ctx(rp, to_f, ghi_f, occ, settings["sp_heat"], settings["sp_cool"])
+    ctx = _Ctx(rp, to_f, ghi_f, occ, settings["sp_heat"], settings["sp_cool"], adjacent_temp(sum(to_f) / len(to_f)))
     margin = settings.get("ai_margin_k", 0.4)
     lo, hi = settings["comfort_low"] + margin, settings["comfort_high"] - margin
     max_lead = settings["ai_max_lead_min"]

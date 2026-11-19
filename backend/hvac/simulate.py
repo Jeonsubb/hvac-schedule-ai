@@ -60,6 +60,7 @@ def simulate_day(
     detail: bool = True,
     occupancy: dict[str, list[float]] | None = None,
     guard: bool = False,
+    t_adj: float = 18.0,
 ) -> dict:
     """guard=True adds closed-loop correction: while people are present and the unit is
     not conditioning, leaving the comfort band starts conditioning until the room empties."""
@@ -121,7 +122,7 @@ def simulate_day(
             qq = thermostat_q(rp, a, passive, sp_h, sp_c) if c == COND else 0.0
             q[r] = qq
             ta[r] = a + DT * (passive + qq) / rp.ca
-            tm[r] = b + DT * (rp.gam * (a - b) + rp.gmo * (to - b)) / rp.cm
+            tm[r] = b + DT * (rp.gam * (a - b) + rp.gmo * (to - b) + rp.gadj * (t_adj - b)) / rp.cm
             if qq > 0:
                 q_room_heat[r] += qq * DT / 3.6e6
             elif qq < 0:
@@ -169,7 +170,7 @@ def simulate_day(
 
     rooms_out = {}
     for r in ids:
-        comfort = session_comfort(sessions_by_room.get(r, []), ta_series[r], tm_series[r], rh_min, to_min, lo, hi, clo)
+        comfort = session_comfort(sessions_by_room.get(r, []), ta_series[r], tm_series[r], rh_min, to_min, lo, hi, clo, occ[r])
         on_min = sum(1 for v in cmds[r] if v != OFF)
         rooms_out[r] = {
             "kwh": round(e_room[r], 3),
@@ -208,12 +209,16 @@ def simulate_day(
     }
 
 
-def session_comfort(sessions, ta5, tm5, rh_min, to_min, lo, hi, clo) -> list[dict]:
+def session_comfort(sessions, ta5, tm5, rh_min, to_min, lo, hi, clo, occ=None) -> list[dict]:
+    """Comfort while people are actually present (unannounced no-shows / early dismissal excluded)."""
     out = []
     for s in sessions:
         a, b = hm_to_min(s["start"]), hm_to_min(s["end"])
-        idx = [k for k in range(a // 5, min(b // 5, len(ta5)))]
+        idx = [k for k in range(a // 5, min(b // 5, len(ta5))) if occ is None or occ[min(k * 5 + 2, 1439)] > 0]
         if not idx:
+            out.append({"id": s["id"], "start": s["start"], "end": s["end"], "minutes": 0, "in_band_minutes": 0,
+                        "ta_start": ta5[max(a // 5 - 1, 0)], "ta_min": None, "ta_max": None,
+                        "discomfort_dm": 0.0, "pmv": None, "vacant": True})
             continue
         temps = [ta5[k] for k in idx]
         inb = sum(1 for t in temps if lo <= t <= hi)
@@ -230,8 +235,8 @@ def session_comfort(sessions, ta5, tm5, rh_min, to_min, lo, hi, clo) -> list[dic
                 "id": s["id"],
                 "start": s["start"],
                 "end": s["end"],
-                "minutes": b - a,
-                "in_band_minutes": inb * 5 if len(temps) * 5 <= b - a else round(inb * (b - a) / len(temps)),
+                "minutes": len(temps) * 5,
+                "in_band_minutes": inb * 5,
                 "ta_start": ta5[start_k] if start_k < len(ta5) else None,
                 "ta_min": min(temps),
                 "ta_max": max(temps),

@@ -4,8 +4,8 @@ from __future__ import annotations
 import random
 from datetime import date, timedelta
 
-from .config import HOLIDAYS, ODUS, ROOMS, SEMESTER, STRATEGIES
-from .model import clo_for_month
+from .config import HOLIDAYS, ODUS, ROOMS, SEMESTER, STRATEGIES, tou_band
+from .model import adjacent_temp, clo_for_month
 from .simulate import COND, OFF, history_from_cmds, occupancy_array, simulate_day
 from .strategies import plan_ai, plan_fixed, plan_manual, plan_rule
 from .timetable import hm_to_min, min_to_hm, sessions_for_date
@@ -220,7 +220,8 @@ def warm_state(d: date, courses: list[dict], events: list[dict], weather_by_date
         plan = plan_rule(by_room, ROOMS, settings)
         sim = simulate_day(ROOMS, ODUS, plan, by_room, minute_series(w["actual"]["t"]),
                            minute_series(w["actual"]["rh"]), minute_series(w["actual"]["ghi"]),
-                           state, settings, detail=False, clo=clo_for_month(wd.month))
+                           state, settings, detail=False, clo=clo_for_month(wd.month),
+                           t_adj=adjacent_temp(sum(w["actual"]["t"]) / 24.0))
         state = sim["end_state"]
     return state
 
@@ -261,19 +262,21 @@ def compute_day(
            "sessions": sessions, "weather": weather_day, "strategies": {}, "decisions": decisions,
            "init": {r: [round(v[0], 2), round(v[1], 2)] for r, v in init.items()}, "scenario": scenario}
     season = season_of(d)
-    price = settings["tariff"][season]
+    rates = settings["tariff"][season]
+    if not isinstance(rates, dict):
+        rates = {"light": rates, "mid": rates, "peak": rates}
     for st, plan in plans.items():
         anomalies, extra_causes = ({}, {})
         if st == "ai":
             anomalies, extra_causes = ai_field_controls(plan, scenario, settings)
         sim = simulate_day(rooms, odus, plan, by_room, to_a, rh_a, ghi_a, init_states[st], settings,
                            anomalies=anomalies, clo=clo, detail=detail, occupancy=occ_actual,
-                           guard=(st == "ai"))
+                           guard=(st == "ai"), t_adj=adjacent_temp(sum(wa["t"]) / 24.0))
         guard_events = sim.pop("guard_events", {})
         sim.pop("end_state")
         cmds = sim.pop("_cmds")
         sim["plan"] = plan
-        sim["cost_krw"] = round(sim["kwh"] * price)
+        sim["cost_krw"] = round(sum(k * rates[tou_band(season, h)] for h, k in enumerate(sim["kwh_by_hour"])))
         sim["co2_kg"] = round(sim["kwh"] * settings["co2_kg_per_kwh"], 2)
         if st == "ai":
             out["validation"] = validate_day(by_room, plan, decisions, sim, cmds, scenario, anomalies, settings,

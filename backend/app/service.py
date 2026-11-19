@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v7"
+ENGINE_VERSION = "v8"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST

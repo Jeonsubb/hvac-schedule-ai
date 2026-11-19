@@ -23,7 +23,7 @@ ERV_EFF = 0.6  # energy recovery ventilator sensible effectiveness
 
 
 class RoomPhys:
-    __slots__ = ("id", "ca", "cm", "gam", "gao", "gmo", "win", "cap_heat", "cap_cool",
+    __slots__ = ("id", "ca", "cm", "gam", "gao", "gmo", "gadj", "win", "cap_heat", "cap_cool",
                  "n_idu", "area", "pcs", "odu")
 
     def __init__(self, room: dict):
@@ -34,6 +34,7 @@ class RoomPhys:
         self.gam = 1050.0 * s
         self.gao = 80.0 * s
         self.gmo = 60.0 * s
+        self.gadj = 80.0 * s  # partitions / slabs to neighbouring rooms and corridors
         self.win = 10.0 * s
         self.cap_heat = sum(i["heat_kw"] for i in room["idus"]) * 1000.0
         self.cap_cool = sum(i["cool_kw"] for i in room["idus"]) * 1000.0
@@ -81,9 +82,13 @@ def cop_heat(to: float) -> float:
 
 
 def plr_factor(plr: float) -> float:
-    """Electric input multiplier vs. full-load efficiency (low-load cycling penalty)."""
-    p = max(plr, 0.1)
-    return (0.12 + 0.7 * p + 0.18 * p * p) / p
+    """Electric input per unit heat vs. full load, shaped after the EnergyPlus
+    VariableRefrigerantFlow_5Zone example curves: ~1.2x more efficient at 50-60 %
+    part load than at full load; below 25 % the compressor cycles and efficiency drops."""
+    p = min(max(plr, 0.02), 1.2)
+    if p >= 0.25:
+        return 1.037 * p * p - 1.2296 * p + 1.1926
+    return 0.95 * (0.25 / p) ** 0.35
 
 
 def electric_w(q: float, to: float, plr: float) -> float:
@@ -143,3 +148,8 @@ def pmv(ta: float, tr: float, rh: float, clo: float, met: float = 1.1, vel: floa
 
 def clo_for_month(month: int) -> float:
     return {6: 0.5, 7: 0.5, 8: 0.5, 9: 0.55, 10: 0.75, 11: 0.95, 12: 1.0}.get(month, 0.9)
+
+
+def adjacent_temp(to_daily_mean: float) -> float:
+    """Temperature of neighbouring spaces (corridors, other rooms) seen by the structure node."""
+    return min(max(0.5 * to_daily_mean + 10.0, 17.0), 26.0)
