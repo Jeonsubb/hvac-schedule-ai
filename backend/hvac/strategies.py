@@ -46,7 +46,7 @@ def plan_rule(sessions_by_room: dict, rooms: dict, settings: dict) -> dict:
         for s, e, sess in ss:
             if ivs and s - ivs[-1]["_end"] <= gap:
                 ivs[-1]["e"] = max(e - early, ivs[-1]["e"])
-                ivs[-1]["_end"] = e
+                ivs[-1]["_end"] = max(e, ivs[-1]["_end"])
                 ivs[-1]["sessions"].append(sess["id"])
                 ivs[-1]["reason"] = f"연속 강의(공백 {gap}분 이내) 유지"
                 continue

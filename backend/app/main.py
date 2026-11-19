@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from hvac import config, engine, timetable
 
 from . import jobs, service
+from .validation import InvalidInput, in_weather_range
 
 app = FastAPI(title="HVAC Schedule AI", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -30,9 +31,33 @@ async def origin_guard(request: Request, call_next):
 
 def _date(s: str) -> date:
     try:
-        return date.fromisoformat(s)
-    except ValueError:
+        d = date.fromisoformat(s)
+    except (TypeError, ValueError):
         raise HTTPException(400, "date must be YYYY-MM-DD")
+    try:
+        in_weather_range(d)
+    except InvalidInput as e:
+        raise HTTPException(400, str(e))
+    return d
+
+
+@app.exception_handler(InvalidInput)
+async def invalid_input(_request: Request, exc: InvalidInput):
+    return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+AI_PER_MINUTE = int(os.environ.get("AI_PER_MINUTE", "8"))
+
+
+def _rate_limit(request: Request, bucket: str, limit: int = AI_PER_MINUTE) -> None:
+    """Per-client-IP limit for Bedrock-backed endpoints (counter in the item store)."""
+    addr = request.headers.get("cloudfront-viewer-address") or request.headers.get("x-forwarded-for") or (
+        request.client.host if request.client else "unknown")
+    ip = addr.split(",")[0].strip().rsplit(":", 1)[0] if addr.count(":") == 1 else addr.split(",")[0].strip()
+    minute = service.now_kst().strftime("%Y%m%d%H%M")
+    n = service.get_store().incr("ratelimit", f"{bucket}|{ip}|{minute}", "n")
+    if n > limit:
+        raise HTTPException(429, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.")
 
 
 @app.get("/api/health")
@@ -97,7 +122,14 @@ def weather_now():
 
 @app.post("/api/weather/refresh")
 def weather_refresh():
+    st = service.get_store()
+    last = st.get_item("meta", "refresh_queued") or {}
+    import time as _t
+
+    if _t.time() - float(last.get("t", 0)) < 300:
+        return {"job": last.get("job"), "throttled": True}
     job = jobs.create("refresh", {})
+    st.put_item("meta", "refresh_queued", {"t": _t.time(), "job": job["id"]})
     return {"job": job["id"]}
 
 
@@ -107,7 +139,7 @@ def courses():
 
 
 @app.post("/api/import")
-async def import_file(file: UploadFile = File(...), hint: str = Form("")):
+async def import_file(request: Request, file: UploadFile = File(...), hint: str = Form("")):
     data = await file.read()
     name = file.filename or "upload"
     lower = name.lower()
@@ -139,24 +171,33 @@ async def import_file(file: UploadFile = File(...), hint: str = Form("")):
              "gif": "image/gif", "pdf": "application/pdf"}.get(lower.rsplit(".", 1)[-1])
     if not media:
         raise HTTPException(400, "지원 형식: CSV, XLSX, JSON, PNG/JPG/WEBP 이미지, PDF")
-    job = jobs.create("extract", {"data_b64": base64.b64encode(data).decode(), "media_type": media,
-                                  "filename": name, "hint": hint})
+    _rate_limit(request, "extract", 3)
+    job = jobs.create("extract", {"media_type": media, "filename": name[:120], "hint": hint[:500]},
+                      blob={"data_b64": base64.b64encode(data).decode()})
     return {"mode": "job", "job": job["id"], "source": name}
 
 
 @app.post("/api/import/commit")
 def import_commit(body: dict = Body(...)):
-    res = service.commit_courses(body["courses"], body.get("source", "가져오기"))
-    jobs.create("precompute", {})
+    try:
+        res = service.commit_courses(body.get("courses") or [], str(body.get("source", "가져오기"))[:120])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    service._queue_precompute()
     return res
 
 
 @app.post("/api/import/api")
 def import_api(body: dict = Body(...)):
     """External system push (API/DB integration): long-format records."""
-    new = timetable.normalize_records(body.get("records", []), source=body.get("source", "API"))
+    new = timetable.normalize_records(body.get("records", []), source=str(body.get("source", "API"))[:120])
     if body.get("commit"):
-        return {"committed": service.commit_courses(new, body.get("source", "API"))}
+        try:
+            res = service.commit_courses(new, str(body.get("source", "API"))[:120])
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        service._queue_precompute()
+        return {"committed": res}
     return {"preview": service.preview_courses(new)}
 
 
@@ -167,12 +208,12 @@ def list_events():
 
 @app.post("/api/events")
 def create_event(ev: dict = Body(...)):
-    if ev.get("type") not in ("add", "cancel", "move", "closure") or not ev.get("date"):
-        raise HTTPException(400, "type(add|cancel|move|closure)와 date가 필요합니다.")
-    _date(ev["date"])
-    if ev["type"] == "add" and not (ev.get("room") in config.ROOMS and ev.get("start") and ev.get("end")):
-        raise HTTPException(400, "추가 일정은 room(IT관 강의실), start, end가 필요합니다.")
-    res = service.add_event({k: v for k, v in ev.items() if k != "clarification"})
+    try:
+        res = service.add_event(ev)
+    except InvalidInput as e:
+        raise HTTPException(400, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     service._queue_precompute()
     return res
 
@@ -185,11 +226,15 @@ def remove_event(event_id: str):
 
 
 @app.post("/api/events/parse")
-def parse_event(body: dict = Body(...)):
+def parse_event(request: Request, body: dict = Body(...)):
     from . import ai
 
+    text = str(body.get("text") or "").strip()
+    if not text or len(text) > 500:
+        raise HTTPException(400, "text는 1~500자여야 합니다.")
+    _rate_limit(request, "parse")
     try:
-        return ai.parse_event(body["text"])
+        return ai.parse_event(text)
     except ai.QuotaExceeded as e:
         raise HTTPException(429, str(e))
 
@@ -202,14 +247,14 @@ def get_settings():
 @app.put("/api/settings")
 def put_settings(body: dict = Body(...)):
     res = service.save_settings(body)
-    jobs.create("precompute", {})
+    service._queue_precompute()
     return res
 
 
 @app.post("/api/settings/reset")
 def reset_settings():
     res = service.save_settings(config.default_settings())
-    jobs.create("precompute", {})
+    service._queue_precompute()
     return res
 
 
@@ -246,10 +291,16 @@ def history(d: str, device: str | None = None):
 
 
 @app.post("/api/chat")
-def chat(body: dict = Body(...)):
-    msgs = body.get("messages") or []
-    if not msgs or msgs[-1].get("role") != "user":
+def chat(request: Request, body: dict = Body(...)):
+    raw = body.get("messages") or []
+    # only plain user/assistant text turns are accepted (no client-injected system/tool content)
+    msgs = [{"role": m.get("role"), "content": str(m.get("content"))[:4000]}
+            for m in raw if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")]
+    if not msgs or msgs[-1]["role"] != "user":
         raise HTTPException(400, "messages의 마지막은 user 메시지여야 합니다.")
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    _rate_limit(request, "chat")
     job = jobs.create("chat", {"messages": msgs[-12:]})
     return {"job": job["id"]}
 
@@ -265,5 +316,5 @@ def job_status(job_id: str):
 
 @app.post("/api/precompute")
 def precompute():
-    job = jobs.create("precompute", {})
-    return {"job": job["id"]}
+    service._queue_precompute()
+    return {"queued": True}

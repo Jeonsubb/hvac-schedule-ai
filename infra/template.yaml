@@ -116,6 +116,14 @@ Resources:
           LLM_DAILY_CAP: "600"
       Tags: [{ Key: project, Value: hvac-ai }]
 
+  ApiAsyncConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Qualifier: $LATEST
+      MaximumRetryAttempts: 0
+      MaximumEventAgeInSeconds: 900
+
   ApiFunctionUrl:
     Type: AWS::Lambda::Url
     Properties:

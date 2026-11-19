@@ -93,7 +93,7 @@ def parse_event(text: str) -> dict:
         "정보가 부족해 확정할 수 없으면 clarification에 짧은 질문을 넣고, 나머지는 가능한 만큼 채웁니다.\n\n"
         "강의 목록(id|강의실|요일|시간|과목|교수):\n" + _course_catalog()
     )
-    resp = client().messages.create(
+    resp = client().with_options(timeout=40.0, max_retries=1).messages.create(
         model=HAIKU,
         max_tokens=2000,
         system=system,

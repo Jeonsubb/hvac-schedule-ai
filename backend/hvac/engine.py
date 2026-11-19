@@ -173,7 +173,7 @@ def validate_day(sessions_by_room: dict, plans: dict, decisions: list, sim: dict
                         if g["s"] < b and g["e"] > a)
             if g_min > 0:
                 notes.append(f"예보 오차로 실내온도 이탈 → 피드백 보정 {g_min}분")
-                if status == "ok":
+                if status in ("ok", "skip_ok"):
                     status = "corrected"
             if "failure" in evtypes:
                 notes.append("On 명령 응답 없음 → 5분 후 재전송으로 복구")

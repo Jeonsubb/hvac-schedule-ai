@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v8"
+ENGINE_VERSION = "v9"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST
@@ -52,9 +52,11 @@ def settings() -> dict:
 
 
 def save_settings(new: dict, actor: str = "운영자") -> dict:
+    from .validation import settings_patch
+
     cur = settings()
-    allowed = set(config.DEFAULT_SETTINGS)
-    changes = {k: v for k, v in new.items() if k in allowed and cur.get(k) != v}
+    clean = settings_patch({k: v for k, v in new.items() if k in config.DEFAULT_SETTINGS}, cur)
+    changes = {k: v for k, v in clean.items() if cur.get(k) != v}
     merged = {**cur, **changes}
     get_store().put_item("settings", "active", merged)
     if changes:
@@ -64,9 +66,11 @@ def save_settings(new: dict, actor: str = "운영자") -> dict:
 
 def courses() -> list[dict]:
     items = get_store().list_items("course")
-    if not items:
+    if not items and not get_store().get_item("meta", "seeded"):
+        # first run only: seed the bundled PNU timetable
         items = timetable.parse_grid_csv(RAW_CSV.read_text(encoding="utf-8-sig"), source="부산대 시간표 CSV")
         get_store().replace_kind("course", {c["id"]: c for c in items})
+        get_store().put_item("meta", "seeded", {"at": now_kst().isoformat(timespec="seconds")})
     return sorted(items, key=lambda c: (c["room"], c["weekday"], c["start"]))
 
 
@@ -103,6 +107,14 @@ def refresh_weather(save_snapshots: bool = True) -> dict:
     src = weather.fetch_sources(now_kst().date(), s[0], s[-1], config.BUILDING["lat"], config.BUILDING["lon"],
                                 config.BUILDING["kma_nx"], config.BUILDING["kma_ny"], key)
     src["today"] = now_kst().date().isoformat()
+    # a failed source keeps its last good value instead of degrading the whole semester
+    prev = get_store().get_blob("weather/sources.json") or {}
+    for name in ("archive", "prev_day1", "om_forecast", "climatology", "kma_forecast", "kma_nowcast"):
+        if name in src.get("errors", {}) and prev.get(name):
+            src[name] = prev[name]
+            src.setdefault("stale_sources", []).append(name)
+    if not src.get("archive") and not src.get("om_forecast") and prev:
+        return prev  # nothing usable fetched: keep the previous snapshot untouched
     get_store().put_blob("weather/sources.json", src)
     if save_snapshots and src.get("kma_forecast", {}).get("hourly"):
         # keep the KMA forecast that was valid before each future day started (planner view)
@@ -154,7 +166,7 @@ def day_fingerprint(d: date, cs: list, evs: list, wx: dict, st: dict) -> str:
     parts = [ENGINE_VERSION, _h(st)]
     for x in days:
         ss = timetable.sessions_for_date(x, cs, evs)
-        parts.append(_h([(s["room"], s["start"], s["end"], s["expected_people"]) for s in ss]))
+        parts.append(_h([(s["id"], s["room"], s["start"], s["end"], s["expected_people"], s["title"]) for s in ss]))
         parts.append(_h(wx.get(x.isoformat())))
     return _h(parts)
 
@@ -199,7 +211,7 @@ def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
     ctx = ctx or Ctx()
     s, e = semester_range()
     dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
-    key_all = _h([day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
+    key_all = _h([now_kst().date().isoformat()] + [day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
     cached = get_store().get_blob(f"summary/{key_all}.json")
     if cached:
         return cached
@@ -285,6 +297,11 @@ def effective_now(ctx: Ctx, at: str | None = None) -> dict:
 # ---------------------------------------------------------------- events & imports
 
 def add_event(ev: dict, actor: str = "운영자") -> dict:
+    from .validation import event as validate_event
+
+    ev = validate_event(ev, {c["id"] for c in courses()})
+    if len(get_store().list_items("event")) >= 500:
+        raise ValueError("이벤트는 최대 500개까지 등록할 수 있습니다.")
     ctx = Ctx()
     d = date.fromisoformat(ev["date"])
     before = engine.summarize_day(get_day(d, ctx))
@@ -323,13 +340,22 @@ def preview_courses(new: list[dict]) -> dict:
 
 
 def commit_courses(new: list[dict], source: str, actor: str = "운영자") -> dict:
-    weekly = [c for c in new if c.get("weekday") is not None]
-    dated = [c for c in new if c.get("weekday") is None and c.get("date")]
-    get_store().replace_kind("course", {c["id"]: c for c in weekly})
+    from .validation import courses as clean_courses
+
+    items = clean_courses(new)
+    weekly = [c for c in items if c.get("weekday") is not None]
+    dated = [c for c in items if c.get("weekday") is None and c.get("date")]
+    if not weekly and not dated:
+        raise ValueError("반영할 수 있는 강의가 없습니다(강의실·시간 형식을 확인하세요).")
+    if weekly:  # only replace the weekly timetable when the import actually contains one
+        get_store().replace_kind("course", {c["id"]: c for c in weekly})
     for c in dated:
-        add_ev = {"type": "add", "date": c["date"], "room": c["room"], "start": c["start"], "end": c["end"],
-                  "title": c["class_name"], "expected_people": c["expected_people"], "source": source}
-        get_store().put_item("event", "E" + uuid.uuid4().hex[:8], {**add_ev, "id": "E" + uuid.uuid4().hex[:8]})
+        if not (config.SEMESTER["start"].isoformat() <= c["date"] <= config.SEMESTER["end"].isoformat()):
+            continue
+        eid = "E" + uuid.uuid4().hex[:8]
+        get_store().put_item("event", eid, {"id": eid, "type": "add", "date": c["date"], "room": c["room"],
+                                            "start": c["start"], "end": c["end"], "title": c["class_name"],
+                                            "expected_people": c["expected_people"], "source": source})
     audit("import", f"시간표 반영: 주간 강의 {len(weekly)}개, 일회성 일정 {len(dated)}개 ({source})", actor)
     return {"weekly": len(weekly), "dated": len(dated)}
 
@@ -337,8 +363,10 @@ def commit_courses(new: list[dict], source: str, actor: str = "운영자") -> di
 # ---------------------------------------------------------------- what-if & exports
 
 def what_if(overrides: dict, dates: list[date]) -> dict:
+    from .validation import settings_patch
+
     ctx = Ctx()
-    st = {**ctx.settings, **{k: v for k, v in overrides.items() if k in config.DEFAULT_SETTINGS}}
+    st = {**ctx.settings, **settings_patch({k: v for k, v in overrides.items() if k in config.DEFAULT_SETTINGS}, ctx.settings)}
     res = {"base": {}, "new": {}, "dates": [d.isoformat() for d in dates], "overrides": overrides}
     for label, s in (("base", ctx.settings), ("new", st)):
         tot: dict = {}
