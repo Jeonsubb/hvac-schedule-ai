@@ -84,9 +84,12 @@ class AwsStore:
     def __init__(self, bucket: str, table: str, region: str):
         import boto3
 
+        from botocore.config import Config
+
+        cfg = Config(connect_timeout=4, read_timeout=15, retries={"max_attempts": 2, "mode": "standard"})
         self.bucket = bucket
-        self.s3 = boto3.client("s3", region_name=region)
-        self.table = boto3.resource("dynamodb", region_name=region).Table(table)
+        self.s3 = boto3.client("s3", region_name=region, config=cfg)
+        self.table = boto3.resource("dynamodb", region_name=region, config=cfg).Table(table)
         self._cache: dict[str, tuple[float, list]] = {}
 
     def get_blob(self, key: str):
@@ -149,13 +152,96 @@ class AwsStore:
         return int(r["Attributes"][field])
 
 
+class ResilientStore:
+    """AWS store with a local disk mirror.
+
+    Writes go to both; reads come from AWS (and refresh the mirror). If AWS calls fail
+    (e.g. expired credentials on a host without an IAM role), the store serves and accepts
+    data locally and retries AWS after a cool-down, so the site keeps working.
+    """
+
+    COOLDOWN_S = 120
+
+    def __init__(self, primary: "AwsStore", local: LocalStore):
+        self.primary, self.local = primary, local
+        self._down_until = 0.0
+        self.last_error: str | None = None
+
+    @property
+    def degraded(self) -> bool:
+        return time.time() < self._down_until
+
+    def _try(self, fn, *a):
+        if self.degraded:
+            return False, None
+        try:
+            return True, fn(*a)
+        except Exception as e:  # credentials expired, network, throttling
+            self.last_error = f"{type(e).__name__}: {str(e)[:160]}"
+            self._down_until = time.time() + self.COOLDOWN_S
+            return False, None
+
+    def get_blob(self, key):
+        ok, v = self._try(self.primary.get_blob, key)
+        if ok:
+            if v is not None:
+                self.local.put_blob(key, v)
+            return v if v is not None else self.local.get_blob(key)
+        return self.local.get_blob(key)
+
+    def put_blob(self, key, obj):
+        self.local.put_blob(key, obj)
+        self._try(self.primary.put_blob, key, obj)
+
+    def put_item(self, kind, item_id, obj):
+        self.local.put_item(kind, item_id, obj)
+        self._try(self.primary.put_item, kind, item_id, obj)
+
+    def get_item(self, kind, item_id):
+        ok, v = self._try(self.primary.get_item, kind, item_id)
+        if ok:
+            if v is not None and kind not in ("usage", "ratelimit"):
+                self.local.put_item(kind, item_id, v)
+            return v
+        return self.local.get_item(kind, item_id)
+
+    def list_items(self, kind):
+        ok, v = self._try(self.primary.list_items, kind)
+        if ok:
+            self.local.replace_kind(kind, {str(i.get("id") or i.get("date") or n): i for n, i in enumerate(v)})
+            return v
+        return self.local.list_items(kind)
+
+    def delete_item(self, kind, item_id):
+        self.local.delete_item(kind, item_id)
+        self._try(self.primary.delete_item, kind, item_id)
+
+    def replace_kind(self, kind, items):
+        self.local.replace_kind(kind, items)
+        self._try(self.primary.replace_kind, kind, items)
+
+    def incr(self, kind, item_id, field, by=1):
+        ok, v = self._try(self.primary.incr, kind, item_id, field, by)
+        return v if ok else self.local.incr(kind, item_id, field, by)
+
+    def status(self) -> dict:
+        return {"mode": "local-fallback" if self.degraded else "aws", "last_error": self.last_error}
+
+
 _store = None
 
 
 def get_store():
     global _store
     if _store is None:
-        if os.environ.get("DATA_BUCKET") and os.environ.get("TABLE_NAME"):
+        if os.environ.get("DATA_BUCKET") and os.environ.get("TABLE_NAME") and os.environ.get("LOCAL_MIRROR"):
+            from botocore.config import Config  # noqa: F401  (fail fast on expired credentials)
+
+            _store = ResilientStore(
+                AwsStore(os.environ["DATA_BUCKET"], os.environ["TABLE_NAME"], os.environ.get("AWS_REGION", "ap-northeast-2")),
+                LocalStore(os.environ["LOCAL_MIRROR"]),
+            )
+        elif os.environ.get("DATA_BUCKET") and os.environ.get("TABLE_NAME"):
             _store = AwsStore(os.environ["DATA_BUCKET"], os.environ["TABLE_NAME"], os.environ.get("AWS_REGION", "ap-northeast-2"))
         else:
             root = os.environ.get("LOCAL_STORE", str(Path(__file__).resolve().parents[2] / "data" / "local"))

@@ -79,6 +79,7 @@ def meta():
         "settings": ctx.settings,
         "now": service.effective_now(ctx),
         "counts": {"courses": len(ctx.courses), "events": len(ctx.events)},
+        "storage": getattr(service.get_store(), "status", lambda: {"mode": type(service.get_store()).__name__})(),
         "weather": {"fetched_at": src.get("fetched_at"), "errors": src.get("errors", {}),
                     "kma_base": (src.get("kma_forecast") or {}).get("base")},
         "models": {"sonnet": os.environ.get("MODEL_SONNET", "global.anthropic.claude-sonnet-5-5"),
