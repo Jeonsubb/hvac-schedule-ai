@@ -193,7 +193,9 @@ def get_day_summary(d: date, ctx: Ctx) -> dict:
     return sm
 
 
-def semester_summary(ctx: Ctx | None = None) -> dict:
+def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
+    """Semester index. With allow_stale, a request never computes the whole semester inline:
+    it returns the latest summary (flagged stale) and queues a background precompute."""
     ctx = ctx or Ctx()
     s, e = semester_range()
     dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
@@ -201,6 +203,11 @@ def semester_summary(ctx: Ctx | None = None) -> dict:
     cached = get_store().get_blob(f"summary/{key_all}.json")
     if cached:
         return cached
+    if allow_stale:
+        latest = get_store().get_blob("summary/latest.json")
+        if latest:
+            _queue_precompute()
+            return {**latest, "stale": True}
     # fetch existing per-day summaries in parallel, compute the rest
     with ThreadPoolExecutor(max_workers=16) as ex:
         days = list(ex.map(lambda d: get_day_summary(d, ctx), dates))
@@ -234,7 +241,21 @@ def semester_summary(ctx: Ctx | None = None) -> dict:
            "computed_at": now_kst().isoformat(timespec="seconds"),
            "weather_sources": sorted({(ctx.wx[x['date']]['src_actual'], ctx.wx[x['date']]['src_forecast']) for x in days})}
     get_store().put_blob(f"summary/{key_all}.json", out)
+    get_store().put_blob("summary/latest.json", out)
     return out
+
+
+def _queue_precompute() -> None:
+    """Start at most one background precompute per minute."""
+    st = get_store()
+    last = st.get_item("meta", "precompute_queued") or {}
+    now = time.time()
+    if now - float(last.get("t", 0)) < 60:
+        return
+    st.put_item("meta", "precompute_queued", {"t": now})
+    from . import jobs
+
+    jobs.create("precompute", {})
 
 
 # ---------------------------------------------------------------- "now" (demo clock)

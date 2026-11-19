@@ -77,7 +77,7 @@ def day(d: str, strategies: str | None = None):
 
 @app.get("/api/summary")
 def summary():
-    return service.semester_summary()
+    return service.semester_summary(allow_stale=True)
 
 
 @app.get("/api/weather")
@@ -173,14 +173,14 @@ def create_event(ev: dict = Body(...)):
     if ev["type"] == "add" and not (ev.get("room") in config.ROOMS and ev.get("start") and ev.get("end")):
         raise HTTPException(400, "추가 일정은 room(IT관 강의실), start, end가 필요합니다.")
     res = service.add_event({k: v for k, v in ev.items() if k != "clarification"})
-    jobs.create("precompute", {})
+    service._queue_precompute()
     return res
 
 
 @app.delete("/api/events/{event_id}")
 def remove_event(event_id: str):
     res = service.delete_event(event_id)
-    jobs.create("precompute", {})
+    service._queue_precompute()
     return res
 
 
