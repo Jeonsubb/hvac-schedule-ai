@@ -8,9 +8,7 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
-  Wrench,
   ChevronDown,
-  ChevronRight,
   SlidersHorizontal,
   CalendarPlus,
   FlaskConical,
@@ -23,7 +21,7 @@ import { useCopilot, useMeta } from '../lib/context'
 import type { ChatResult, ChatStep, EventDraft, EventResult, Job, Proposal, WhatIf } from '../lib/types'
 import { EVENT_TYPE, SETTING_LABEL, TOOL_LABEL, WEEKDAY } from '../lib/constants'
 import { cx, fmtDateK, fmtTs, weekdayOf } from '../lib/format'
-import { Badge, Button, Modal, Spinner, toast } from './ui'
+import { Badge, Button, Disclosure, Modal, Spinner, toast } from './ui'
 import { WhatIfTable } from '../pages/Settings'
 import { EventCheckPanel, eventBody, useEventCheck } from './EventCheck'
 import { BeforeAfter, EventForm } from '../pages/Data'
@@ -156,56 +154,52 @@ export default function Copilot() {
       className="slide-in fixed top-0 right-0 bottom-0 z-40 flex w-[440px] max-w-[100vw] flex-col border-l border-line bg-surface shadow-[var(--shadow-cover)] 2xl:shadow-none"
       aria-label="AI 코파일럿"
     >
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-ink text-[#7fd6a8]" aria-hidden>
+      <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-line px-5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-ink text-[#7fd6a8]" aria-hidden>
             <Sparkles size={16} />
           </span>
-          <div className="leading-tight">
-            <div className="text-[14.5px] font-[650] text-ink">AI 코파일럿</div>
-            <div className="text-[12px] text-ink-3">운영 데이터와 시뮬레이터를 직접 조회해 답합니다</div>
-          </div>
+          <div className="text-[16px] font-[650] text-ink">AI 코파일럿</div>
         </div>
         <div className="flex items-center gap-1">
           {msgs.length > 0 && (
             <button
+              type="button"
               onClick={() => !busy && setMsgs([])}
               disabled={busy}
-              className="rounded-[6px] p-1.5 text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-40"
-              title="새 대화"
-              aria-label="새 대화"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] px-2.5 text-[13px] font-medium text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-40"
+              title="대화를 지우고 새로 시작"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={15} aria-hidden /> 새 대화
             </button>
           )}
-          <button onClick={() => setOpen(false)} className="rounded-[6px] p-1.5 text-ink-3 hover:bg-hover hover:text-ink" aria-label="코파일럿 닫기">
-            <X size={18} />
+          <button type="button" onClick={() => setOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-ink-3 transition-colors hover:bg-hover hover:text-ink" aria-label="코파일럿 닫기">
+            <X size={19} />
           </button>
         </div>
       </header>
 
-      <div ref={listRef} className="thin-scroll flex-1 space-y-4 overflow-y-auto bg-paper px-4 py-4" aria-live="polite">
+      <div ref={listRef} className="thin-scroll flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 py-5" aria-live="polite">
         {msgs.length === 0 && (
-          <div className="pt-2">
-            <p className="text-[13.5px] leading-relaxed text-ink-2">
-              전력 낭비 원인 분석, 운영 규칙 시뮬레이션과 제안, 일정 등록 초안, 강의실 재배치 분석을 맡길 수 있습니다. 규칙 변경과 일정 등록은 담당자가 확인을 눌러야
-              적용됩니다.
+          <div className="pt-1">
+            <p className="text-[15px] leading-relaxed text-ink">무엇을 도와드릴까요?</p>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
+              운영 데이터와 시뮬레이터를 직접 조회해 답합니다. 규칙 변경과 일정 등록은 담당자가 확인을 눌러야 적용됩니다.
             </p>
-            {meta && (
-              <p className="mt-2 text-[12px] text-ink-3">
-                기준 시각 {fmtDateK(meta.now.date)}, 모델 {meta.models.sonnet?.replace('global.anthropic.', '')}
-              </p>
-            )}
-            <div className="mt-5 mb-2 text-[12.5px] font-semibold text-ink-2">자주 묻는 질문</div>
-            <ul className="overflow-hidden rounded-[8px] border border-line bg-surface">
+            <ul className="mt-5 divide-y divide-line overflow-hidden rounded-[14px] border border-line">
               {SUGGESTIONS.map((s) => (
-                <li key={s} className="border-t border-line first:border-t-0">
-                  <button onClick={() => send(s)} className="w-full px-3.5 py-2.5 text-left text-[13px] text-ink hover:bg-well">
+                <li key={s}>
+                  <button type="button" onClick={() => send(s)} className="w-full px-4 py-3 text-left text-[14px] text-ink transition-colors hover:bg-well">
                     {s}
                   </button>
                 </li>
               ))}
             </ul>
+            {meta && (
+              <p className="mt-4 text-[13px] text-ink-3">
+                기준 시각 {fmtDateK(meta.now.date)}, 모델 {meta.models.sonnet?.replace('global.anthropic.', '')}
+              </p>
+            )}
           </div>
         )}
         {msgs.map((m) => (m.role === 'user' ? <UserBubble key={m.id} text={m.content} /> : <AssistantMsg key={m.id} m={m} onRetry={() => {
@@ -218,14 +212,15 @@ export default function Copilot() {
         }} />))}
       </div>
 
-      <div className="border-t border-line bg-surface p-3">
+      <div className="border-t border-line bg-surface px-4 pt-3 pb-4">
         {msgs.length > 0 && !busy && (
-          <div className="thin-scroll mb-2 flex gap-1.5 overflow-x-auto pb-1">
-            {SUGGESTIONS.slice(0, 4).map((s) => (
+          <div className="thin-scroll mb-2.5 flex gap-1.5 overflow-x-auto pb-1">
+            {SUGGESTIONS.slice(0, 3).map((s) => (
               <button
                 key={s}
+                type="button"
                 onClick={() => send(s)}
-                className="shrink-0 rounded-[6px] border border-line px-2.5 py-1 text-[12px] whitespace-nowrap text-ink-2 hover:border-line-strong hover:text-ink"
+                className="shrink-0 rounded-[8px] bg-well px-2.5 py-1 text-[13px] whitespace-nowrap text-ink-2 transition-colors hover:bg-hover hover:text-ink"
               >
                 {s}
               </button>
@@ -249,17 +244,18 @@ export default function Copilot() {
               }
             }}
             rows={2}
+            name="copilot-input"
             aria-label="코파일럿에게 질문"
-            placeholder="질문이나 요청을 입력하세요 (Enter 보내기, Shift+Enter 줄바꿈)"
-            className="thin-scroll max-h-32 min-h-[44px] flex-1 resize-none rounded-[6px] border border-line-strong px-3 py-2 text-[13px] placeholder:text-ink-4 focus:border-focus focus:shadow-[0_0_0_3px_rgb(47_111_222/0.16)] focus-visible:outline-none"
+            placeholder="질문이나 요청을 입력하세요… (Enter 보내기, Shift+Enter 줄바꿈)"
+            className="thin-scroll max-h-32 min-h-[48px] flex-1 resize-none rounded-[12px] border border-line-strong px-3.5 py-2.5 text-[14px] transition-[border-color,box-shadow] placeholder:text-ink-4 focus:border-focus focus:shadow-[0_0_0_3px_rgb(47_111_222/0.16)] focus-visible:outline-none"
           />
           <button
             type="submit"
             disabled={busy || !input.trim()}
-            className="flex h-[44px] w-[44px] items-center justify-center rounded-[6px] bg-ink text-white hover:bg-[#24334d] disabled:opacity-40"
+            className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-ink text-white transition-colors hover:bg-[#25344e] disabled:opacity-40"
             aria-label="보내기"
           >
-            {busy ? <Spinner className="text-white" /> : <Send size={17} />}
+            {busy ? <Spinner className="text-white" /> : <Send size={18} aria-hidden />}
           </button>
         </form>
       </div>
@@ -275,73 +271,88 @@ function stripCacheNote(text: string) {
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-[10px] rounded-br-[3px] bg-ink px-3.5 py-2 text-[13px] whitespace-pre-wrap text-white">{text}</div>
+      <div className="max-w-[85%] rounded-[16px] rounded-br-[6px] bg-ink px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap text-white">{text}</div>
     </div>
   )
 }
 
-function Steps({ steps, running }: { steps: ChatStep[]; running: boolean }) {
-  const [open, setOpen] = useState(running)
-  useEffect(() => {
-    setOpen(running)
-  }, [running])
-  if (!steps.length && !running) return null
+/** "시뮬레이션 2회 실행" / "데이터 3회 조회": the tool steps in one line. */
+function stepSummary(steps: ChatStep[]): string {
+  const sims = steps.filter((x) => x.tool === 'simulate_policy' || x.tool === 'propose_policy').length
+  const rest = steps.length - sims
+  const parts: string[] = []
+  if (sims) parts.push(`시뮬레이션 ${sims}회 실행`)
+  if (rest) parts.push(`데이터 ${rest}회 조회`)
+  return parts.join(', ')
+}
+
+function StepsLine({ steps, running, open, onToggle, secs }: { steps: ChatStep[]; running: boolean; open: boolean; onToggle: () => void; secs: number }) {
+  const last = steps[steps.length - 1]
   return (
-    <div className="rounded-[6px] border border-line bg-surface">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[12.5px] font-medium text-ink-2">
-        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        <Wrench size={12} />
-        {running ? '데이터를 조회하는 중' : `조회 ${steps.length}회`}
-        {!running && (
-          <span className="ml-1 truncate font-normal text-ink-3">{[...new Set(steps.map((s) => TOOL_LABEL[s.tool] ?? s.tool))].join(', ')}</span>
-        )}
-      </button>
-      {open && (
-        <ol className="space-y-1 border-t border-line px-3 py-2">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 text-[12px]">
-              {s.ok === false ? (
-                <XCircle size={13} className="mt-0.5 shrink-0 text-crit" />
-              ) : s.ok ? (
-                <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-good" />
-              ) : (
-                <Spinner size={13} className="mt-0.5 shrink-0" />
-              )}
-              <span>
-                <span className="font-medium text-ink">{TOOL_LABEL[s.tool] ?? s.tool}</span>
-                {stepInput(s) && <span className="text-ink-3"> {stepInput(s)}</span>}
-              </span>
-            </li>
-          ))}
-          {running && (
-            <li className="flex items-center gap-2 text-[12px] text-ink-3">
-              <Spinner size={13} /> {steps.length ? '결과를 해석하는 중…' : '질문을 이해하고 필요한 데이터를 고르는 중…'}
-            </li>
-          )}
-        </ol>
+    <div className="flex min-w-0 items-center gap-2 text-[13px] text-ink-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-ink text-[#7fd6a8]" aria-hidden>
+        <Sparkles size={12} />
+      </span>
+      <span className="shrink-0 font-medium text-ink-2">코파일럿</span>
+      {running ? (
+        <span className="flex min-w-0 items-center gap-1.5" role="status">
+          <Spinner size={13} />
+          <span className="truncate">{last ? `${TOOL_LABEL[last.tool] ?? last.tool} 중…` : '질문을 이해하는 중…'}</span>
+        </span>
+      ) : (
+        steps.length > 0 && <span className="truncate">{stepSummary(steps)}</span>
       )}
+      {steps.length > 0 && (
+        <button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex shrink-0 items-center gap-0.5 rounded-[6px] px-1 font-medium text-ink-2 transition-colors hover:text-ink">
+          자세히
+          <ChevronDown size={13} className={cx('transition-transform duration-200', open && 'rotate-180')} aria-hidden />
+        </button>
+      )}
+      <span className="tnum ml-auto shrink-0">{running ? `${secs}초째` : `${secs}초`}</span>
     </div>
+  )
+}
+
+function StepsDetail({ steps, running }: { steps: ChatStep[]; running: boolean }) {
+  return (
+    <ol className="reveal space-y-1.5 rounded-[12px] bg-well px-3.5 py-3">
+      {steps.map((s, i) => (
+        <li key={i} className="flex items-start gap-2 text-[13px]">
+          {s.ok === false ? (
+            <XCircle size={14} className="mt-[2px] shrink-0 text-crit" aria-hidden />
+          ) : s.ok ? (
+            <CheckCircle2 size={14} className="mt-[2px] shrink-0 text-good" aria-hidden />
+          ) : (
+            <Spinner size={14} className="mt-[2px] shrink-0" />
+          )}
+          <span>
+            <span className="font-medium text-ink">{TOOL_LABEL[s.tool] ?? s.tool}</span>
+            {stepInput(s) && <span className="text-ink-3"> {stepInput(s)}</span>}
+          </span>
+        </li>
+      ))}
+      {running && (
+        <li className="flex items-center gap-2 text-[13px] text-ink-3">
+          <Spinner size={14} /> {steps.length ? '결과를 해석하는 중…' : '질문을 이해하고 필요한 데이터를 고르는 중…'}
+        </li>
+      )}
+    </ol>
   )
 }
 
 function AssistantMsg({ m, onRetry }: { m: Msg; onRetry: () => void }) {
   const running = m.status === 'running'
+  const [showSteps, setShowSteps] = useState(false)
   const secs = Math.round(((m.elapsed ?? (m.startedAt ? Date.now() - m.startedAt : 0)) as number) / 1000)
   const r = m.result
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-[12px] text-ink-3">
-        <span className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-ink text-[#7fd6a8]" aria-hidden>
-          <Sparkles size={11} />
-        </span>
-        코파일럿
-        <span className="tnum">{running ? `${secs}초째` : `${secs}초`}</span>
-      </div>
-      <Steps steps={m.steps ?? []} running={running} />
+    <div className="space-y-2.5">
+      <StepsLine steps={m.steps ?? []} running={running} open={showSteps} onToggle={() => setShowSteps((v) => !v)} secs={secs} />
+      {showSteps && <StepsDetail steps={m.steps ?? []} running={running} />}
       {m.status === 'error' && (
-        <div className="flex items-center justify-between gap-2 rounded-[6px] border border-[#efc6c6] bg-crit-bg px-3 py-2 text-[12.5px] text-crit-ink">
+        <div className="flex items-center justify-between gap-2 rounded-[12px] bg-crit-bg px-3.5 py-2.5 text-[13.5px] text-crit-ink" role="alert">
           <span className="flex items-center gap-1.5">
-            <AlertTriangle size={14} /> {m.error}
+            <AlertTriangle size={15} aria-hidden /> {m.error}
           </span>
           <Button size="sm" onClick={onRetry}>
             다시 시도
@@ -349,13 +360,13 @@ function AssistantMsg({ m, onRetry }: { m: Msg; onRetry: () => void }) {
         </div>
       )}
       {r?.from_cache && (
-        <div className="flex items-start gap-1.5 rounded-[6px] bg-well px-2.5 py-1.5 text-[12px] text-ink-2 ring-1 ring-line ring-inset">
-          <History size={12} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+        <div className="flex items-start gap-1.5 rounded-[10px] bg-well px-3 py-2 text-[13px] text-ink-2">
+          <History size={13} className="mt-[3px] shrink-0 text-ink-3" aria-hidden />
           AI 연결이 불안정해 {r.cached_at ? fmtTs(r.cached_at) : '이전'}에 같은 질문으로 받은 답을 보여 줍니다. 수치가 지금과 다를 수 있습니다.
         </div>
       )}
       {m.content && (
-        <div className="md rounded-[10px] rounded-tl-[3px] border border-line bg-surface px-3.5 py-2.5 text-[13px] text-ink">
+        <div className="md pl-8 text-[14px] text-ink">
           <ReactMarkdown
             remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
             components={{
@@ -386,11 +397,11 @@ function SimGroup({ sims }: { sims: WhatIf[] }) {
   const [all, setAll] = useState(false)
   const shown = all ? sims : sims.slice(0, 2)
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between px-0.5 text-[12px] text-ink-3">
-        <span>시뮬레이터 검증 {sims.length}건, 눌러서 전략별 결과 보기</span>
+    <div className="space-y-1.5 pl-8">
+      <div className="flex items-center justify-between px-0.5 text-[13px] text-ink-3">
+        <span>시뮬레이션 결과 {sims.length}건</span>
         {sims.length > 2 && (
-          <button className="font-semibold text-ink hover:underline" onClick={() => setAll((v) => !v)}>
+          <button type="button" className="font-semibold text-ink hover:underline" onClick={() => setAll((v) => !v)}>
             {all ? '접기' : `모두 보기 (+${sims.length - 2})`}
           </button>
         )}
@@ -405,9 +416,9 @@ function SimGroup({ sims }: { sims: WhatIf[] }) {
 function SimCard({ wi }: { wi: WhatIf }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-[8px] border border-line bg-surface">
-      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px]">
-        <FlaskConical size={13} className="text-ink-3" />
+    <div className="rounded-[12px] border border-line bg-surface">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[13.5px]">
+        <FlaskConical size={14} className="text-ink-3" aria-hidden />
         <span className="shrink-0 font-medium whitespace-nowrap text-ink">시뮬레이션</span>
         <span className="truncate text-ink-3">
           {Object.entries(wi.overrides)
@@ -415,10 +426,10 @@ function SimCard({ wi }: { wi: WhatIf }) {
             .join(', ')}{' '}
           ({wi.dates[0]?.slice(5)}~{wi.dates[wi.dates.length - 1]?.slice(5)})
         </span>
-        {open ? <ChevronDown size={13} className="ml-auto shrink-0" /> : <ChevronRight size={13} className="ml-auto shrink-0" />}
+        <ChevronDown size={14} className={cx('ml-auto shrink-0 text-ink-3 transition-transform duration-200', open && 'rotate-180')} aria-hidden />
       </button>
       {open && (
-        <div className="border-t border-line px-3 pb-2">
+        <div className="reveal border-t border-line px-3.5 pb-2.5">
           <WhatIfTable wi={wi} compact />
         </div>
       )}
@@ -450,11 +461,11 @@ function ProposalCard({ p }: { p: Proposal }) {
     }
   }
   return (
-    <div className={cx('rounded-[8px] border bg-surface p-3.5', done ? 'border-[#bfe3cf]' : 'border-[#c9dcf5]')}>
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-info-ink">
-        <SlidersHorizontal size={12} /> 운영 규칙 변경 제안
+    <div className={cx('ml-8 rounded-[14px] border bg-surface p-4', done ? 'border-[#bfe3cf]' : 'border-line')}>
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-info-ink">
+        <SlidersHorizontal size={13} aria-hidden /> 운영 규칙 변경 제안
       </div>
-      <div className="mt-1 text-[13.5px] font-semibold text-ink">{p.title}</div>
+      <div className="mt-1 text-[15px] font-semibold text-ink">{p.title}</div>
       <div className="mt-1.5 flex flex-wrap gap-1">
         {Object.entries(p.overrides).map(([k, v]) => (
           <Badge key={k} tone="info">
@@ -463,13 +474,15 @@ function ProposalCard({ p }: { p: Proposal }) {
           </Badge>
         ))}
       </div>
-      <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">{p.rationale}</p>
-      <div className="mt-2 rounded-[6px] bg-well px-2.5 py-1.5 text-[12.5px] text-ink-2 ring-1 ring-line ring-inset">
+      <div className="mt-2.5 rounded-[10px] bg-well px-3 py-2 text-[13.5px] text-ink-2">
         <b className="font-semibold text-ink">예상 효과</b> {p.expected_effect}
       </div>
+      <Disclosure variant="inline" className="mt-2" title="근거 보기">
+        <p className="text-[13.5px] leading-relaxed text-ink-2">{p.rationale}</p>
+      </Disclosure>
       {err && (
-        <div className="mt-2 flex items-start gap-1.5 rounded-[6px] border border-[#efc6c6] bg-crit-bg px-2.5 py-1.5 text-[12.5px] text-crit-ink" role="alert">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+        <div className="mt-2 flex items-start gap-1.5 rounded-[10px] bg-crit-bg px-3 py-2 text-[13.5px] text-crit-ink" role="alert">
+          <AlertTriangle size={14} className="mt-[3px] shrink-0" aria-hidden />
           <span>
             적용하지 못했습니다. {err}
           </span>
@@ -477,8 +490,8 @@ function ProposalCard({ p }: { p: Proposal }) {
       )}
       <div className="mt-2.5 flex justify-end">
         {done ? (
-          <span className="flex items-center gap-1 text-[12.5px] font-medium text-good-ink">
-            <CheckCircle2 size={14} /> 적용됨
+          <span className="flex items-center gap-1 text-[13.5px] font-medium text-good-ink">
+            <CheckCircle2 size={15} aria-hidden /> 적용됨
           </span>
         ) : (
           <Button variant="primary" size="sm" onClick={() => setConfirm(true)}>
@@ -499,12 +512,12 @@ function ProposalCard({ p }: { p: Proposal }) {
           </>
         }
       >
-        <p className="text-[13px] text-ink-2">
+        <p className="text-[14px] text-ink-2">
           <b className="text-ink">{p.title}</b>: 아래 값으로 운영 규칙을 바꾸고 운전 계획을 다시 계산합니다. 변경 기록에 남으며 운영 규칙 화면에서 되돌릴 수 있습니다.
         </p>
         <ul className="mt-2 space-y-1">
           {Object.entries(p.overrides).map(([k, v]) => (
-            <li key={k} className="flex justify-between rounded-md bg-well px-3 py-1.5 text-[13px]">
+            <li key={k} className="flex justify-between rounded-[10px] bg-well px-3 py-2 text-[14px]">
               <span>{SETTING_LABEL[k] ?? k}</span>
               <span className="tnum font-medium">
                 {meta ? String(meta.settings[k]) : '?'} → {String(v)}
@@ -539,16 +552,16 @@ function DraftCard({ d }: { d: EventDraft }) {
   }
   const wd = draft.date ? WEEKDAY[weekdayOf(draft.date)] : ''
   return (
-    <div className="rounded-[8px] border border-[#d8d3f5] bg-surface p-3.5">
-      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-event-ink">
-        <CalendarPlus size={12} /> 일정 초안: {EVENT_TYPE[draft.type] ?? draft.type}
+    <div className="ml-8 rounded-[14px] border border-line bg-surface p-4">
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-event-ink">
+        <CalendarPlus size={13} aria-hidden /> 일정 초안: {EVENT_TYPE[draft.type] ?? draft.type}
       </div>
       {d.from_cache && !res && (
-        <div className="mt-1.5 text-[12px] text-ink-3">AI 연결이 불안정해 {d.cached_at ? fmtTs(d.cached_at) : '앞서'} 해석한 결과입니다.</div>
+        <div className="mt-1.5 text-[13px] text-ink-3">AI 연결이 불안정해 {d.cached_at ? fmtTs(d.cached_at) : '앞서'} 해석한 결과입니다.</div>
       )}
       {d.clarification && !res && (
-        <div className="mt-1.5 flex items-start gap-1.5 rounded-[6px] bg-warn-bg px-2 py-1 text-[12.5px] text-warn-ink">
-          <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {d.clarification}
+        <div className="mt-2 flex items-start gap-1.5 rounded-[10px] bg-warn-bg px-3 py-2 text-[13.5px] text-warn-ink">
+          <AlertTriangle size={14} className="mt-[3px] shrink-0" aria-hidden /> {d.clarification}
         </div>
       )}
       {res ? (
@@ -561,7 +574,7 @@ function DraftCard({ d }: { d: EventDraft }) {
         </div>
       ) : (
         <>
-          <dl className="mt-2 grid grid-cols-[64px_1fr] gap-y-1 text-[12.5px]">
+          <dl className="mt-3 grid grid-cols-[64px_1fr] gap-y-1.5 text-[14px]">
             <dt className="text-ink-3">날짜</dt>
             <dd className="font-medium text-ink">
               {draft.date} ({wd})
@@ -595,7 +608,7 @@ function DraftCard({ d }: { d: EventDraft }) {
               </>
             )}
           </dl>
-          <div className="mt-2.5">
+          <div className="mt-3">
             <EventCheckPanel
               compact
               draft={draft}
@@ -603,9 +616,9 @@ function DraftCard({ d }: { d: EventDraft }) {
               onPickRoom={(r) => setDraft((x) => ({ ...x, ...(x.type === 'move' ? { new_room: r } : { room: r }), check: undefined }))}
             />
           </div>
-          <div className="mt-2.5 flex justify-end gap-1.5">
+          <div className="mt-3 flex justify-end gap-1.5">
             <Button size="sm" variant="ghost" onClick={() => setEdit(true)}>
-              <Pencil size={12} /> 수정
+              <Pencil size={13} aria-hidden /> 수정
             </Button>
             <Button
               size="sm"
@@ -613,7 +626,7 @@ function DraftCard({ d }: { d: EventDraft }) {
               onClick={register}
               disabled={busy || checked.checking}
             >
-              {busy ? <Spinner size={13} className="text-white" /> : <CheckCircle2 size={13} />} {checked.check && !checked.check.ok ? '문제를 알고 등록' : '등록'}
+              {busy ? <Spinner size={14} className="text-white" /> : <CheckCircle2 size={14} aria-hidden />} {checked.check && !checked.check.ok ? '문제를 알고 등록' : '등록'}
             </Button>
           </div>
         </>

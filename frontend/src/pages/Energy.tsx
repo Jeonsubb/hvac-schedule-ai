@@ -1,12 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MoveRight, Sparkles, Printer } from 'lucide-react'
+import { MoveRight, Sparkles, Printer, Info, CalendarDays, TrendingDown, ScatterChart as ScatterIcon, ListChecks, ArrowLeftRight } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
 import type { AttributionScope, AttributionVariant, Consolidation, StrategyKey, Summary, TotalsRow } from '../lib/types'
 import { CHART, COLD_START, DECISION, STRATEGY, STRATEGY_KEYS, sumDays } from '../lib/constants'
 import { cx, fmtDateShort, fmtKwh, fmtNum, fmtPct, pctSaving } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
-import { Badge, Button, Card, CardHeader, ChartCard, ErrorBox, LegendItem, Loading, PageHeader, PageSkeleton, Segmented, Skeleton, Spinner, StrategyName } from '../components/ui'
+import {
+  Badge,
+  Button,
+  ChartCard,
+  Disclosure,
+  DisclosureList,
+  ErrorBox,
+  Figure,
+  LegendItem,
+  Loading,
+  PageHeader,
+  PageSkeleton,
+  Popover,
+  Segmented,
+  Skeleton,
+  Spinner,
+  StrategyName,
+  TableToggle,
+  DataTable,
+} from '../components/ui'
 import { Waterfall, WaterfallLegend, splitNote, useAttribution, waterfallTable } from '../components/Attribution'
 import { DecisionIcon } from '../components/Gantt'
 
@@ -16,7 +36,14 @@ export default function Energy() {
   const { meta } = useMeta()
   const summary = useApi<Summary>('/api/summary')
   const attr = useAttribution()
-  const [scope, setScope] = useState<Scope>('to_date')
+  const [params, setParams] = useSearchParams()
+  const scope: Scope = params.get('scope') === 'all' ? 'all' : 'to_date'
+  const setScope = (v: Scope) => {
+    const p = new URLSearchParams(params)
+    if (v === 'all') p.set('scope', 'all')
+    else p.delete('scope')
+    setParams(p, { replace: true })
+  }
 
   if (summary.error) return <ErrorBox title="학기 비교 결과를 불러오지 못했습니다" error={summary.error} onRetry={summary.reload} />
   if (!summary.data || !meta) return <PageSkeleton label="학기 전체 시뮬레이션 결과를 불러오는 중…" />
@@ -37,71 +64,57 @@ export default function Energy() {
       ? rawA
       : undefined
   const attrBroken = !!rawA && !A && !attr.computing
+  const vs30 = A ? pctSaving(A.variants.rule30.kwh, A.variants.ai.kwh) : null
 
   return (
-    <div className="space-y-4">
+    <div>
       <PageHeader
         title="절감 효과"
-        desc="같은 시간표와 같은 날씨로 운전 방식을 시뮬레이션해 전력, 요금, 탄소, 쾌적도를 비교합니다. 비교 기준이 공정한지, 절감이 어디서 오는지까지 보여 줍니다."
+        desc={
+          vs30 != null
+            ? `규칙 기반을 30분 앞당겨 쾌적도를 AI만큼 맞춰도, AI 예측 제어가 전력을 ${vs30 >= 0 ? '덜' : '더'} 씁니다.`
+            : '같은 시간표와 같은 날씨로 네 가지 운전 방식을 시뮬레이션해 비교합니다.'
+        }
         right={
           <Segmented
             label="집계 범위"
             value={scope}
             onChange={setScope}
             options={[
-              { value: 'to_date', label: `오늘까지 (09/01–${S.today.slice(5).replace('-', '/')})` },
+              { value: 'to_date', label: `오늘까지 (9/1–${fmtDateShort(S.today)})` },
               { value: 'all', label: '학기 전체 (예상 포함)' },
             ]}
           />
         }
       />
 
-      <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
+      <section className="rounded-[16px] border border-line bg-surface" aria-label="절감 요약">
+        <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
+        <div className="border-t border-line px-8 pt-7 pb-6">
+          <WaterfallSection A={A} attr={attr} broken={attrBroken} />
+        </div>
+      </section>
 
-      <ChartCard
-        title="AI 절감은 어디서 오는가"
-        sub={
-          attr.data
-            ? `${splitNote(attr.data.note ?? '').method} 막대 위 숫자는 앞 단계 대비 전력 변화입니다.`
-            : '같은 날씨와 같은 현장 상황에서 기능을 하나씩 켜며 다시 시뮬레이션합니다.'
-        }
-        right={attr.stale ? <Badge tone="info">이전 결과, 다시 계산 중</Badge> : undefined}
-        legend={A ? <WaterfallLegend /> : undefined}
-        table={A ? waterfallTable(A) : undefined}
-      >
-        {A && attr.data ? (
-          <div className={cx('transition-opacity', attr.stale && 'opacity-70')}>
-            <Waterfall A={A} note={attr.data.note ?? ''} />
-          </div>
-        ) : attr.error || attrBroken ? (
-          <ErrorBox
-            title="기능별 절감 분석을 불러오지 못했습니다"
-            error={attr.error ?? '서버 응답에 필요한 값이 빠져 있습니다. 잠시 뒤 다시 시도하세요.'}
-            onRetry={attr.reload}
-          />
-        ) : (
-          <div className="space-y-3" role="status">
-            <div className="flex items-center gap-2 text-[13px] text-ink-2">
-              <Spinner size={14} /> 학기 전체를 기능별로 다시 시뮬레이션하는 중입니다. 처음 한 번은 1분 정도 걸리고, 10초마다 확인합니다.
-            </div>
-            <Skeleton className="h-[300px]" />
-          </div>
-        )}
-      </ChartCard>
-
-      <StrategyTable T={T} cold={cold} />
-
-      <DailyChart S={S} />
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <CumulativeChart S={S} />
-        <ScatterChart T={T} A={A} scope={scope} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <DecisionChart S={S} />
-        <ConsolidationReport />
-      </div>
+      <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
+        <Disclosure icon={<ArrowLeftRight size={16} aria-hidden />} title="운전 방식 4가지 비교" summary={`AI ${fmtNum(T.ai.kwh)} kWh, 고정 ${fmtNum(T.fixed.kwh)} kWh`}>
+          <StrategyTable T={T} cold={cold} />
+        </Disclosure>
+        <Disclosure icon={<CalendarDays size={16} aria-hidden />} title="일별 전력량과 외기온도" summary={`강의일 ${S.days.filter((d) => d.sessions > 0).length}일`}>
+          <DailyChart S={S} />
+        </Disclosure>
+        <Disclosure icon={<TrendingDown size={16} aria-hidden />} title="AI 누적 절감량" summary={`학기 말 고정 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh 예상`}>
+          <CumulativeChart S={S} />
+        </Disclosure>
+        <Disclosure icon={<ScatterIcon size={16} aria-hidden />} title="전기를 아끼느라 쾌적을 포기했는가" summary={`AI 쾌적 유지율 ${fmtPct(T.ai.comfort_pct, 2)}`}>
+          <ScatterChart T={T} A={A} scope={scope} />
+        </Disclosure>
+        <Disclosure icon={<ListChecks size={16} aria-hidden />} title="AI 판단 유형별 횟수" summary={`학기 ${fmtNum(Object.values(S.decisions).reduce((a, v) => a + v, 0))}회`}>
+          <DecisionChart S={S} />
+        </Disclosure>
+        <Disclosure icon={<MoveRight size={16} aria-hidden />} title="강의실 재배치 권고" summary="학사 부서 검토용">
+          <ConsolidationReport />
+        </Disclosure>
+      </DisclosureList>
     </div>
   )
 }
@@ -124,53 +137,54 @@ function Hero({
   const r30 = A?.variants.rule30
   const ai = A?.variants.ai
   const vs30 = r30 && ai ? pctSaving(r30.kwh, ai.kwh) : null
-  const max = r30 && ai ? Math.max(r30.kwh, ai.kwh) : 1
   return (
-    <section className="overflow-hidden rounded-[10px] border border-line bg-surface">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <div className="border-b border-line px-6 py-6 lg:border-r lg:border-b-0">
-          <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-ink-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-s-ai" aria-hidden />
-            같은 쾌적도라면, AI 예측 제어가 규칙 기반보다 덜 쓴 전력
-            {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
-          </div>
-          {r30 && ai && vs30 != null ? (
-            <>
-              <div className="mt-3 flex items-baseline gap-1.5">
-                <span className="pnum text-[56px] leading-none font-[650] tracking-[-0.035em] text-ink">{vs30 >= 0 ? '−' : '+'}{Math.abs(vs30).toFixed(1)}</span>
-                <span className="text-[24px] font-semibold text-ink-3">%</span>
-              </div>
-              <p className="mt-3 text-[14px] leading-relaxed text-ink">
-                규칙 기반(30분 전 가동) <b className="tnum font-[650]">{fmtNum(r30.kwh, 1)} kWh</b> vs AI 예측 제어 <b className="tnum font-[650]">{fmtNum(ai.kwh, 1)} kWh</b>
-              </p>
-              <div className="mt-3 max-w-[540px] space-y-1.5" aria-hidden>
-                {[
-                  { name: '규칙 30분 전', v: r30.kwh, c: STRATEGY.rule.color },
-                  { name: 'AI 예측 제어', v: ai.kwh, c: STRATEGY.ai.color },
-                ].map((b) => (
-                  <div key={b.name} className="flex items-center gap-2 text-[12px]">
-                    <span className="w-[84px] shrink-0 text-ink-2">{b.name}</span>
-                    <div className="h-2.5 flex-1 rounded-full bg-[#eceff3]">
-                      <div className="h-2.5 rounded-full" style={{ width: `${(b.v / max) * 100}%`, background: b.c }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <table className="tnum mt-4 w-full max-w-[540px] text-[12.5px]">
+    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 px-8 pt-8 pb-7">
+      <div className="min-w-0">
+        {r30 && ai && vs30 != null ? (
+          <Popover
+            label="같은 쾌적도 비교의 근거"
+            width={440}
+            buttonClassName="group -m-3 block rounded-[14px] p-3 text-left transition-colors hover:bg-hover"
+            button={
+              <>
+                <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
+                  같은 쾌적도의 규칙 기반(30분 전 가동) 대비
+                  {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
+                  <Info size={14} className="text-ink-4 transition-colors group-hover:text-ink-2" aria-hidden />
+                </span>
+                <span className="mt-2 flex items-baseline gap-1.5">
+                  <span className="tnum text-[64px] leading-none font-[650] tracking-[-0.035em] text-ink">
+                    {vs30 >= 0 ? '−' : '+'}
+                    {Math.abs(vs30).toFixed(1)}
+                  </span>
+                  <span className="text-[26px] font-semibold text-ink-3">%</span>
+                </span>
+                <span className="tnum mt-3 block text-[15px] text-ink-2">
+                  규칙 {fmtNum(r30.kwh, 1)} kWh → AI <b className="font-semibold text-ink">{fmtNum(ai.kwh, 1)} kWh</b>
+                </span>
+              </>
+            }
+          >
+            <div className="space-y-3">
+              <p className="text-[13.5px]">규칙 기반을 강의 30분 전에 켜도록 앞당겨 AI와 쾌적도를 맞춘 뒤, 같은 기간의 전력을 비교했습니다. 더 좋은 쪽을 굵게 표시합니다.</p>
+              <table className="tnum w-full text-[13.5px]">
                 <thead>
-                  <tr className="text-[12px] text-ink-3">
+                  <tr className="text-[13px] text-ink-3">
                     <th className="py-1 text-left font-medium">같은 기간</th>
                     <th className="py-1 text-right font-medium">규칙 30분 전</th>
-                    <th className="py-1 text-right font-medium">AI 예측 제어</th>
+                    <th className="py-1 text-right font-medium">AI</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    ['강의 중 쾌적 유지율', fmtPct(r30.comfort_pct, 2), fmtPct(ai.comfort_pct, 2), (ai.comfort_pct ?? 0) >= (r30.comfort_pct ?? 0)],
-                    [COLD_START.label, `${fmtNum(r30.cold_starts)}회`, `${fmtNum(ai.cold_starts)}회`, ai.cold_starts <= r30.cold_starts],
-                    ['불쾌 누적', `${fmtNum(r30.discomfort_dm)} ℃·분`, `${fmtNum(ai.discomfort_dm)} ℃·분`, ai.discomfort_dm <= r30.discomfort_dm],
-                  ].map(([k, a, b, aiBetter]) => (
-                    <tr key={k as string} className="border-t border-line">
+                  {(
+                    [
+                      ['강의 중 쾌적 유지율', fmtPct(r30.comfort_pct, 2), fmtPct(ai.comfort_pct, 2), (ai.comfort_pct ?? 0) >= (r30.comfort_pct ?? 0)],
+                      [COLD_START.label, `${fmtNum(r30.cold_starts)}회`, `${fmtNum(ai.cold_starts)}회`, ai.cold_starts <= r30.cold_starts],
+                      ['불쾌 누적', `${fmtNum(r30.discomfort_dm)} ℃·분`, `${fmtNum(ai.discomfort_dm)} ℃·분`, ai.discomfort_dm <= r30.discomfort_dm],
+                    ] as [string, string, string, boolean][]
+                  ).map(([k, a, b, aiBetter]) => (
+                    <tr key={k} className="border-t border-line">
                       <th className="py-1.5 text-left font-medium text-ink-2" title={k === COLD_START.label ? COLD_START.desc : undefined}>
                         {k}
                       </th>
@@ -180,47 +194,105 @@ function Hero({
                   ))}
                 </tbody>
               </table>
-              <p className="mt-3 max-w-[560px] text-[12.5px] leading-relaxed text-ink-3">
+              <p className="rounded-[10px] bg-well px-3 py-2.5 text-[13.5px]">
                 {T.rule.kwh < T.ai.kwh
-                  ? `10분 전에 켜는 규칙은 AI보다 ${fmtNum(T.ai.kwh - T.rule.kwh, 1)} kWh 적게 쓰지만, 강의 ${fmtNum(cold.rule)}건이 쾌적하지 않은 교실에서 시작합니다(AI ${fmtNum(cold.ai)}건). 규칙을 30분 앞당겨 쾌적도를 맞추면 AI보다 더 씁니다.`
-                  : `10분 전에 켜는 규칙보다도 ${fmtNum(T.rule.kwh - T.ai.kwh, 1)} kWh 적게 쓰면서, 쾌적하지 않게 시작한 강의를 ${fmtNum(cold.rule)}건에서 ${fmtNum(cold.ai)}건으로 줄였습니다.`}
+                  ? `10분 전에 켜는 규칙은 AI보다 ${fmtNum(T.ai.kwh - T.rule.kwh, 1)} kWh 적게 쓰지만, 강의 ${fmtNum(cold.rule)}건이 쾌적하지 않은 교실에서 시작합니다(AI ${fmtNum(cold.ai)}건).`
+                  : `10분 전에 켜는 규칙보다도 ${fmtPct(vsRule)} 적게 쓰면서, 쾌적하지 않게 시작한 강의를 ${fmtNum(cold.rule)}건에서 ${fmtNum(cold.ai)}건으로 줄였습니다.`}
               </p>
-            </>
-          ) : (
-            <div className="mt-4 space-y-2" role="status">
-              <div className="flex items-center gap-2 text-[13px] text-ink-2">
-                {computing && <Spinner size={14} />} {computing ? '같은 쾌적도의 규칙 기반과 비교하는 시뮬레이션을 계산하는 중…' : '같은 쾌적도 비교 결과를 불러오지 못했습니다. 아래 기능별 분석의 다시 시도를 눌러 보세요.'}
-              </div>
-              {computing && (
-                <>
-                  <Skeleton className="h-[56px] w-[220px]" />
-                  <Skeleton className="h-[64px] max-w-[540px]" />
-                </>
-              )}
             </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-px bg-line">
-          <HeroCell label="고정 스케줄(08:30–22:30) 대비" value={`−${vsFixed.toFixed(1)}%`} sub={`${fmtNum(T.fixed.kwh)} → ${fmtNum(T.ai.kwh)} kWh`} />
-          <HeroCell
-            label="규칙 기반(10분 전 가동) 대비"
-            value={`${vsRule >= 0 ? '−' : '+'}${Math.abs(vsRule).toFixed(1)}%`}
-            sub={`${COLD_START.short} ${fmtNum(cold.rule)}회 → ${fmtNum(cold.ai)}회`}
-          />
-          <HeroCell label="아낀 전기요금 (고정 대비)" value={`${fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원`} sub="한전 교육용(을) 고압A 선택I 기준" />
-          <HeroCell label="줄인 탄소 (고정 대비)" value={`${((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)} tCO₂`} sub="배출계수 0.4173 kgCO₂/kWh" />
-        </div>
+          </Popover>
+        ) : (
+          <div className="space-y-3" role="status">
+            <div className="flex items-center gap-2 text-[14px] text-ink-2">
+              {computing && <Spinner size={15} />}
+              {computing ? '같은 쾌적도의 규칙 기반과 비교하는 시뮬레이션을 계산하는 중…' : '같은 쾌적도 비교 결과를 불러오지 못했습니다. 아래 기능별 분석의 다시 시도를 눌러 보세요.'}
+            </div>
+            {computing && (
+              <>
+                <Skeleton className="h-[64px] w-[240px]" />
+                <Skeleton className="h-[20px] w-[320px]" />
+              </>
+            )}
+          </div>
+        )}
       </div>
-    </section>
+      <div className="flex flex-wrap gap-x-12 gap-y-5 pb-1">
+        <Figure
+          label="고정 스케줄 대비"
+          value={`−${vsFixed.toFixed(1)}`}
+          unit="%"
+          info={
+            <p className="text-[13.5px]">
+              고정 스케줄(평일 08:30–22:30 가동) <b className="tnum font-semibold text-ink">{fmtNum(T.fixed.kwh)} kWh</b>를 AI는{' '}
+              <b className="tnum font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b>로 운전했습니다. 규칙 기반(10분 전 가동)과 비교하면 {vsRule >= 0 ? '−' : '+'}
+              {Math.abs(vsRule).toFixed(1)}%, {COLD_START.short}는 {fmtNum(cold.rule)}회 → {fmtNum(cold.ai)}회입니다.
+            </p>
+          }
+        />
+        <Figure
+          label="아낀 전기요금"
+          value={fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}
+          unit="만원"
+          info={
+            <p className="text-[13.5px]">
+              고정 스케줄 대비 금액입니다. 한전 교육용(을) 고압A 선택I 시간대별 전력량요금(2023-05-16 게시본)으로 계산했고 기본요금은 뺐습니다. AI {fmtNum(T.ai.cost_krw)}원, 고정 {fmtNum(T.fixed.cost_krw)}원.
+            </p>
+          }
+        />
+        <Figure
+          label="줄인 탄소"
+          value={((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)}
+          unit="tCO₂"
+          align="right"
+          info={<p className="text-[13.5px]">고정 스케줄 대비입니다. 전력량에 국가 전력배출계수 0.4173 kgCO₂eq/kWh(2023년도)를 곱했습니다.</p>}
+        />
+      </div>
+    </div>
   )
 }
 
-function HeroCell({ label, value, sub }: { label: string; value: string; sub: string }) {
+function WaterfallSection({ A, attr, broken }: { A: AttributionScope | undefined; attr: ReturnType<typeof useAttribution>; broken: boolean }) {
+  const [asTable, setAsTable] = useState(false)
+  const [detail, setDetail] = useState(false)
   return (
-    <div className="flex flex-col justify-center bg-surface px-5 py-5">
-      <div className="text-[12.5px] font-medium text-ink-2">{label}</div>
-      <div className="pnum mt-2 text-[26px] leading-none font-[650] tracking-[-0.02em] text-ink">{value}</div>
-      <div className="tnum mt-2 text-[12px] text-ink-3">{sub}</div>
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-[17px] font-[650] tracking-[-0.01em] text-ink">
+          AI 절감은 어디서 오는가
+          {attr.stale && (
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-normal text-ink-3" title="이전 결과를 보여 주면서 최신 입력으로 다시 계산하고 있습니다">
+              <Spinner size={13} /> 갱신 중
+            </span>
+          )}
+        </h2>
+        {A && <TableToggle asTable={asTable} onToggle={() => setAsTable((v) => !v)} />}
+      </div>
+      {A && attr.data ? (
+        asTable ? (
+          <DataTable spec={waterfallTable(A)} />
+        ) : (
+          <>
+            <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-ink-2">
+              <WaterfallLegend />
+            </div>
+            <div className={cx('transition-opacity duration-200', attr.stale && 'opacity-70')}>
+              <Waterfall A={A} note={attr.data.note ?? ''} detail={detail} />
+            </div>
+            <Disclosure variant="inline" className="mt-4" title={detail ? '단계별 쾌적 지표 접기' : '단계별 쾌적 지표와 계산 방법 보기'} open={detail} onOpenChange={setDetail}>
+              <p className="max-w-[90ch] text-[13.5px] leading-relaxed text-ink-2">{splitNote(attr.data.note ?? '').method} 막대 위 숫자는 앞 단계 대비 전력 변화입니다.</p>
+            </Disclosure>
+          </>
+        )
+      ) : attr.error || broken ? (
+        <ErrorBox title="기능별 절감 분석을 불러오지 못했습니다" error={attr.error ?? '서버 응답에 필요한 값이 빠져 있습니다. 잠시 뒤 다시 시도하세요.'} onRetry={attr.reload} />
+      ) : (
+        <div className="space-y-3" role="status">
+          <div className="flex items-center gap-2 text-[14px] text-ink-2">
+            <Spinner size={15} /> 학기 전체를 기능별로 다시 시뮬레이션하는 중입니다. 처음 한 번은 1분 정도 걸리고, 10초마다 확인합니다.
+          </div>
+          <Skeleton className="h-[300px]" />
+        </div>
+      )}
     </div>
   )
 }
@@ -236,9 +308,9 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
       cell: (k) => (
         <div>
           <div>
-            <b className="text-[15px] font-[650] text-ink">{fmtNum(T[k].kwh)}</b> <span className="text-ink-3">kWh</span>
+            <b className="text-[16px] font-[650] text-ink">{fmtNum(T[k].kwh)}</b> <span className="text-ink-3">kWh</span>
           </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-[#eceff3]" aria-hidden>
+          <div className="mt-2 h-1.5 rounded-full bg-[#eceff3]" aria-hidden>
             <div className="h-1.5 rounded-full" style={{ width: `${(T[k].kwh / maxKwh) * 100}%`, background: STRATEGY[k].color }} />
           </div>
         </div>
@@ -253,12 +325,10 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
     { label: '불쾌 누적', cell: (k) => `${fmtNum(T[k].discomfort_dm, 0)} ℃·분`, best: (k) => T[k].discomfort_dm === minOf((x) => T[x].discomfort_dm) },
   ]
   return (
-    <Card pad={false} className="overflow-hidden">
-      <div className="px-5 pt-4">
-        <CardHeader title="운전 방식 비교" sub="같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다. 시작 시 쾌적 이탈은 강의가 너무 춥거나 더운 교실에서 시작한 횟수입니다." className="mb-3" />
-      </div>
-      <div className="overflow-x-auto">
-        <table className="tnum w-full min-w-[760px] table-fixed text-[13px]">
+    <div>
+      <p className="mb-4 text-[13.5px] text-ink-3">같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다.</p>
+      <div className="overflow-x-auto rounded-[12px] border border-line">
+        <table className="tnum w-full min-w-[760px] table-fixed text-[14px]">
           <colgroup>
             <col className="w-[180px]" />
             {order.map((k) => (
@@ -267,16 +337,12 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
           </colgroup>
           <thead>
             <tr>
-              <th className="border-b border-line px-5 py-2.5 text-left text-[12.5px] font-medium text-ink-3">
+              <th className="border-b border-line px-5 py-3 text-left">
                 <span className="sr-only">항목</span>
               </th>
               {order.map((k) => (
-                <th key={k} className={cx('relative border-b border-line px-4 py-2.5 text-left align-bottom', k === 'ai' && 'bg-[#f1f9f5]')}>
-                  {k === 'ai' && <span className="absolute inset-x-0 top-0 h-[3px] bg-s-ai" aria-hidden />}
-                  <div className="flex items-center justify-between gap-2">
-                    <StrategyName k={k} />
-                    {k === 'ai' && <Badge tone="ai">운영 중</Badge>}
-                  </div>
+                <th key={k} className={cx('border-b border-line px-4 py-3 text-left align-bottom font-semibold', k === 'ai' && 'bg-[#f3faf6]')}>
+                  <StrategyName k={k} />
                 </th>
               ))}
             </tr>
@@ -284,18 +350,18 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
           <tbody>
             {rows.map((r) => (
               <tr key={r.label} className="border-b border-line last:border-b-0">
-                <th className="px-5 py-2.5 text-left text-[12.5px] font-medium text-ink-2">{r.label}</th>
+                <th className="px-5 py-3 text-left text-[13.5px] font-medium text-ink-2">{r.label}</th>
                 {order.map((k) => (
-                  <td key={k} className={cx('px-4 py-2.5 text-ink', k === 'ai' && 'bg-[#f1f9f5]', r.best?.(k) && 'font-semibold')}>
+                  <td key={k} className={cx('px-4 py-3 text-ink', k === 'ai' && 'bg-[#f3faf6]', r.best?.(k) && 'font-semibold')}>
                     {r.cell(k)}
                   </td>
                 ))}
               </tr>
             ))}
             <tr>
-              <th className="px-5 py-3 text-left align-top text-[12.5px] font-medium text-ink-2">운전 방식</th>
+              <th className="px-5 py-3 text-left align-top text-[13.5px] font-medium text-ink-2">운전 방식</th>
               {order.map((k) => (
-                <td key={k} className={cx('px-4 py-3 align-top text-[12px] leading-snug text-ink-3', k === 'ai' && 'bg-[#f1f9f5]')}>
+                <td key={k} className={cx('px-4 py-3 align-top text-[13px] leading-snug text-ink-3', k === 'ai' && 'bg-[#f3faf6]')}>
                   {STRATEGY[k].desc}
                 </td>
               ))}
@@ -303,7 +369,7 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
           </tbody>
         </table>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -343,13 +409,13 @@ function DailyChart({ S }: { S: Summary }) {
         },
       ],
       yAxis: [
-        { type: 'value', gridIndex: 0, name: 'kWh/일', ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' }, axisLine: { show: false } },
+        { type: 'value', gridIndex: 0, name: 'kWh/일', ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 12, align: 'left' }, axisLine: { show: false } },
         {
           type: 'value',
           gridIndex: 1,
           name: '외기 ℃',
           ...axisCommon,
-          nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
+          nameTextStyle: { color: CHART.muted, fontSize: 12, align: 'left' },
           axisLine: { show: false },
           splitNumber: 2,
         },
@@ -370,7 +436,7 @@ function DailyChart({ S }: { S: Summary }) {
                 markArea: {
                   silent: true,
                   itemStyle: { color: 'rgba(20,32,51,0.035)' },
-                  label: { show: true, position: 'insideTop' as const, color: CHART.muted, fontSize: 11, formatter: '예보·평년 기반 예상' },
+                  label: { show: true, position: 'insideTop' as const, color: CHART.muted, fontSize: 12, formatter: '예보·평년 기반 예상' },
                   data: [[{ xAxis: futureStart }, { xAxis: cats[cats.length - 1] }]] as never,
                 },
               }
@@ -415,7 +481,7 @@ function DailyChart({ S }: { S: Summary }) {
 
   return (
     <ChartCard
-      title="일별 전력량과 외기온도"
+      bare
       sub="강의일만 표시합니다. 냉방철(9월)과 난방철(11~12월) 사이 간절기에는 AI가 외기 냉방과 가동 생략으로 전력을 크게 줄입니다."
       legend={
         <>
@@ -473,7 +539,7 @@ function CumulativeChart({ S }: { S: Summary }) {
         name: '누적 절감 kWh',
         min: (v: { min: number }) => Math.floor(Math.min(0, v.min) / 100) * 100,
         ...axisCommon,
-        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
+        nameTextStyle: { color: CHART.muted, fontSize: 12, align: 'left' },
         axisLine: { show: false },
       },
       series: [
@@ -485,12 +551,12 @@ function CumulativeChart({ S }: { S: Summary }) {
           itemStyle: { color: STRATEGY.fixed.color },
           areaStyle: { color: 'rgba(86,90,96,0.06)' },
           data: vsFixed,
-          endLabel: { show: true, formatter: (p: { value: number }) => `${fmtNum(p.value)}`, color: CHART.ink, fontSize: 11, fontWeight: 600 },
+          endLabel: { show: true, formatter: (p: { value: number }) => `${fmtNum(p.value)}`, color: CHART.ink, fontSize: 12, fontWeight: 600 },
           markLine: {
             silent: true,
             symbol: 'none',
             lineStyle: { color: CHART.ink, width: 1, type: 'solid' },
-            label: { formatter: '오늘', color: CHART.ink2, fontSize: 11, position: 'end', rotate: 0 },
+            label: { formatter: '오늘', color: CHART.ink2, fontSize: 12, position: 'end', rotate: 0 },
             data: [{ xAxis: S.today }],
           },
         },
@@ -501,7 +567,7 @@ function CumulativeChart({ S }: { S: Summary }) {
           lineStyle: { width: 2, color: STRATEGY.rule.color },
           itemStyle: { color: STRATEGY.rule.color },
           data: vsRule,
-          endLabel: { show: true, formatter: (p: { value: number }) => `${fmtNum(p.value)}`, color: CHART.ink, fontSize: 11, fontWeight: 600 },
+          endLabel: { show: true, formatter: (p: { value: number }) => `${fmtNum(p.value)}`, color: CHART.ink, fontSize: 12, fontWeight: 600 },
         },
       ] as never,
     }
@@ -509,7 +575,7 @@ function CumulativeChart({ S }: { S: Summary }) {
   const last = S.days.length - 1
   return (
     <ChartCard
-      title="AI 누적 절감량"
+      bare
       sub="AI 예측 제어가 각 방식보다 덜 쓴 전력을 쌓아 올린 값입니다. 오늘 이후는 예상입니다."
       legend={
         <>
@@ -525,7 +591,7 @@ function CumulativeChart({ S }: { S: Summary }) {
         ],
       }}
       footer={
-        <div className="mt-2 text-[11.5px] text-ink-3">
+        <div className="mt-2 text-[13px] text-ink-3">
           {S.days[last] && `학기 말(${fmtDateShort(S.days[last].date)})까지 고정 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh, 규칙 대비 ${fmtNum(S.totals.all.rule.kwh - S.totals.all.ai.kwh)} kWh 절감 예상`}
         </div>
       }
@@ -597,14 +663,14 @@ function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: A
           )
         },
       },
-      xAxis: { type: 'value', name: '전력량 (kWh), 적을수록 좋음', nameLocation: 'middle', nameGap: 28, min: 0, ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 11 } },
+      xAxis: { type: 'value', name: '전력량 (kWh), 적을수록 좋음', nameLocation: 'middle', nameGap: 28, min: 0, ...axisCommon, nameTextStyle: { color: CHART.muted, fontSize: 12 } },
       yAxis: {
         type: 'value',
         name: '강의 중 쾌적 유지율 (%), 높을수록 좋음',
         min: Math.floor(minC - 0.4),
         max: 100.4,
         ...axisCommon,
-        nameTextStyle: { color: CHART.muted, fontSize: 11, align: 'left' },
+        nameTextStyle: { color: CHART.muted, fontSize: 12, align: 'left' },
         axisLabel: { ...axisCommon.axisLabel, formatter: (v: number) => (v > 100 ? '' : `${v}`) },
       },
       series: [
@@ -617,13 +683,13 @@ function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: A
             value: [q.kwh, q.comfort],
             symbol: q.symbol,
             itemStyle: { color: q.color },
-            label: { show: true, formatter: q.short, position: q.pos, color: CHART.ink, fontSize: 11.5, fontWeight: q.key === 'ai' ? 650 : 400, distance: 9 },
+            label: { show: true, formatter: q.short, position: q.pos, color: CHART.ink, fontSize: 13, fontWeight: q.key === 'ai' ? 650 : 400, distance: 9 },
           })),
           markArea: ai
             ? {
                 silent: true,
                 itemStyle: { color: 'rgba(20,166,115,0.07)' },
-                label: { show: true, position: 'insideBottomLeft', color: CHART.ink2, fontSize: 11, formatter: '적게 쓰고 쾌적한 영역' },
+                label: { show: true, position: 'insideBottomLeft', color: CHART.ink2, fontSize: 12, formatter: '적게 쓰고 쾌적한 영역' },
                 data: [[{ xAxis: 0, yAxis: 99.5 }, { xAxis: ai.kwh * 1.12, yAxis: 100.4 }]] as never,
               }
             : undefined,
@@ -633,7 +699,7 @@ function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: A
   }, [pts])
   return (
     <ChartCard
-      title="전기를 아끼느라 쾌적을 포기했는가"
+      bare
       sub={`${scope === 'all' ? '학기 전체(예상)' : '오늘까지'} 기준입니다. 왼쪽 위로 갈수록 적게 쓰고 쾌적한 운전이며, 규칙 기반은 켜는 시점과 재실 감지를 바꾼 경우도 함께 놓았습니다.`}
       legend={
         <>
@@ -667,14 +733,14 @@ function DecisionChart({ S }: { S: Summary }) {
   const max = Math.max(1, ...entries.map(([, v]) => v))
   return (
     <ChartCard
-      title="AI 판단 유형별 횟수"
+      bare
       sub={`학기 전체 ${fmtNum(total)}회입니다. 강의마다 열모델로 판단합니다.`}
       table={{ columns: ['판단', '횟수'], rows: entries.map(([k, v]) => [DECISION[k]?.label ?? k, v]) }}
     >
-      <ul className="space-y-4">
+      <ul className="grid grid-cols-1 gap-x-10 gap-y-5 lg:grid-cols-2">
         {entries.map(([k, v]) => (
           <li key={k}>
-            <div className="mb-1.5 flex items-center justify-between text-[13px]">
+            <div className="mb-1.5 flex items-center justify-between text-[14px]">
               <span className="flex items-center gap-2 font-semibold text-ink">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-white" aria-hidden>
                   <DecisionIcon type={k} size={10} />
@@ -686,7 +752,7 @@ function DecisionChart({ S }: { S: Summary }) {
             <div className="h-2 rounded-full bg-[#eceff3]" title={`${DECISION[k]?.label}: ${v}회`}>
               <div className="h-2 rounded-full bg-s-ai" style={{ width: `${(v / max) * 100}%` }} />
             </div>
-            <div className="mt-1 text-[12px] text-ink-3">{DECISION[k]?.desc}</div>
+            <div className="mt-1.5 text-[13px] text-ink-3">{DECISION[k]?.desc}</div>
           </li>
         ))}
       </ul>
@@ -708,57 +774,49 @@ function ConsolidationReport() {
   const { meta } = useMeta()
   const withMoves = (Array.isArray(c.data?.weekdays) ? c.data.weekdays : []).filter((w) => Array.isArray(w.moves) && w.moves.length > 0)
   return (
-    <Card>
-      <CardHeader
-        title="강의실 재배치 권고"
-        sub="학사 부서 검토용입니다. 같은 유형이고 정원이 맞으며 그 시간에 비어 있는 강의실로 옮겨, 같은 실외기에 강의를 모읍니다."
-        right={
-          <>
-            {stale && (
-              <span className="inline-flex items-center gap-1.5 text-[12px] text-ink-3" title="이전 결과를 보여 주면서 최신 시간표로 다시 계산하고 있습니다">
-                <Spinner size={12} /> 갱신 중
-              </span>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => ask('금요일 강의실 재배치로 얼마나 절감돼? 이유와 함께 설명해줘')}>
-              <Sparkles size={13} /> 코파일럿에게 설명 듣기
-            </Button>
-            <Button size="sm" onClick={() => window.print()}>
-              <Printer size={13} /> 인쇄
-            </Button>
-          </>
-        }
-      />
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[72ch] text-[13.5px] text-ink-3">같은 유형이고 정원이 맞으며 그 시간에 비어 있는 강의실로 옮겨, 같은 실외기에 강의를 모읍니다.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {stale && (
+            <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-3" title="이전 결과를 보여 주면서 최신 시간표로 다시 계산하고 있습니다">
+              <Spinner size={13} /> 갱신 중
+            </span>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => ask('금요일 강의실 재배치로 얼마나 절감돼? 이유와 함께 설명해줘')}>
+            <Sparkles size={14} aria-hidden /> 코파일럿에게 설명 듣기
+          </Button>
+          <Button size="sm" onClick={() => window.print()}>
+            <Printer size={14} aria-hidden /> 인쇄
+          </Button>
+        </div>
+      </div>
       {c.error ? (
         <ErrorBox error={c.error} onRetry={c.reload} />
       ) : !c.data ? (
         <Loading label="요일별 재배치안을 학기 전체로 다시 시뮬레이션하는 중… (5초 정도 걸립니다)" />
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[6px] bg-well px-4 py-3 ring-1 ring-line ring-inset">
-            <div>
-              <div className="text-[12.5px] font-medium text-ink-2">학기 예상 추가 절감</div>
-              <div className="pnum mt-1 text-[26px] leading-none font-[650] tracking-[-0.02em] text-ink">
-                {fmtNum(c.data.semester_kwh_saving, 1)} <span className="text-[13px] font-medium text-ink-3">kWh</span>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-[12px] bg-well px-5 py-4">
+            <Figure label="학기 예상 추가 절감" value={fmtNum(c.data.semester_kwh_saving, 1)} unit="kWh" size="sm" />
             <div className="hidden h-10 w-px bg-line-strong sm:block" />
-            <div className="text-[13px] text-ink-2">
+            <div className="text-[14px] text-ink-2">
               <div>
                 권고 이동 <b className="font-semibold text-ink">{withMoves.reduce((a, w) => a + w.moves.length, 0)}건</b>, 대상 요일{' '}
                 <b className="font-semibold text-ink">{withMoves.map((w) => w.weekday_label).join('·') || '없음'}</b>
               </div>
-              <div className="text-[12.5px] text-ink-3">쾌적 유지율은 그대로이고, AI 운전 기준으로 다시 시뮬레이션한 값입니다.</div>
+              <div className="text-[13px] text-ink-3">쾌적 유지율은 그대로이고, AI 운전 기준으로 다시 시뮬레이션한 값입니다.</div>
             </div>
           </div>
-          {withMoves.length === 0 && <div className="text-[13px] text-ink-2">현재 시간표에서는 옮겨서 아낄 수 있는 강의가 없습니다.</div>}
+          {withMoves.length === 0 && <div className="text-[14px] text-ink-2">현재 시간표에서는 옮겨서 아낄 수 있는 강의가 없습니다.</div>}
           {withMoves.map((w) => (
-            <div key={w.weekday} className="rounded-[6px] border border-line">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-well px-4 py-2.5">
-                <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+            <div key={w.weekday} className="overflow-hidden rounded-[12px] border border-line">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-well px-4 py-3">
+                <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
                   매주 {w.weekday_label}요일
                   <span className="font-normal text-ink-3">학기 중 {w.dates}회</span>
                 </div>
-                <div className="tnum flex items-center gap-3 text-[12px] text-ink-2">
+                <div className="tnum flex items-center gap-3 text-[13px] text-ink-2">
                   <span>
                     {fmtNum(w.kwh_before, 1)} → <b className="text-ink">{fmtNum(w.kwh_after, 1)} kWh</b>
                   </span>
@@ -772,8 +830,8 @@ function ConsolidationReport() {
                   )}
                 </div>
               </div>
-              <table className="tnum w-full text-[13px]">
-                <thead className="text-[12px] text-ink-3">
+              <table className="tnum w-full text-[14px]">
+                <thead className="text-[13px] text-ink-3">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">강의</th>
                     <th className="px-2 py-2 text-left font-medium">시간</th>
@@ -787,7 +845,7 @@ function ConsolidationReport() {
                     <tr key={m.course_id + m.start} className="border-t border-line">
                       <td className="px-4 py-2">
                         <div className="font-medium text-ink">{m.title}</div>
-                        <div className="text-[12px] text-ink-3">{m.professor}</div>
+                        <div className="text-[13px] text-ink-3">{m.professor}</div>
                       </td>
                       <td className="px-2 py-2 text-ink-2">
                         {m.start}–{m.end}
@@ -796,9 +854,9 @@ function ConsolidationReport() {
                         <span className="inline-flex items-center gap-1.5 font-semibold text-ink">
                           {m.from_room}호 <MoveRight size={13} className="text-ink-3" /> {m.to_room}호
                         </span>
-                        <div className="text-[12px] text-ink-3">{meta?.rooms[m.to_room]?.type_label}</div>
+                        <div className="text-[13px] text-ink-3">{meta?.rooms[m.to_room]?.type_label}</div>
                       </td>
-                      <td className="px-2 py-2 text-[12px] whitespace-nowrap text-ink-2">
+                      <td className="px-2 py-2 text-[13px] whitespace-nowrap text-ink-2">
                         {m.from_odu.replace('ODU-', '')} <MoveRight size={11} className="inline text-ink-3" aria-label="에서" /> {m.to_odu.replace('ODU-', '')}
                       </td>
                       <td className="px-4 py-2 text-right text-ink-2">
@@ -810,9 +868,9 @@ function ConsolidationReport() {
               </table>
             </div>
           ))}
-          <p className="text-[12px] leading-relaxed text-ink-3">{c.data.note}</p>
+          <p className="text-[13px] leading-relaxed text-ink-3">{c.data.note}</p>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

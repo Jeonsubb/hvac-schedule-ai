@@ -1,11 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Download, History } from 'lucide-react'
+import { Download, Fan, Users } from 'lucide-react'
 import type { Day, Meta, StrategyKey } from '../lib/types'
 import { CHART, STRATEGY, STRATEGY_KEYS, statusInfo, decisionLabel } from '../lib/constants'
 import { cx, fmtDateK, fmtDuration, fmtKwh, fmtMin, hm } from '../lib/format'
+import { MODE, type Mode, type RoomState } from '../lib/thermal'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from './EChart'
-import { Badge, Card, CardHeader, DataTable, Drawer, Empty, Facts, StatusBadge, btnCls, tbl } from './ui'
+import { Badge, DataTable, Disclosure, DisclosureList, Drawer, Empty, Figure, StatusBadge, btnCls, tbl } from './ui'
 import { DecisionIcon } from './Gantt'
+import { ModeIcon } from './BuildingView'
+
+/** The room's state at the minute the overview shows, with its outdoor unit (opened from the building view). */
+export type RoomNow = RoomState & { minute: number; label: string; odu?: { id: string; on: boolean; power_w: number; mode: Mode } }
 
 export default function RoomDrawer({
   open,
@@ -14,6 +19,7 @@ export default function RoomDrawer({
   meta,
   room,
   initial = ['ai', 'rule'],
+  now,
 }: {
   open: boolean
   onClose: () => void
@@ -21,6 +27,7 @@ export default function RoomDrawer({
   meta: Meta
   room: string | null
   initial?: StrategyKey[]
+  now?: RoomNow
 }) {
   const [sel, setSel] = useState<StrategyKey[]>(initial)
   const [showOdu, setShowOdu] = useState(false)
@@ -35,7 +42,7 @@ export default function RoomDrawer({
     const lo = meta.settings.comfort_low
     const hi = meta.settings.comfort_high
     const sessions = day.sessions.filter((s) => s.room === room)
-    const keys = STRATEGY_KEYS.filter((k) => sel.includes(k) && day.strategies[k])
+    const keys = STRATEGY_KEYS.filter((k) => sel.includes(k) && day.strategies[k]?.rooms[room])
     const taSeries = keys.map((k) => ({
       name: `${STRATEGY[k].short} 실내`,
       type: 'line' as const,
@@ -68,7 +75,7 @@ export default function RoomDrawer({
       markArea: {
         silent: true,
         itemStyle: { color: CHART.comfortBand },
-        label: { show: true, position: 'insideTopLeft' as const, color: CHART.comfortInk, fontSize: 11, formatter: `쾌적 범위 ${lo}–${hi}℃` },
+        label: { show: true, position: 'insideTopLeft' as const, color: CHART.comfortInk, fontSize: 12, formatter: `쾌적 범위 ${lo}–${hi}℃` },
         data: [[{ yAxis: lo }, { yAxis: hi }]] as never,
       },
     }
@@ -110,12 +117,12 @@ export default function RoomDrawer({
       interval: 60,
       ...axisCommon,
       splitLine: { show: true, lineStyle: { color: CHART.grid } },
-      axisLabel: { ...axisCommon.axisLabel, show, formatter: (v: number) => `${Math.floor(v / 60)}시` },
+      axisLabel: { ...axisCommon.axisLabel, show, formatter: (v: number) => (Math.floor(v / 60) % 2 ? '' : `${Math.floor(v / 60)}시`) },
     })
     return {
       grid: [
-        { left: 44, right: 16, top: 16, height: 200 },
-        { left: 44, right: 16, top: 262, height: 110 },
+        { left: 44, right: 16, top: 16, height: 210 },
+        { left: 44, right: 16, top: 276, height: 100 },
       ],
       axisPointer: { link: [{ xAxisIndex: 'all' }], lineStyle: { color: CHART.muted } },
       tooltip: {
@@ -144,14 +151,15 @@ export default function RoomDrawer({
           interval: step,
           name: '℃',
           ...axisCommon,
-          nameTextStyle: { color: CHART.muted, fontSize: 11, padding: [0, 24, 0, 0] },
+          nameTextStyle: { color: CHART.muted, fontSize: 12, padding: [0, 24, 0, 0] },
         },
         {
           type: 'value',
           gridIndex: 1,
           name: 'kW',
+          splitNumber: 2,
           ...axisCommon,
-          nameTextStyle: { color: CHART.muted, fontSize: 11, padding: [0, 24, 0, 0] },
+          nameTextStyle: { color: CHART.muted, fontSize: 12, padding: [0, 24, 0, 0] },
         },
       ],
       series: [band, outdoor, ...taSeries, sessArea, ...pSeries] as never,
@@ -163,34 +171,26 @@ export default function RoomDrawer({
   const vals = day?.validation.sessions.filter((v) => v.room === room) ?? []
   const decs = day?.decisions.filter((d) => d.room === room) ?? []
   const hist = (day?.history ?? []).filter((h) => h.room === room || (showOdu && h.device === rm.odu))
+  const aiRd = day?.strategies.ai?.rooms[room]
+  const occ = (aiRd?.sessions ?? []).reduce((a, s) => a + s.minutes, 0)
+  const inb = (aiRd?.sessions ?? []).reduce((a, s) => a + s.in_band_minutes, 0)
+  const issues = vals.filter((v) => statusInfo(v.status).group !== 'normal').length
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      width={820}
+      width={860}
       title={
-        <span className="flex items-baseline gap-2">
-          {room}호 <span className="text-[13.5px] font-medium text-ink-3">{rm.type_label}</span>
+        <span className="flex items-baseline gap-2.5">
+          {room}호 <span className="text-[15px] font-medium text-ink-3">{rm.type_label}</span>
         </span>
       }
-      sub={
-        day ? (
-          <Facts>
-            {fmtDateK(day.date)}
-            {`정원 ${rm.capacity}명`}
-            {`${rm.area}㎡`}
-            {`실내기 ${rm.idus.length}대`}
-            {`${rm.odu.replace('ODU-', '실외기 ')} 연결`}
-          </Facts>
-        ) : (
-          '불러오는 중…'
-        )
-      }
+      sub={day ? `${fmtDateK(day.date)}, 정원 ${rm.capacity}명` : '불러오는 중…'}
       right={
         day && (
-          <a href={`/api/export/plan.csv?date=${day.date}&strategy=ai`} className={btnCls('secondary', 'md')} download>
-            <Download size={14} /> 운전 계획 CSV
+          <a href={`/api/export/plan.csv?date=${day.date}&strategy=ai`} className={btnCls('ghost', 'sm')} download>
+            <Download size={14} aria-hidden /> 운전 계획 CSV
           </a>
         )
       }
@@ -201,174 +201,240 @@ export default function RoomDrawer({
           <div className="skeleton h-[420px]" />
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* strategy toggles: one strip, pressed = drawn in the chart */}
-          <div className="overflow-hidden rounded-[10px] border border-line bg-line" role="group" aria-label="차트에 그릴 운전 방식">
-            <div className="grid grid-cols-4 gap-px">
-              {STRATEGY_KEYS.map((k) => {
-                const rd = day.strategies[k]?.rooms[room]
-                const on = sel.includes(k)
-                const comfortVals = rd?.sessions ?? []
-                const occ = comfortVals.reduce((a, s) => a + s.minutes, 0)
-                const inb = comfortVals.reduce((a, s) => a + s.in_band_minutes, 0)
-                return (
-                  <button
-                    key={k}
-                    onClick={() => toggle(k)}
-                    aria-pressed={on}
-                    className={cx('relative bg-surface px-4 pt-3.5 pb-3 text-left transition-colors', on ? '' : 'hover:bg-well')}
-                    title={on ? '차트에서 숨기기' : '차트에 표시'}
-                  >
-                    <span className="absolute inset-x-0 top-0 h-[3px]" style={{ background: on ? STRATEGY[k].color : 'transparent' }} aria-hidden />
-                    <div className={cx('flex items-center gap-1.5 text-[12.5px] font-medium', on ? 'text-ink' : 'text-ink-3')}>
-                      <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: on ? STRATEGY[k].color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${STRATEGY[k].color}` }} aria-hidden />
-                      {STRATEGY[k].label}
-                    </div>
-                    <div className={cx('pnum mt-1.5 text-[20px] font-[650] tracking-[-0.02em]', on ? 'text-ink' : 'text-ink-3')}>
-                      {fmtKwh(rd?.kwh ?? 0)} <span className="text-[12px] font-medium text-ink-3">kWh</span>
-                    </div>
-                    <div className="tnum mt-0.5 text-[12px] text-ink-3">
-                      가동 {fmtDuration(rd?.on_minutes ?? 0)}, 쾌적 {occ ? `${((inb / occ) * 100).toFixed(0)}%` : '–'}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+        <div className="space-y-8">
+          {now && <NowBlock now={now} />}
+
+          <div className="flex flex-wrap gap-x-12 gap-y-5">
+            <Figure label="AI 전력 (하루)" value={fmtKwh(aiRd?.kwh ?? 0)} unit="kWh" accent={STRATEGY.ai.color} size="sm" />
+            <Figure label="AI 가동 시간" value={fmtDuration(aiRd?.on_minutes ?? 0)} size="sm" />
+            <Figure label="강의 중 쾌적" value={occ ? ((inb / occ) * 100).toFixed(0) : '–'} unit={occ ? '%' : undefined} size="sm" />
+            <Figure label="강의" value={String(sessions.length)} unit="건" size="sm" />
           </div>
 
-          <Card>
-            <CardHeader
-              title="실내온도·전력 추이"
-              sub="5분 간격 시뮬레이션입니다. 회색 띠는 강의 시간, 옅은 띠는 쾌적 범위이고, 위의 운전 방식을 눌러 선을 켜고 끕니다."
-            />
-            <div className="-mt-1 mb-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-2">
-              {STRATEGY_KEYS.filter((k) => sel.includes(k)).map((k) => (
-                <span key={k} className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: STRATEGY[k].color }} />
-                  {STRATEGY[k].label}
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-[2px] w-4 rounded-full" style={{ background: CHART.outdoor }} />
-                외기온도 <span className="text-ink-3">{day.weather.src_actual}</span>
-              </span>
-            </div>
-            {option && <EChart option={option} height={392} />}
-          </Card>
-
-          <Card>
-            <CardHeader title="강의별 검증 결과" sub="계획에 들어갔는지, 실제로 가동했는지, 시작 시 실내온도와 쾌적 유지율입니다." />
-            {vals.length === 0 ? (
-              <Empty title="이 날은 이 강의실에 강의가 없습니다" desc="강의가 없으면 AI는 냉난방을 켜지 않습니다." />
-            ) : (
-              <div className={tbl.frame}>
-                <table className={tbl.table}>
-                  <thead className={tbl.thead}>
-                    <tr>
-                      <th className={tbl.th}>강의</th>
-                      <th className={tbl.th}>시간</th>
-                      <th className={tbl.th}>상태</th>
-                      <th className={tbl.thR}>실행률</th>
-                      <th className={tbl.thR}>시작 온도</th>
-                      <th className={tbl.thR}>쾌적</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vals.map((v) => {
-                      const info = statusInfo(v.status)
-                      const s = sessions.find((x) => x.id === v.session)
-                      return (
-                        <tr key={v.session} className={cx(tbl.tr, 'align-top')}>
-                          <td className="px-3 py-2">
-                            <div className="font-medium text-ink">{v.title}</div>
-                            <div className="text-[12px] text-ink-3">
-                              {[s?.professor, `${s?.expected_people ?? '–'}명`].filter(Boolean).join(', ')}
-                            </div>
-                            {v.decisions.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {v.decisions.map((d) => (
-                                  <Badge key={d} tone="ai">
-                                    <DecisionIcon type={d} size={10} />
-                                    {decisionLabel(d)}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-ink-2">
-                            {v.start}–{v.end}
-                          </td>
-                          <td className="px-3 py-2">
-                            <StatusBadge group={info.group} label={info.label} />
-                            {v.notes.map((n, i) => (
-                              <div key={i} className="mt-1 text-[12px] text-ink-2">
-                                {n}
-                              </div>
-                            ))}
-                          </td>
-                          <td className="px-3 py-2 text-right">{v.exec_ratio != null ? `${(v.exec_ratio * 100).toFixed(0)}%` : '–'}</td>
-                          <td className="px-3 py-2 text-right">{v.ta_start != null ? `${v.ta_start.toFixed(1)}℃` : '–'}</td>
-                          <td className="px-3 py-2 text-right">{v.comfort_pct != null ? `${v.comfort_pct.toFixed(0)}%` : '–'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+          <section aria-labelledby="rd-chart">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 id="rd-chart" className="text-[17px] font-[650] text-ink">
+                실내온도와 전력
+              </h3>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="차트에 그릴 운전 방식">
+                {STRATEGY_KEYS.map((k) => {
+                  const on = sel.includes(k)
+                  const rd = day.strategies[k]?.rooms[room]
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => toggle(k)}
+                      aria-pressed={on}
+                      title={`${STRATEGY[k].label}: ${fmtKwh(rd?.kwh ?? 0)} kWh, 가동 ${fmtDuration(rd?.on_minutes ?? 0)}`}
+                      className={cx(
+                        'inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium transition-colors duration-150',
+                        on ? 'border-ink-3 bg-surface text-ink' : 'border-line bg-surface text-ink-3 hover:border-line-strong hover:text-ink',
+                      )}
+                    >
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-[3px]"
+                        style={{ background: on ? STRATEGY[k].color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${STRATEGY[k].color}` }}
+                        aria-hidden
+                      />
+                      {STRATEGY[k].short}
+                      <span className="tnum text-ink-3">{fmtKwh(rd?.kwh ?? 0)}</span>
+                    </button>
+                  )
+                })}
               </div>
-            )}
-          </Card>
+            </div>
+            <div className="mb-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-[2px] w-4 rounded-full" style={{ background: CHART.outdoor }} aria-hidden />
+                외기온도
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-4 rounded-[3px] bg-[rgb(20_32_51/0.08)]" aria-hidden />
+                강의 시간(아래 칸)
+              </span>
+              <span className="text-ink-3">버튼으로 운전 방식 선을 켜고 끕니다</span>
+            </div>
+            {option && <EChart option={option} height={400} />}
+          </section>
 
-          {decs.length > 0 && (
-            <Card>
-              <CardHeader title="AI 판단 근거" sub="열모델과 예보로 계산한 이 강의실의 운전 결정입니다." />
-              <ul className="divide-y divide-line">
-                {decs.map((d, i) => (
-                  <li key={i} className="flex gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-white">
-                      <DecisionIcon type={d.type} size={12} />
-                    </span>
-                    <div className="text-[13px]">
-                      <div className="font-semibold text-ink">
-                        {decisionLabel(d.type)}{' '}
-                        <span className="tnum font-normal text-ink-3">
-                          {d.title} {d.start}–{d.end}
-                        </span>
+          <DisclosureList>
+            <Disclosure title="강의별 검증 결과" summary={vals.length ? `${vals.length}건${issues ? `, 이상 ${issues}` : ', 모두 정상'}` : '강의 없음'}>
+              {vals.length === 0 ? (
+                <Empty title="이 날은 이 강의실에 강의가 없습니다" desc="강의가 없으면 AI는 냉난방을 켜지 않습니다." />
+              ) : (
+                <div className={tbl.frame}>
+                  <table className={tbl.table}>
+                    <thead className={tbl.thead}>
+                      <tr>
+                        <th className={tbl.th}>강의</th>
+                        <th className={tbl.th}>상태</th>
+                        <th className={tbl.thR}>실행률</th>
+                        <th className={tbl.thR}>시작 온도</th>
+                        <th className={tbl.thR}>쾌적</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vals.map((v) => {
+                        const info = statusInfo(v.status)
+                        const s = sessions.find((x) => x.id === v.session)
+                        return (
+                          <tr key={v.session} className={cx(tbl.tr, 'align-top')}>
+                            <td className="px-3.5 py-2.5">
+                              <div className="font-medium text-ink">{v.title}</div>
+                              <div className="text-[13px] text-ink-3">
+                                {v.start}–{v.end}
+                                {s?.professor ? `, ${s.professor}` : ''}, {s?.expected_people ?? '–'}명
+                              </div>
+                              {v.decisions.length > 0 && (
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {v.decisions.map((d) => (
+                                    <Badge key={d} tone="ai">
+                                      <DecisionIcon type={d} size={11} />
+                                      {decisionLabel(d)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-2.5">
+                              <StatusBadge group={info.group} label={info.label} />
+                              {v.notes.map((n, i) => (
+                                <div key={i} className="mt-1 text-[13px] text-ink-2">
+                                  {n}
+                                </div>
+                              ))}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-right">{v.exec_ratio != null ? `${(v.exec_ratio * 100).toFixed(0)}%` : '–'}</td>
+                            <td className="px-3.5 py-2.5 text-right">{v.ta_start != null ? `${v.ta_start.toFixed(1)}℃` : '–'}</td>
+                            <td className="px-3.5 py-2.5 text-right">{v.comfort_pct != null ? `${v.comfort_pct.toFixed(0)}%` : '–'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Disclosure>
+            <Disclosure title="AI 판단 근거" summary={decs.length ? `${decs.length}건` : '없음'}>
+              {decs.length === 0 ? (
+                <p className="text-[14px] text-ink-3">이 날 이 강의실에서는 AI가 따로 판단한 운전이 없습니다.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {decs.map((d, i) => (
+                    <li key={i} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-white" aria-hidden>
+                        <DecisionIcon type={d.type} size={13} />
+                      </span>
+                      <div className="text-[14px]">
+                        <div className="font-semibold text-ink">
+                          {decisionLabel(d.type)}{' '}
+                          <span className="tnum font-normal text-ink-3">
+                            {d.title} {d.start}–{d.end}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-ink-2">{d.detail}</div>
                       </div>
-                      <div className="text-ink-2">{d.detail}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Disclosure>
+            <Disclosure title="설비 켜고 끈 기록" summary={`${(day.history ?? []).filter((h) => h.room === room).length}건`}>
+              <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-[13.5px] text-ink-2">
+                <input type="checkbox" name="show-odu" checked={showOdu} onChange={(e) => setShowOdu(e.target.checked)} className="h-4 w-4 accent-[#142033]" />
+                실외기({rm.odu.replace('ODU-', '')}) 기록도 보기
+              </label>
+              {hist.length === 0 ? (
+                <Empty title="이 날은 켜고 끈 기록이 없습니다" />
+              ) : (
+                <DataTable
+                  maxHeight={300}
+                  spec={{
+                    columns: ['시각', '장치', '상태', '원인'],
+                    align: ['left', 'left', 'left', 'left'],
+                    rows: hist.map((h) => [h.t, h.device, h.state === 'ON' ? '켬' : h.state === 'OFF' ? '끔' : h.state, h.cause]),
+                  }}
+                />
+              )}
+            </Disclosure>
+            <Disclosure title="설비 정보" summary={`실내기 ${rm.idus.length}대, ${rm.odu.replace('ODU-', '실외기 ')}`}>
+              <dl className="tnum grid grid-cols-[120px_1fr] gap-y-2 text-[14px]">
+                <dt className="text-ink-3">유형</dt>
+                <dd className="text-ink">{rm.type_label}</dd>
+                <dt className="text-ink-3">면적·정원</dt>
+                <dd className="text-ink">
+                  {rm.area}㎡, {rm.capacity}명{rm.pcs ? `, PC ${rm.pcs}대` : ''}
+                </dd>
+                <dt className="text-ink-3">실내기</dt>
+                <dd className="text-ink">
+                  {rm.idus.map((i) => (
+                    <div key={i.id}>
+                      {i.id} <span className="text-ink-3">(냉방 {i.cool_kw} / 난방 {i.heat_kw} kW)</span>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader
-              title="설비 On/Off 이력"
-              icon={<History size={16} />}
-              sub="AI 운전 기준으로 실내기에 보낸 켜기·끄기 명령입니다."
-              right={
-                <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2">
-                  <input type="checkbox" checked={showOdu} onChange={(e) => setShowOdu(e.target.checked)} className="h-3.5 w-3.5 accent-[#142033]" />
-                  실외기({rm.odu}) 포함
-                </label>
-              }
-            />
-            {hist.length === 0 ? (
-              <Empty title="이 날은 켜고 끈 기록이 없습니다" />
-            ) : (
-              <DataTable
-                maxHeight={300}
-                spec={{
-                  columns: ['시각', '장치', '상태', '원인'],
-                  align: ['left', 'left', 'left', 'left'],
-                  rows: hist.map((h) => [h.t, h.device, h.state === 'ON' ? '켬' : h.state === 'OFF' ? '끔' : h.state, h.cause]),
-                }}
-              />
-            )}
-          </Card>
+                  ))}
+                </dd>
+                <dt className="text-ink-3">실외기</dt>
+                <dd className="text-ink">
+                  {rm.odu} {meta.odus[rm.odu] && <span className="text-ink-3">({meta.odus[rm.odu].label}, 용량 {meta.odus[rm.odu].cap_kw} kW)</span>}
+                </dd>
+              </dl>
+              {rm.assumption && <p className="mt-3 text-[13px] text-ink-3">현장 설비 대장과 대조하기 전의 가정값입니다.</p>}
+            </Disclosure>
+          </DisclosureList>
         </div>
       )}
     </Drawer>
+  )
+}
+
+function NowBlock({ now }: { now: RoomNow }) {
+  const run = now.mode !== 'off'
+  return (
+    <section className="rounded-[14px] bg-well px-6 py-5" aria-label={`${fmtMin(now.minute)} ${now.label} 상태`}>
+      <div className="text-[13px] font-medium text-ink-3">
+        <span className="tnum">{fmtMin(now.minute)}</span> {now.label}
+      </div>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+        <div className="flex items-center gap-4">
+          <span className="tnum text-[40px] leading-none font-[650] tracking-[-0.03em] text-ink">
+            {Number.isFinite(now.ta) ? now.ta.toFixed(1) : '–'}
+            <span className="ml-0.5 text-[18px] font-medium text-ink-3">℃</span>
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[14px] font-semibold"
+            style={{ background: run ? MODE[now.mode].tint : '#ffffff', color: MODE[now.mode].deep }}
+          >
+            <ModeIcon mode={now.mode} size={14} />
+            {MODE[now.mode].label}
+            {run && <span className="tnum font-medium">{(now.power_w / 1000).toFixed(1)} kW</span>}
+          </span>
+        </div>
+        {now.odu && (
+          <span className="inline-flex items-center gap-1.5 text-[14px] text-ink-2">
+            <Fan size={15} className="text-ink-3" aria-hidden />
+            실외기 {now.odu.id.replace('ODU-', '')}
+            <b className="tnum font-semibold text-ink">{now.odu.on ? `가동 ${(now.odu.power_w / 1000).toFixed(1)} kW` : '정지'}</b>
+          </span>
+        )}
+      </div>
+      <div className="mt-3 text-[14px] text-ink-2">
+        {now.session ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Users size={15} className="text-ink-3" aria-hidden />
+            강의 중 <b className="font-semibold text-ink">{now.session.title}</b>
+            <span className="tnum text-ink-3">
+              {now.session.start}–{now.session.end}, {now.session.expected_people ?? '–'}명
+            </span>
+          </span>
+        ) : now.next ? (
+          <span>
+            다음 강의 <b className="font-semibold text-ink">{now.next.title}</b> <span className="tnum text-ink-3">{now.next.start}–{now.next.end}</span>
+          </span>
+        ) : (
+          '오늘 남은 강의가 없습니다.'
+        )}
+      </div>
+    </section>
   )
 }

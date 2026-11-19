@@ -3,7 +3,8 @@ import { AlertTriangle, CheckCircle2, Fan, Info, Users } from 'lucide-react'
 import { apiSend } from '../lib/api'
 import { hm, cx } from '../lib/format'
 import type { EventCheck, EventDraft } from '../lib/types'
-import { Badge, Button, Spinner } from './ui'
+import { Badge, Button, Disclosure, Spinner } from './ui'
+import type { EventCheck as Check } from '../lib/types'
 
 /** The fields /api/events/check needs, or null while the draft is still incomplete. */
 export function checkBody(d: EventDraft): Record<string, unknown> | null {
@@ -108,20 +109,20 @@ export function EventCheckPanel({
   const { complete, checking, check, error } = result
   if (!complete)
     return (
-      <div className="flex items-center gap-2 rounded-[6px] bg-well px-3 py-2 text-[12.5px] text-ink-3 ring-1 ring-line ring-inset">
-        <Info size={13} aria-hidden /> 날짜{draft.type === 'add' ? ', 강의실, 시간' : draft.type === 'closure' ? '' : ', 대상 강의'}를 채우면 겹치는 일정과 정원을 확인합니다.
+      <div className="flex items-center gap-2 rounded-[12px] bg-well px-3.5 py-2.5 text-[13.5px] text-ink-3">
+        <Info size={14} aria-hidden /> 날짜{draft.type === 'add' ? ', 강의실, 시간' : draft.type === 'closure' ? '' : ', 대상 강의'}를 채우면 겹치는 일정과 정원을 확인합니다.
       </div>
     )
   if (checking && !check)
     return (
-      <div className="flex items-center gap-2 rounded-[6px] bg-well px-3 py-2 text-[12.5px] text-ink-2 ring-1 ring-line ring-inset" role="status">
-        <Spinner size={13} /> 겹치는 일정과 정원을 확인하는 중…
+      <div className="flex items-center gap-2 rounded-[12px] bg-well px-3.5 py-2.5 text-[13.5px] text-ink-2" role="status">
+        <Spinner size={14} /> 겹치는 일정과 정원을 확인하는 중…
       </div>
     )
   if (error)
     return (
-      <div className="flex items-start gap-2 rounded-[6px] border border-[#efc6c6] bg-crit-bg px-3 py-2 text-[12.5px] text-crit-ink" role="alert">
-        <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden /> 겹치는 일정을 확인하지 못했습니다. {error}
+      <div className="flex items-start gap-2 rounded-[12px] bg-crit-bg px-3.5 py-2.5 text-[13.5px] text-crit-ink" role="alert">
+        <AlertTriangle size={14} className="mt-[3px] shrink-0" aria-hidden /> 겹치는 일정을 확인하지 못했습니다. {error}
       </div>
     )
   if (!check) return null
@@ -135,13 +136,13 @@ export function EventCheckPanel({
   const showAlts = problems ? others : check.ok ? cheaper : []
 
   return (
-    <div className={cx('space-y-2 transition-opacity', checking && 'opacity-60')} aria-live="polite">
+    <div className={cx('space-y-3 transition-opacity duration-200', checking && 'opacity-60')} aria-live="polite">
       {/* verdict: conflicts/capacity, or another reason (note), or all clear */}
       {problems ? (
-        <div className="space-y-1.5 rounded-[6px] border border-[#efc6c6] bg-crit-bg px-3 py-2 text-[12.5px] text-crit-ink" role="alert">
+        <div className="space-y-1.5 rounded-[12px] bg-crit-bg px-3.5 py-2.5 text-[13.5px] text-crit-ink" role="alert">
           {check.conflicts.map((c, i) => (
             <div key={i} className="flex items-start gap-2">
-              <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+              <AlertTriangle size={14} className="mt-[3px] shrink-0" aria-hidden />
               <span>
                 <b className="font-semibold">{c.room}호</b>에 같은 시간 {c.kind === 'event' ? '일정' : '강의'}이 있습니다:{' '}
                 <span className="tnum">
@@ -152,23 +153,23 @@ export function EventCheckPanel({
           ))}
           {!check.capacity_ok && cap && (
             <div className="flex items-start gap-2">
-              <Users size={13} className="mt-0.5 shrink-0" aria-hidden />
+              <Users size={14} className="mt-[3px] shrink-0" aria-hidden />
               <span className="tnum">
                 예상 {cap.expected_people}명이 {cap.room}호 정원 {cap.capacity}명을 넘습니다.
               </span>
             </div>
           )}
-          {check.note && <div className="pl-[21px]">{check.note}</div>}
+          {check.note && <div className="pl-[22px]">{check.note}</div>}
         </div>
       ) : !check.ok ? (
-        <div className="flex items-start gap-2 rounded-[6px] border border-[#efc6c6] bg-crit-bg px-3 py-2 text-[12.5px] text-crit-ink" role="alert">
-          <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+        <div className="flex items-start gap-2 rounded-[12px] bg-crit-bg px-3.5 py-2.5 text-[13.5px] text-crit-ink" role="alert">
+          <AlertTriangle size={14} className="mt-[3px] shrink-0" aria-hidden />
           <span>{check.note || '이 일정은 확인되지 않았습니다. 날짜와 대상 강의를 다시 확인하세요.'}</span>
         </div>
       ) : (
-        <div className="space-y-1 rounded-[6px] bg-good-bg px-3 py-2 text-[12.5px] text-good-ink">
+        <div className="space-y-1 rounded-[12px] bg-good-bg px-3.5 py-2.5 text-[13.5px] text-good-ink">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <CheckCircle2 size={13} className="shrink-0" aria-hidden />
+            <CheckCircle2 size={14} className="shrink-0" aria-hidden />
             <span className="font-semibold">{VERDICT[draft.type] ?? '겹치는 일정 없음'}</span>
             {cap && cap.expected_people != null && (
               <span className="tnum">
@@ -177,11 +178,11 @@ export function EventCheckPanel({
             )}
             {requested && <span className="tnum text-ink-2">이 강의실을 쓰면 AI 운전 전력 +{requested.extra_kwh.toFixed(2)} kWh</span>}
           </div>
-          {check.note && <div className="pl-[21px] text-ink-2">{check.note}</div>}
+          {check.note && <div className="pl-[22px] text-ink-2">{check.note}</div>}
         </div>
       )}
       {(check.target ?? []).length > 0 && (
-        <div className="tnum flex flex-wrap items-baseline gap-x-2 text-[12.5px] text-ink-2">
+        <div className="tnum flex flex-wrap items-baseline gap-x-2 text-[13.5px] text-ink-2">
           <span className="font-semibold text-ink">{draft.type === 'move' ? '옮길 강의' : '취소 대상'}</span>
           {(check.target ?? []).map((t, i) => (
             <span key={i}>
@@ -191,53 +192,69 @@ export function EventCheckPanel({
         </div>
       )}
 
-      {/* alternatives */}
-      {showAlts.length > 0 && (
-        <div>
-          <div className="mb-1 text-[12.5px] font-semibold text-ink-2">
-            {problems ? '그 시간에 비어 있고 정원이 맞는 강의실' : '전기를 더 적게 쓰는 빈 강의실'}
-            <span className="ml-1.5 font-normal text-ink-3">추가 전력이 적은 순</span>
+      {/* alternatives: with a problem the best free room is shown with its action, the rest one click away */}
+      {showAlts.length > 0 &&
+        (problems ? (
+          <div>
+            <div className="mb-1.5 text-[13.5px] font-semibold text-ink-2">
+              그 시간에 비어 있고 정원이 맞는 강의실 <span className="font-normal text-ink-3">추가 전력이 적은 순</span>
+            </div>
+            <AltList alts={showAlts.slice(0, 1)} target={target} onPickRoom={onPickRoom} />
+            {showAlts.length > 1 && (
+              <Disclosure variant="inline" className="mt-1.5" title={`다른 빈 강의실 ${(compact ? showAlts.slice(1, 3) : showAlts.slice(1)).length}곳 보기`}>
+                <AltList alts={compact ? showAlts.slice(1, 3) : showAlts.slice(1)} target={target} onPickRoom={onPickRoom} />
+                {check.alternatives_note && !compact && <p className="mt-1.5 text-[13px] leading-snug text-ink-3">{check.alternatives_note}</p>}
+              </Disclosure>
+            )}
           </div>
-          <ul className="divide-y divide-line overflow-hidden rounded-[6px] border border-line">
-            {(compact ? showAlts.slice(0, 3) : showAlts).map((a) => (
-              <li key={a.room} className="flex items-center gap-3 bg-surface px-3 py-2 text-[12.5px]">
-                <div className="min-w-0 flex-1">
-                  <div className="text-ink">
-                    <b className="font-semibold">{a.room}호</b>{' '}
-                    <span className="text-ink-3">
-                      {a.type}, {a.capacity}석
-                    </span>
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="tnum text-ink-2">
-                      추가 전력 {a.extra_kwh >= 0 ? '+' : '−'}
-                      {Math.abs(a.extra_kwh).toFixed(2)} kWh
-                    </span>
-                    {a.odu_already_on && (
-                      <Badge tone="ai" title={`${a.odu}가 그 시간에 이미 가동 중이라 함께 쓰면 효율적입니다`}>
-                        <Fan size={11} aria-hidden /> {a.odu.replace('ODU-', '실외기 ')} 이미 가동
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                {a.room === target ? (
-                  <Badge tone="outline">선택됨</Badge>
-                ) : (
-                  <Button size="sm" onClick={() => onPickRoom(a.room)}>
-                    이 강의실로 변경
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {check.alternatives_note && !compact && <p className="mt-1 text-[12px] leading-snug text-ink-3">{check.alternatives_note}</p>}
-        </div>
-      )}
+        ) : (
+          <Disclosure variant="inline" title={`전기를 더 적게 쓰는 빈 강의실 ${(compact ? showAlts.slice(0, 3) : showAlts).length}곳 보기`}>
+            <AltList alts={compact ? showAlts.slice(0, 3) : showAlts} target={target} onPickRoom={onPickRoom} />
+            {check.alternatives_note && !compact && <p className="mt-1.5 text-[13px] leading-snug text-ink-3">{check.alternatives_note}</p>}
+          </Disclosure>
+        ))}
       {checking && (
-        <div className="flex items-center gap-1.5 text-[12px] text-ink-3" role="status">
-          <Spinner size={12} /> 바뀐 내용으로 다시 확인하는 중…
+        <div className="flex items-center gap-1.5 text-[13px] text-ink-3" role="status">
+          <Spinner size={13} /> 바뀐 내용으로 다시 확인하는 중…
         </div>
       )}
     </div>
+  )
+}
+
+function AltList({ alts, target, onPickRoom }: { alts: Check['alternatives']; target: string | undefined | null; onPickRoom: (room: string) => void }) {
+  return (
+    <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line">
+      {alts.map((a) => (
+        <li key={a.room} className="flex items-center gap-3 bg-surface px-3.5 py-2.5 text-[13.5px]">
+          <div className="min-w-0 flex-1">
+            <div className="text-ink">
+              <b className="font-semibold">{a.room}호</b>{' '}
+              <span className="text-ink-3">
+                {a.type}, {a.capacity}석
+              </span>
+            </div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="tnum text-ink-2">
+                추가 전력 {a.extra_kwh >= 0 ? '+' : '−'}
+                {Math.abs(a.extra_kwh).toFixed(2)} kWh
+              </span>
+              {a.odu_already_on && (
+                <Badge tone="ai" title={`${a.odu}가 그 시간에 이미 가동 중이라 함께 쓰면 효율적입니다`}>
+                  <Fan size={12} aria-hidden /> {a.odu.replace('ODU-', '실외기 ')} 이미 가동
+                </Badge>
+              )}
+            </div>
+          </div>
+          {a.room === target ? (
+            <Badge tone="outline">선택됨</Badge>
+          ) : (
+            <Button size="sm" onClick={() => onPickRoom(a.room)}>
+              이 강의실로 변경
+            </Button>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }

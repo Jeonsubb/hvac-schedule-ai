@@ -48,8 +48,11 @@ function niceMax(v: number) {
   return Math.ceil((v * 1.08) / step) * step
 }
 
-/** Which feature saved what: fixed → rule → predictive start/stop → weather → occupancy = AI. */
-export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
+/**
+ * Which feature saved what: fixed → rule → predictive start/stop → weather → occupancy = AI.
+ * Default view: bars, change labels and step names. `detail` adds the per-step comfort rows and the sensor footnote.
+ */
+export function Waterfall({ A, note, detail = false }: { A: AttributionScope; note: string; detail?: boolean }) {
   const [hover, setHover] = useState<string | null>(null)
   const steps = A.waterfall
   const cols: Col[] = steps.map((s, i) => {
@@ -71,7 +74,7 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
   const ai = A.variants.ai
   cols.push({ key: 'ai_total', title: 'AI 예측 제어', sub: '운영 중인 방식', kind: 'total', from: 0, to: ai.kwh, delta: null, cold: ai.cold_starts, comfort: ai.comfort_pct, color: STRATEGY.ai.color })
 
-  const H = 230
+  const H = 240
   const yMax = niceMax(Math.max(...cols.map((c) => Math.max(c.from, c.to))))
   const y = (v: number) => (v / yMax) * H
   const raw = yMax / 4
@@ -80,6 +83,7 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
   const ticks: number[] = []
   for (let t = 0; t <= yMax + 1e-6; t += tickStep) ticks.push(t)
   const { sensor } = splitNote(note)
+  // fixed label column so toggling the comfort rows never shifts the bars
   const grid = { gridTemplateColumns: `112px repeat(${cols.length}, minmax(0, 1fr))` }
 
   return (
@@ -89,15 +93,15 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
         <div className="grid" style={grid}>
           <div className="relative" style={{ height: H + 30 }} aria-hidden>
             {ticks.map((t) => (
-              <span key={t} className="tnum absolute right-3 translate-y-1/2 text-[11px] leading-none text-ink-3" style={{ bottom: y(t) }}>
+              <span key={t} className="tnum absolute right-3 translate-y-1/2 text-[12px] leading-none text-ink-3" style={{ bottom: y(t) }}>
                 {fmtNum(t)}
               </span>
             ))}
-            <span className="absolute top-0 right-3 text-[11px] text-ink-3">kWh</span>
+            <span className="absolute top-0 right-3 text-[12px] text-ink-3">kWh</span>
           </div>
           <div className="relative" style={{ gridColumn: `2 / span ${cols.length}`, height: H + 30 }}>
             {ticks.map((t) => (
-              <div key={t} className={cx('absolute inset-x-0 h-px', t === 0 ? 'bg-line-strong' : 'bg-[#eef1f4]')} style={{ bottom: y(t) }} aria-hidden />
+              <div key={t} className={cx('absolute inset-x-0 h-px', t === 0 ? 'bg-line-strong' : 'bg-[#f0f2f5]')} style={{ bottom: y(t) }} aria-hidden />
             ))}
             <div className="absolute inset-0 flex">
               {cols.map((c, i) => {
@@ -128,10 +132,10 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
                       aria-hidden
                     />
                     <div className="absolute inset-x-1 text-center" style={{ bottom: y(hi) + 6 }}>
-                      <div className={cx('tnum text-[13px] leading-tight font-[650]', c.kind === 'total' ? 'text-ink' : up ? 'text-heat-ink' : 'text-ink')}>
+                      <div className={cx('tnum leading-tight font-[650]', c.kind === 'total' ? 'text-[15px] text-ink' : up ? 'text-[14px] text-heat-ink' : 'text-[14px] text-ink')}>
                         {c.kind === 'total' ? fmtNum(c.to) : `${(c.delta ?? 0) > 0 ? '+' : '−'}${fmtNum(Math.abs(c.delta ?? 0), 1)}`}
                       </div>
-                      {up && <div className="text-[11.5px] leading-tight font-medium text-heat-ink">쾌적을 위한 전력</div>}
+                      {up && <div className="text-[13px] leading-tight font-medium text-heat-ink">쾌적을 위한 전력</div>}
                     </div>
                   </div>
                 )
@@ -141,34 +145,36 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
         </div>
 
         {/* step names */}
-        <div className="grid border-t border-line pt-2.5" style={grid}>
-          <div className="pr-3 text-right text-[12px] font-medium text-ink-3">단계</div>
+        <div className="grid border-t border-line pt-3" style={grid}>
+          <div aria-hidden />
           {cols.map((c, i) => (
             <div key={c.key} className={cx('px-1.5 text-center', hover === c.key && 'bg-well')}>
-              <div className="text-[12.5px] leading-snug font-semibold text-ink">
+              <div className="text-[14px] leading-snug font-semibold text-ink">
                 {i > 0 && i < cols.length - 1 && <span className="mr-0.5 text-ink-3">+</span>}
                 {i === cols.length - 1 && <span className="mr-0.5 text-ink-3">=</span>}
                 {c.title}
-                {c.sensor && <sup className="ml-0.5 text-[10.5px] font-semibold text-ink-2">1</sup>}
+                {c.sensor && detail && <sup className="ml-0.5 text-[11px] font-semibold text-ink-2">1</sup>}
               </div>
-              {c.sub && <div className="mt-0.5 text-[11.5px] leading-snug text-ink-3">{c.sub}</div>}
+              {c.sub && <div className="mt-0.5 text-[13px] leading-snug text-ink-3">{c.sub}</div>}
             </div>
           ))}
         </div>
 
+        {detail && (
+          <>
         {/* cold starts and comfort under each step */}
-        <div className="mt-2.5 grid items-center border-t border-line py-2" style={grid}>
-          <div className="pr-3 text-right text-[12px] leading-tight font-medium text-ink-2" title={COLD_START.desc}>
+        <div className="mt-3 grid items-center border-t border-line py-2.5" style={grid}>
+          <div className="pr-3 text-right text-[13px] leading-tight font-medium text-ink-2" title={COLD_START.desc}>
             {COLD_START.label}
           </div>
           {cols.map((c, i) => {
             const prev = i > 0 && i < cols.length - 1 ? cols[i - 1].cold : null
             const drop = prev != null ? c.cold - prev : 0
             return (
-              <div key={c.key} className={cx('tnum text-center text-[13px]', hover === c.key && 'bg-well')}>
+              <div key={c.key} className={cx('tnum text-center text-[14px]', hover === c.key && 'bg-well')}>
                 <b className={cx('font-[650]', c.cold === 0 ? 'text-good-ink' : 'text-ink')}>{fmtNum(c.cold)}회</b>
                 {prev != null && Math.abs(drop) >= 5 && (
-                  <span className={cx('ml-1 text-[11.5px] font-semibold', drop < 0 ? 'text-good-ink' : 'text-crit-ink')}>
+                  <span className={cx('ml-1 text-[13px] font-semibold', drop < 0 ? 'text-good-ink' : 'text-crit-ink')}>
                     {drop < 0 ? '−' : '+'}
                     {Math.abs(drop)}
                   </span>
@@ -177,19 +183,21 @@ export function Waterfall({ A, note }: { A: AttributionScope; note: string }) {
             )
           })}
         </div>
-        <div className="grid items-center border-t border-line py-2" style={grid}>
-          <div className="pr-3 text-right text-[12px] font-medium text-ink-2">쾌적 유지율</div>
+        <div className="grid items-center border-t border-line py-2.5" style={grid}>
+          <div className="pr-3 text-right text-[13px] font-medium text-ink-2">쾌적 유지율</div>
           {cols.map((c) => (
-            <div key={c.key} className={cx('tnum text-center text-[13px] text-ink-2', hover === c.key && 'bg-well')}>
+            <div key={c.key} className={cx('tnum text-center text-[14px] text-ink-2', hover === c.key && 'bg-well')}>
               {fmtPct(c.comfort, 2)}
             </div>
           ))}
         </div>
         {sensor && (
-          <p className="mt-2 border-t border-line pt-2 text-[12px] leading-relaxed text-ink-3">
+          <p className="mt-2 border-t border-line pt-2.5 text-[13px] leading-relaxed text-ink-3">
             <sup className="mr-0.5 font-semibold text-ink-2">1</sup>
             {sensor}
           </p>
+        )}
+          </>
         )}
       </div>
     </div>

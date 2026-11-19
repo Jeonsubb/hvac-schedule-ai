@@ -18,15 +18,15 @@ export const baseTooltip = {
   backgroundColor: '#ffffff',
   borderColor: '#e1e6ec',
   borderWidth: 1,
-  padding: [8, 11],
-  textStyle: { color: CHART.ink, fontSize: 12, fontFamily: FONT },
-  extraCssText: 'box-shadow: 0 8px 24px rgba(20,32,51,0.12); border-radius: 8px;',
+  padding: [10, 13],
+  textStyle: { color: CHART.ink, fontSize: 13, fontFamily: FONT },
+  extraCssText: 'box-shadow: 0 12px 32px rgba(20,32,51,0.12); border-radius: 12px;',
 }
 
 export const axisCommon = {
   axisLine: { lineStyle: { color: CHART.axis } },
   axisTick: { show: false },
-  axisLabel: { color: CHART.muted, fontSize: 11, fontFamily: FONT },
+  axisLabel: { color: CHART.muted, fontSize: 12, fontFamily: FONT },
   splitLine: { lineStyle: { color: CHART.grid, width: 1 } },
 }
 
@@ -41,7 +41,7 @@ export function ttRow(color: string, label: string, value: string, kind: 'line' 
 }
 
 export function ttTitle(t: string) {
-  return `<div style="font-weight:650;color:#142033;margin-bottom:4px">${escapeHtml(t)}</div>`
+  return `<div style="font-weight:650;color:#142033;margin-bottom:5px;font-size:13.5px">${escapeHtml(t)}</div>`
 }
 
 export function escapeHtml(s: string) {
@@ -68,7 +68,7 @@ export default function EChart({
   return (
     <ReactEChartsCore
       echarts={echarts}
-      option={{ animation: !reducedMotion(), animationDuration: 350, textStyle: { fontFamily: FONT }, ...option }}
+      option={{ animation: !reducedMotion(), animationDuration: 300, textStyle: { fontFamily: FONT }, ...option }}
       notMerge={notMerge}
       lazyUpdate
       style={{ height, width: '100%' }}

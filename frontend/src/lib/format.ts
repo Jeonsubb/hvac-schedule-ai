@@ -1,4 +1,3 @@
-import { WEEKDAY } from './constants'
 
 export function hm(s: string): number {
   const [h, m] = s.split(':').map(Number)
@@ -67,10 +66,13 @@ export function weekdayOf(s: string): number {
   return (parseDate(s).getDay() + 6) % 7
 }
 
+const DATE_K = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+const DATE_K_NO_WD = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' })
+
+/** "11월 20일 (금)" via Intl (same output as the hand-built format it replaces). */
 export function fmtDateK(s: string, withWeekday = true): string {
   const d = parseDate(s)
-  const base = `${d.getMonth() + 1}월 ${d.getDate()}일`
-  return withWeekday ? `${base} (${WEEKDAY[weekdayOf(s)]})` : base
+  return (withWeekday ? DATE_K : DATE_K_NO_WD).format(d)
 }
 
 export function fmtDateShort(s: string): string {
@@ -102,4 +104,11 @@ export function sum(a: number[]): number {
 
 export function cx(...c: (string | false | null | undefined)[]): string {
   return c.filter(Boolean).join(' ')
+}
+
+/** Korean particle by the last syllable's final consonant, e.g. josa('규칙', '과', '와') -> '과'. Latin endings take the vowel form. */
+export function josa(word: string, withFinal: string, withoutFinal: string): string {
+  const c = word.charCodeAt(word.length - 1)
+  if (c < 0xac00 || c > 0xd7a3) return withoutFinal
+  return (c - 0xac00) % 28 ? withFinal : withoutFinal
 }

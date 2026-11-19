@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Flame, Snowflake, Wind, Fan, Users, CloudSun, Play, Pause } from 'lucide-react'
+import { Flame, Snowflake, Wind, Fan, Users, CloudSun, Play, Pause, AlertTriangle } from 'lucide-react'
 import type { Day, Meta } from '../lib/types'
 import { MODE, shade, thermalFill, thermalGradient, type BuildingState, type Mode, type RoomState } from '../lib/thermal'
 import { cx, fmtMin, hm } from '../lib/format'
@@ -19,22 +19,6 @@ export function useWidth<T extends HTMLElement>() {
     return () => ro.disconnect()
   }, [])
   return [ref, w] as const
-}
-
-function textWidth(s: string, fs: number) {
-  let w = 0
-  for (const ch of s) w += /[ㄱ-힝]/.test(ch) ? fs * 0.94 : /[0-9]/.test(ch) ? fs * 0.6 : /[A-Z]/.test(ch) ? fs * 0.66 : /\s/.test(ch) ? fs * 0.28 : fs * 0.55
-  return w
-}
-
-function fit(s: string, maxW: number, fs: number) {
-  if (textWidth(s, fs) <= maxW) return s
-  let out = ''
-  for (const ch of s) {
-    if (textWidth(out + ch + '…', fs) > maxW) break
-    out += ch
-  }
-  return out ? out + '…' : ''
 }
 
 export function ModeIcon({ mode, size = 13, className }: { mode: Mode; size?: number; className?: string }) {
@@ -59,17 +43,16 @@ const SLOTS: Record<number, Slot[]> = {
 }
 
 // projection (px): plan laid back, height stood up. P(x, d, z) = (X0 + x + d·K, Yb − d − z)
-const GUT = 54 // floor label gutter
+const GUT = 56 // floor label gutter
 const K = 0.58 // horizontal shift per px of projected depth
-const HR = 78 // room depth
-const HC = 40 // corridor depth (behind rooms)
-const H = 18 // room height (facade)
+const HR = 84 // room depth
+const HC = 34 // corridor depth (behind rooms)
+const H = 16 // room height (facade)
 const SLAB = 7
-const CHIP = 24
-const CHIP_GAP = 10
-const GAP = 7 // wall gap between rooms
-const FLOOR_GAP = 14
-const BLOCK = CHIP + CHIP_GAP + HC + HR + SLAB
+const CHIP = 26
+const CHIP_GAP = 12
+const GAP = 8 // wall gap between rooms
+const FLOOR_GAP = 22
 const DP = HR + H + (HC - H) / 2 // pipe depth, on the visible corridor strip
 
 type Pt = [number, number]
@@ -83,12 +66,15 @@ export default function BuildingView({
   onRoomClick,
   selected,
   minWidth = 760,
+  showOdus = false,
 }: {
   meta: Meta
   state: BuildingState
   onRoomClick?: (room: string) => void
   selected?: string | null
   minWidth?: number
+  /** outdoor units and refrigerant lines: an opt-in detail layer */
+  showOdus?: boolean
 }) {
   const [wrapRef, measured] = useWidth<HTMLDivElement>()
   const W = Math.max(minWidth, measured || 1000)
@@ -100,6 +86,8 @@ export default function BuildingView({
 
   const L = W - GUT - (HR + HC) * K - 10
   const floors = [4, 3].filter((f) => Object.values(meta.rooms).some((r) => r.floor === f))
+  const TOP = showOdus ? CHIP + CHIP_GAP : 0
+  const BLOCK = TOP + HC + HR + SLAB
   const totalH = floors.length * BLOCK + (floors.length - 1) * FLOOR_GAP + 8
 
   const tipRoom = hover ?? focus
@@ -107,10 +95,10 @@ export default function BuildingView({
 
   return (
     <div ref={wrapRef} className="relative w-full overflow-x-auto">
-      <svg width={W} height={totalH} role="group" aria-label="IT관 3층·4층 단면도: 방 바닥색은 실내온도, 앞면 색은 운전 모드" className="block select-none">
+      <svg width={W} height={totalH} role="group" aria-label="IT관 3층·4층 단면도: 방 바닥색은 실내온도, 앞면 색과 아이콘은 운전 모드" className="block select-none">
         <defs>
           <pattern id="bv-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#d5dbe3" strokeWidth="1.4" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#e1e5ea" strokeWidth="1.2" />
           </pattern>
           {(['heat', 'cool', 'air'] as Mode[]).map((m) => (
             <linearGradient key={m} id={`bv-rise-${m}`} x1="0" y1="1" x2="0" y2="0">
@@ -121,7 +109,7 @@ export default function BuildingView({
         </defs>
         {floors.map((floor, fi) => {
           const T = 4 + fi * (BLOCK + FLOOR_GAP)
-          const Yb = T + CHIP + CHIP_GAP + HC + HR
+          const Yb = T + TOP + HC + HR
           const P = (x: number, d: number, z: number): Pt => [GUT + x + d * K, Yb - d - z]
           const slots = SLOTS[floor] ?? []
           const unit = (L - GAP * (slots.length - 1)) / slots.reduce((a, s) => a + s.w, 0)
@@ -136,16 +124,16 @@ export default function BuildingView({
           return (
             <g key={floor}>
               {/* floor marker */}
-              <text x={6} y={Yb - H - HR / 2 + 2} fontSize="26" fontWeight="300" fill="#667183" style={{ letterSpacing: '-0.02em' }}>
+              <text x={4} y={Yb - H - HR / 2 + 6} fontSize="24" fontWeight="400" fill="#8a94a3" style={{ letterSpacing: '-0.02em' }}>
                 {floor}F
               </text>
               {/* slab: top (corridor surface), front lip, right side */}
-              <polygon points={poly([P(-6, -6, 0), P(L + 6, -6, 0), P(L + 6, HR + HC, 0), P(-6, HR + HC, 0)])} fill="#e7ebf0" />
-              <polygon points={poly([P(-6, -6, -SLAB), P(L + 6, -6, -SLAB), P(L + 6, -6, 0), P(-6, -6, 0)])} fill="#cdd4dd" />
-              <polygon points={poly([P(L + 6, -6, -SLAB), P(L + 6, HR + HC, -SLAB), P(L + 6, HR + HC, 0), P(L + 6, -6, 0)])} fill="#b9c2cd" />
+              <polygon points={poly([P(-6, -6, 0), P(L + 6, -6, 0), P(L + 6, HR + HC, 0), P(-6, HR + HC, 0)])} fill="#eceff3" />
+              <polygon points={poly([P(-6, -6, -SLAB), P(L + 6, -6, -SLAB), P(L + 6, -6, 0), P(-6, -6, 0)])} fill="#d6dbe2" />
+              <polygon points={poly([P(L + 6, -6, -SLAB), P(L + 6, HR + HC, -SLAB), P(L + 6, HR + HC, 0), P(L + 6, -6, 0)])} fill="#c3cad4" />
 
-              {/* refrigerant lines along the corridor, one per outdoor unit */}
-              {odus.map((o) => {
+              {/* refrigerant lines along the corridor, one per outdoor unit (opt-in layer) */}
+              {showOdus && odus.map((o) => {
                 const rs = placed.filter((s) => s.room && meta.rooms[s.room]?.odu === o.id)
                 if (!rs.length) return null
                 const st = state.odus[o.id]
@@ -169,14 +157,14 @@ export default function BuildingView({
                     <line x1={mid} y1={T + CHIP} x2={mid} y2={ay} stroke={col} strokeWidth="1.25" />
                     <g transform={`translate(${mid - chipW / 2} ${T})`}>
                       <title>{`실외기 ${o.id} (${o.label}, 용량 ${o.cap_kw} kW): ${on ? `가동 ${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}`}</title>
-                      <rect width={chipW} height={CHIP} rx="6" fill="#ffffff" stroke={on ? col : '#d5dbe3'} strokeWidth={on ? 1.5 : 1} />
-                      <g transform="translate(7 5)" className={on ? 'fan-spin' : undefined}>
+                      <rect width={chipW} height={CHIP} rx="8" fill="#ffffff" stroke={on ? col : '#d5dbe3'} strokeWidth={on ? 1.5 : 1} />
+                      <g transform="translate(8 6)" className={on ? 'fan-spin' : undefined}>
                         <Fan size={14} color={on ? col : '#97a1ae'} strokeWidth={2.2} />
                       </g>
-                      <text x="26" y="16.5" fontSize="12" fontWeight="600" fill="#142033">
+                      <text x="28" y="17.5" fontSize="13" fontWeight="600" fill="#142033">
                         실외기 {o.id.replace('ODU-', '')}
                       </text>
-                      <text x={chipW - 9} y="16.5" fontSize="12" fontWeight={on ? 650 : 500} textAnchor="end" fill={on ? MODE[st.mode].deep : '#667183'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      <text x={chipW - 10} y="17.5" fontSize="13" fontWeight={on ? 650 : 500} textAnchor="end" fill={on ? MODE[st.mode].deep : '#667183'} style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {on ? `${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}
                       </text>
                     </g>
@@ -193,11 +181,11 @@ export default function BuildingView({
                   const [lx, ly] = P((s.x0 + s.x1) / 2, HR / 2, H)
                   return (
                     <g key={si} aria-hidden>
-                      <polygon points={side} fill="#cfd6df" />
-                      <polygon points={top} fill="#f1f3f6" />
+                      <polygon points={side} fill="#d8dde4" />
+                      <polygon points={top} fill="#f4f6f8" />
                       <polygon points={top} fill="url(#bv-hatch)" />
-                      <polygon points={front} fill="#dbe1e8" />
-                      <text x={lx} y={ly + 4} textAnchor="middle" fontSize="11.5" fill="#667183">
+                      <polygon points={front} fill="#e2e6eb" />
+                      <text x={lx} y={ly + 4} textAnchor="middle" fontSize="12" fill="#8a94a3">
                         {s.label}
                       </text>
                     </g>
@@ -213,18 +201,17 @@ export default function BuildingView({
                 const isSel = selected === s.room
                 const isHover = hover === s.room
                 const isFocus = focus === s.room
-                const w = s.x1 - s.x0
-                const pad = 10
+                const pad = 12
                 const tx = (d: number) => P(s.x0, d, H)[0] + pad
                 const ty = (d: number) => P(s.x0, d, H)[1]
-                const inner = w - pad * 2
                 const silhouette = poly([P(s.x0, 0, 0), P(s.x1, 0, 0), P(s.x1, 0, H), P(s.x1, HR, H), P(s.x0, HR, H), P(s.x0, 0, H)])
-                let line3 = '남은 강의 없음'
-                if (r.session) line3 = r.session.title
-                else if (r.next) line3 = `다음 ${r.next.start} ${r.next.title}`
-                const label = `${s.room}호 ${rm.type_label}, 실내 ${r.ta.toFixed(1)}도, ${MODE[r.mode].label}${run ? ` ${(r.power_w / 1000).toFixed(1)}킬로와트` : ''}${
+                const label = `${s.room}호, 실내 ${Number.isFinite(r.ta) ? r.ta.toFixed(1) : '알 수 없음'}도, ${MODE[r.mode].label}${outBand ? ', 수업 중 쾌적 범위 밖' : ''}${
                   r.session ? `, 강의 중: ${r.session.title}` : r.next ? `, 다음 강의 ${r.next.start}` : ''
-                }`
+                }. 눌러서 상세 보기`
+                // mode badge: right end of the room-number row, inside the top face
+                const [bx0, by0] = P(s.x1, HR - 27, H)
+                const ix = bx0 - pad - 13
+                const iy = by0
                 return (
                   <g
                     key={s.room}
@@ -244,56 +231,35 @@ export default function BuildingView({
                     onFocus={(e) => e.currentTarget.matches(':focus-visible') && setFocus(s.room!)}
                     onBlur={() => setFocus(null)}
                   >
-                    <polygon points={side} fill={shade(fill, 0.2)} />
-                    <polygon points={top} fill={fill} />
+                    <polygon points={side} fill={shade(fill, 0.18)} />
+                    <polygon points={top} fill={isHover && !isSel ? shade(fill, 0.03) : fill} />
                     {run && <polygon points={top} fill={`url(#bv-rise-${r.mode})`} />}
                     <polygon points={front} fill={run ? MODE[r.mode].deep : shade(fill, 0.1)} />
-                    {/* facade: mode + power */}
-                    {run && (
-                      <>
-                        <g transform={`translate(${P(s.x0, 0, 0)[0] + 7} ${Yb - H / 2 - 6})`}>
-                          <ModeIcon mode={r.mode} size={12} className="text-white" />
-                        </g>
-                        {w >= 100 && (
-                          <text x={P(s.x0, 0, 0)[0] + 22} y={Yb - 5} fontSize="11.5" fontWeight="650" fill="#ffffff">
-                            {MODE[r.mode].label}
-                          </text>
-                        )}
-                        <text x={P(s.x1, 0, 0)[0] - 7} y={Yb - 5} fontSize="11.5" fontWeight="600" fill="#ffffff" textAnchor="end" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {(r.power_w / 1000).toFixed(1)} kW
-                        </text>
-                      </>
-                    )}
-                    {/* top face: number, temperature, lecture */}
-                    <text x={tx(HR - 19)} y={ty(HR - 19)} fontSize="13.5" fontWeight="700" fill="#142033">
+                    {/* top face: number, temperature, mode icon. Nothing else. */}
+                    <text x={tx(HR - 22)} y={ty(HR - 22)} fontSize="15" fontWeight="700" fill="#142033" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {s.room}
-                      {w > 150 && (
-                        <tspan fontSize="11.5" fontWeight="400" fill="#4a5668" dx="6">
-                          {rm.type_label}
-                        </tspan>
-                      )}
                     </text>
-                    <text x={tx(27)} y={ty(27)} fontSize="23" fontWeight="650" fill={outBand ? '#a12a2a' : '#142033'} style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+                    <text x={tx(16)} y={ty(16)} fontSize="27" fontWeight="650" fill={outBand ? '#a12a2a' : '#142033'} style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.025em' }}>
                       {Number.isFinite(r.ta) ? r.ta.toFixed(1) : '–'}
-                      <tspan fontSize="12.5" fontWeight="500" fill="#4a5668" dx="1.5">
+                      <tspan fontSize="14" fontWeight="500" fill={outBand ? '#a12a2a' : '#667183'} dx="2">
                         ℃
                       </tspan>
                     </text>
                     {outBand && (
-                      <text x={tx(27) + 70} y={ty(27)} fontSize="11.5" fontWeight="650" fill="#a12a2a">
-                        쾌적 이탈
-                      </text>
-                    )}
-                    {occupied && (
-                      <g transform={`translate(${tx(6) - 1} ${ty(6) - 10.5})`}>
-                        <Users size={12} color="#142033" strokeWidth={2.4} />
+                      <g transform={`translate(${tx(16) + 86} ${ty(16) - 15})`}>
+                        <AlertTriangle size={15} color="#d03b3b" strokeWidth={2.4} />
                       </g>
                     )}
-                    <text x={tx(6) + (occupied ? 15 : 0)} y={ty(6)} fontSize="11.5" fontWeight={occupied ? 650 : 400} fill={occupied ? '#142033' : '#4a5668'}>
-                      {fit(line3, inner - (occupied ? 15 : 0), 11.5)}
-                    </text>
+                    {run && (
+                      <g transform={`translate(${ix - 13} ${iy - 13})`}>
+                        <circle cx="13" cy="13" r="13" fill={MODE[r.mode].deep} />
+                        <g transform="translate(6.5 6.5)">
+                          <ModeIcon mode={r.mode} size={13} className="text-white" />
+                        </g>
+                      </g>
+                    )}
                     {/* hit area, selection, hover and keyboard focus outlines */}
-                    <polygon points={silhouette} fill="transparent" stroke={isFocus ? '#2f6fde' : isSel ? '#142033' : isHover ? '#4a5668' : 'none'} strokeWidth={isFocus ? 2.5 : isSel ? 2 : 1.25} strokeLinejoin="round" />
+                    <polygon points={silhouette} fill="transparent" stroke={isFocus ? '#2f6fde' : isSel ? '#142033' : isHover ? '#667183' : 'none'} strokeWidth={isFocus ? 2.5 : isSel ? 2 : 1.25} strokeLinejoin="round" />
                   </g>
                 )
               })}
@@ -320,37 +286,37 @@ function RoomTip({ r, meta, side }: { r: RoomState; meta: Meta; side: 'left' | '
   return (
     <div
       className={cx(
-        'pointer-events-none absolute top-1 z-10 w-[248px] rounded-[8px] border border-line bg-surface px-3 py-2.5 text-[12.5px] shadow-[var(--shadow-float)]',
+        'fade-in pointer-events-none absolute top-1 z-10 w-[260px] rounded-[14px] border border-line bg-surface px-4 py-3 text-[13.5px] shadow-[var(--shadow-float)]',
         side === 'left' ? 'right-1' : 'left-14',
       )}
       aria-hidden
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[14px] font-bold text-ink">{r.room}호</span>
-        <span className="text-[12px] text-ink-3">
-          {rm?.type_label}, 정원 {rm?.capacity}명
+        <span className="text-[15px] font-bold text-ink">{r.room}호</span>
+        <span className="text-[13px] text-ink-3">
+          {rm?.type_label}, {rm?.capacity}석
         </span>
       </div>
-      <div className="mt-1.5 flex items-center gap-2">
-        <span className="tnum text-[20px] font-[650] tracking-[-0.02em] text-ink">{r.ta.toFixed(1)}℃</span>
-        <span className="inline-flex items-center gap-1 text-[12px] font-semibold" style={{ color: MODE[r.mode].deep }}>
-          <ModeIcon mode={r.mode} size={12} />
+      <div className="mt-1.5 flex items-center gap-2.5">
+        <span className="tnum text-[22px] font-[650] tracking-[-0.02em] text-ink">{r.ta.toFixed(1)}℃</span>
+        <span className="inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: MODE[r.mode].deep }}>
+          <ModeIcon mode={r.mode} size={13} />
           {MODE[r.mode].label}
-          {r.mode !== 'off' && <span className="tnum font-medium">{(r.power_w / 1000).toFixed(2)} kW</span>}
+          {r.mode !== 'off' && <span className="tnum font-medium">{(r.power_w / 1000).toFixed(1)} kW</span>}
         </span>
       </div>
-      <div className="mt-1.5 border-t border-line pt-1.5 text-ink-2">
+      <div className="mt-2 border-t border-line pt-2 text-ink-2">
         {r.session ? (
           <>
-            <b className="font-semibold text-ink">강의 중</b> {r.session.title}
-            <div className="tnum text-ink-3">
+            <span className="font-semibold text-ink">강의 중</span> {r.session.title}
+            <div className="tnum text-[13px] text-ink-3">
               {r.session.start}–{r.session.end}, {r.session.expected_people ?? '–'}명
             </div>
           </>
         ) : r.next ? (
           <>
-            다음 강의 <b className="font-semibold text-ink">{r.next.title}</b>
-            <div className="tnum text-ink-3">
+            다음 강의 <span className="font-semibold text-ink">{r.next.title}</span>
+            <div className="tnum text-[13px] text-ink-3">
               {r.next.start}–{r.next.end}
             </div>
           </>
@@ -358,7 +324,6 @@ function RoomTip({ r, meta, side }: { r: RoomState; meta: Meta; side: 'left' | '
           '오늘 남은 강의가 없습니다'
         )}
       </div>
-      <div className="mt-1.5 text-[11.5px] text-ink-3">눌러서 온도·전력·이력 보기</div>
     </div>
   )
 }
@@ -461,11 +426,11 @@ export function ModeLegend({ state }: { state: BuildingState }) {
     ['off', '정지'],
   ]
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-ink-2">
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-2">
       {items.map(([m, label]) => (
         <li key={m} className={cx('inline-flex items-center gap-1.5', c[m] === 0 && m !== 'off' && 'opacity-55')}>
           <span
-            className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-[4px]"
+            className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full"
             style={{ background: m === 'off' ? '#eef1f4' : MODE[m].deep, color: '#fff', boxShadow: m === 'off' ? 'inset 0 0 0 1px #c9d1db' : undefined }}
           >
             {m !== 'off' && <ModeIcon mode={m} size={11} />}
@@ -479,6 +444,43 @@ export function ModeLegend({ state }: { state: BuildingState }) {
         강의 중 <b className="tnum font-semibold text-ink">{inClass}</b>
       </li>
     </ul>
+  )
+}
+
+/**
+ * The one legend the building view needs: indoor-temperature colour (neutral inside the comfort band)
+ * and the mode icons. Counts are not repeated here (the page sentence carries them).
+ */
+export function MapLegend({ meta }: { meta: Meta }) {
+  const lo = meta.settings.comfort_low
+  const hi = meta.settings.comfort_high
+  const t0 = lo - 9
+  const t1 = hi + 7
+  const x = (t: number) => ((t - t0) / (t1 - t0)) * 100
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-2">
+      <span className="inline-flex items-center gap-2.5">
+        <span className="text-ink-3">실내온도</span>
+        <span className="tnum">낮음</span>
+        <span className="relative inline-block h-2 w-[132px] rounded-full" style={{ background: thermalGradient(t0, t1, lo, hi) }} aria-hidden>
+          <span className="absolute -inset-y-[3px] rounded-[4px] border-[1.5px] border-ink-3" style={{ left: `${x(lo)}%`, width: `${x(hi) - x(lo)}%` }} />
+        </span>
+        <span className="tnum">높음</span>
+        <span className="tnum text-ink-3">
+          테두리 안이 쾌적 범위 {lo}–{hi}℃
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-3.5">
+        {(['heat', 'cool', 'air'] as Mode[]).map((m) => (
+          <span key={m} className="inline-flex items-center gap-1.5">
+            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-white" style={{ background: MODE[m].deep }} aria-hidden>
+              <ModeIcon mode={m} size={10} />
+            </span>
+            {m === 'air' ? '송풍(외기 냉방)' : MODE[m].label}
+          </span>
+        ))}
+      </span>
+    </div>
   )
 }
 
@@ -558,7 +560,7 @@ export function TimeScrubber({
   const hours: number[] = []
   for (let h = Math.ceil(r0 / 60); h * 60 <= r1; h++) hours.push(h)
   const future = minute > nowMinute
-  const H_ = 38
+  const H_ = 40
 
   return (
     <div className="flex items-start gap-3">
@@ -568,11 +570,11 @@ export function TimeScrubber({
           if (!playing && minute >= r1) onChange(r0)
           setPlaying((p) => !p)
         }}
-        className="mt-[3px] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white hover:bg-[#24334d]"
+        className="mt-[2px] inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-colors duration-150 hover:bg-[#25344e]"
         aria-label={playing ? '재생 멈춤' : '하루 운전 재생'}
         title={playing ? '재생 멈춤' : '선택한 시각부터 하루 운전을 재생'}
       >
-        {playing ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+        {playing ? <Pause size={15} aria-hidden /> : <Play size={15} className="ml-0.5" aria-hidden />}
       </button>
       <div className="min-w-0 flex-1">
         <div
@@ -584,8 +586,9 @@ export function TimeScrubber({
           aria-valuemax={r1}
           aria-valuenow={minute}
           aria-valuetext={`${fmtMin(minute)}${future ? ' (예정)' : ''}`}
-          className="relative cursor-ew-resize touch-none rounded-[6px] bg-well ring-1 ring-line ring-inset"
+          className="relative cursor-ew-resize touch-none rounded-[10px] bg-well"
           style={{ height: H_ }}
+          title="끌거나 ←/→로 시각을 옮깁니다. 회색 막대는 강의 중인 강의실 수, 청록 선은 AI가 가동한 강의실 수, 빗금은 지금 이후(AI 계획)입니다."
           onPointerDown={(e) => {
             ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
             setPlaying(false)
@@ -608,11 +611,11 @@ export function TimeScrubber({
           }}
         >
           {/* future shading */}
-          <div className="absolute inset-y-0 right-0 rounded-r-[6px] bg-[repeating-linear-gradient(135deg,transparent_0_5px,rgb(20_32_51/0.035)_5px_6px)]" style={{ left: `${pct(nowMinute)}%` }} />
+          <div className="absolute inset-y-0 right-0 rounded-r-[10px] bg-[repeating-linear-gradient(135deg,transparent_0_5px,rgb(20_32_51/0.04)_5px_6px)]" style={{ left: `${pct(nowMinute)}%` }} />
           {profile && (
             <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${profile.n} ${H_}`} preserveAspectRatio="none" aria-hidden>
               {profile.occ.map((v, i) =>
-                v ? <rect key={`o${i}`} x={i} y={H_ - 3 - (v / profile.max) * (H_ - 8)} width={1.02} height={(v / profile.max) * (H_ - 8)} fill="#c9d1db" /> : null,
+                v ? <rect key={`o${i}`} x={i} y={H_ - 3 - (v / profile.max) * (H_ - 8)} width={1.02} height={(v / profile.max) * (H_ - 8)} fill="#d6dbe2" /> : null,
               )}
               <polyline
                 fill="none"
@@ -628,13 +631,13 @@ export function TimeScrubber({
           <div className="absolute inset-y-0 w-px bg-ink-3" style={{ left: `${pct(nowMinute)}%` }} aria-hidden />
           {/* handle */}
           <div className="pointer-events-none absolute -inset-y-1 z-10 -ml-[1.5px] w-[3px] rounded-full bg-ink" style={{ left: `${pct(minute)}%` }} aria-hidden>
-            <div className="tnum absolute -top-[22px] left-1/2 -translate-x-1/2 rounded-[4px] bg-ink px-1.5 py-[1px] text-[11.5px] font-semibold whitespace-nowrap text-white">
+            <div className="tnum absolute -top-[26px] left-1/2 -translate-x-1/2 rounded-[6px] bg-ink px-2 py-[2px] text-[13px] font-semibold whitespace-nowrap text-white">
               {fmtMin(minute)}
               {future ? ' 예정' : ''}
             </div>
           </div>
         </div>
-        <div className="relative mt-1 h-4 text-[11px] text-ink-3" aria-hidden>
+        <div className="relative mt-1.5 h-4 text-[12px] text-ink-3" aria-hidden>
           {hours.map((h) =>
             h % 2 === 0 ? (
               <span key={h} className="tnum absolute -translate-x-1/2" style={{ left: `${pct(h * 60)}%` }}>
@@ -643,20 +646,9 @@ export function TimeScrubber({
             ) : null,
           )}
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-ink-3">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-line-strong" aria-hidden />
-            강의 중인 강의실 수
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-[2px] w-3.5 rounded-full" style={{ background: STRATEGY.ai.color }} aria-hidden />
-            AI가 가동한 강의실 수
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-3 w-px bg-ink-3" aria-hidden />
-            {refLabel}({fmtMin(nowMinute)}) 이후는 AI 운전 계획
-          </span>
-        </div>
+        <p className="sr-only">
+          회색 막대는 강의 중인 강의실 수, 청록 선은 AI가 가동한 강의실 수입니다. {refLabel}({fmtMin(nowMinute)}) 이후는 AI 운전 계획입니다.
+        </p>
       </div>
     </div>
   )
