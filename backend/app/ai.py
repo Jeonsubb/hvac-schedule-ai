@@ -46,6 +46,13 @@ def _norm(text: str) -> str:
 
 
 def record_status(ok: bool, err: str | None = None) -> None:
+    try:
+        _record_status(ok, err)
+    except Exception:
+        pass
+
+
+def _record_status(ok: bool, err: str | None = None) -> None:
     st = get_store().get_item("meta", "ai_status") or {}
     now = service.now_kst().isoformat(timespec="seconds")
     if ok:
@@ -55,18 +62,36 @@ def record_status(ok: bool, err: str | None = None) -> None:
     get_store().put_item("meta", "ai_status", st)
 
 
-def cache_put(kind: str, text: str, result: dict) -> None:
+def _cache_id(text: str) -> str:
     import hashlib
 
-    get_store().put_item(f"aicache-{kind}", hashlib.sha1(_norm(text).encode()).hexdigest()[:16],
-                         {"q": _norm(text), "result": result, "at": service.now_kst().isoformat(timespec="seconds")})
+    # same-day only: relative dates ("내일", "다음 주") and live data change from day to day
+    return hashlib.sha1(f"{service.now_kst().date().isoformat()}|{_norm(text)}".encode()).hexdigest()[:16]
+
+
+def cache_put(kind: str, text: str, result: dict) -> None:
+    try:
+        get_store().put_item(f"aicache-{kind}", _cache_id(text),
+                             {"q": _norm(text), "result": result, "at": service.now_kst().isoformat(timespec="seconds")})
+    except Exception:
+        pass  # a cache write must never discard a paid, successful answer
 
 
 def cache_get(kind: str, text: str) -> dict | None:
-    import hashlib
-
-    it = get_store().get_item(f"aicache-{kind}", hashlib.sha1(_norm(text).encode()).hexdigest()[:16])
+    it = get_store().get_item(f"aicache-{kind}", _cache_id(text))
     return it and {**it["result"], "cached_at": it["at"], "from_cache": True}
+
+
+def is_outage(e: Exception) -> bool:
+    """True for service-side failures (credentials, network, throttling, 5xx); False for bad input."""
+    import anthropic
+
+    if isinstance(e, (anthropic.BadRequestError, anthropic.UnprocessableEntityError, anthropic.NotFoundError)):
+        return False
+    return True
+
+
+EMPTY_CHECK = {"ok": False, "conflicts": [], "capacity_ok": True, "capacity": None, "alternatives": []}
 
 
 def _charge():
@@ -295,8 +320,8 @@ def run_tool(name: str, inp: dict, out: dict) -> dict:
         try:
             chk = service.check_event(ev)
             ev["check"] = {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}
-        except Exception as e:  # incomplete draft: let the operator fill it in
-            ev["check"] = {"ok": False, "error": str(e)}
+        except Exception as e:  # incomplete draft: same shape, explained in the note
+            ev["check"] = {**EMPTY_CHECK, "note": f"초안을 확인하지 못했습니다: {str(e)[:120]}"}
         out.setdefault("event_drafts", []).append(ev)
         return {"draft": ev, "status": "운영자 확인 대기"}
     if name == "consolidation_advice":

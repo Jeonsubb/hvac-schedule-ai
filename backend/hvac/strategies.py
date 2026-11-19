@@ -256,6 +256,14 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
             sa, sm, _, _ = _forward(ctx, sa, sm, cand, cand + 1, _const(mode))
         ta_off, tm_off = sa, sm
 
+        # reduced-output pre-conditioning segment of this block (if any); defined before the
+        # bridge decision because both paths emit it
+        soft_seg = None
+        if ctx.cap_frac < 1.0 and ctx.cap_until > on_t:
+            soft_seg = {"s": on_t, "e": min(ctx.cap_until, e), "kind": "cond", "cap": ctx.cap_frac,
+                        "reason": f"예열 (실내기 출력 {round(ctx.cap_frac * 100)}%, 실외기 용량 분담)", "sessions": []}
+        ctx.cap_frac, ctx.cap_until = 1.0, -1
+
         bridge = False
         if nxt is not None and gap is not None and 0 < gap <= gap_max and mode == COND:
             # option A: keep running through the gap
@@ -288,15 +296,11 @@ def plan_ai_room(room: dict, sessions: list[dict], to_f, rh_f, ghi_f, init: tupl
             carry_on = True
             continue
 
-        soft_seg = None
-        if ctx.cap_frac < 1.0 and ctx.cap_until > on_t:
-            soft_seg = {"s": on_t, "e": min(ctx.cap_until, t_off), "kind": "cond", "cap": ctx.cap_frac,
-                        "reason": f"예열 (실내기 출력 {round(ctx.cap_frac * 100)}%, 실외기 용량 분담)", "sessions": []}
-        ctx.cap_frac, ctx.cap_until = 1.0, -1
         if e - t_off > rule_early:  # only count stops earlier than the rule would make anyway
             add_dec(blk, **{"type": "early_stop", "detail": f"건물 열관성으로 종료 {e - t_off}분 전 정지해도 쾌적 유지",
                               "saved_min": (e - t_off) - rule_early})
         if soft_seg:
+            soft_seg["e"] = min(soft_seg["e"], t_off)
             intervals.append(soft_seg)
         intervals.append({"s": soft_seg["e"] if soft_seg else on_t, "e": t_off, "kind": "cond",
                           "reason": "예측 최적화 (최적 기동·관성 정지)",

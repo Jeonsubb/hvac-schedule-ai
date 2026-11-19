@@ -10,6 +10,7 @@ def client(tmp_path_factory):
     root = tmp_path_factory.mktemp("store")
     os.environ["LOCAL_STORE"] = str(root)
     os.environ["NOW_OVERRIDE"] = "2026-11-18T10:40:00"
+    os.environ["OPERATOR_KEY"] = "test-operator-key"
     cache = Path(__file__).resolve().parents[2] / "data" / "cache" / "weather_sources.json"
     if not cache.exists():
         pytest.skip("weather cache missing")
@@ -127,3 +128,50 @@ def test_admin_reset_requires_operator_key(client):
 def test_notice_image_rejects_non_images(client):
     r = client.post("/api/events/parse-image", files={"file": ("notice.txt", b"hello", "text/plain")})
     assert r.status_code == 400
+
+
+
+# ---------------------------------------------------------------- v12 diff-review regressions
+
+def test_check_detects_clash_with_added_event(client):
+    ev = client.post("/api/events", json={"type": "add", "date": "2026-11-25", "room": "408", "start": "18:00",
+                                          "end": "21:00", "title": "행사A", "expected_people": 30}).json()["event"]
+    r = client.post("/api/events/check", json={"type": "add", "date": "2026-11-25", "room": "408", "start": "19:00",
+                                               "end": "20:00", "title": "행사B", "expected_people": 20}).json()
+    assert r["ok"] is False and any(c["title"] == "행사A" for c in r["conflicts"])
+    assert all(a["room"] != "408" for a in r["alternatives"])
+    client.delete(f"/api/events/{ev['id']}")
+
+
+def test_check_cancel_requires_class_on_that_day(client):
+    courses = client.get("/api/courses").json()
+    mon = next(c for c in courses if c["weekday"] == 0)
+    r = client.post("/api/events/check", json={"type": "cancel", "date": "2026-11-24", "course_id": mon["id"]}).json()
+    assert r["ok"] is False and "열리지 않습니다" in r["note"]  # 11/24 is a Tuesday
+    ok = client.post("/api/events/check", json={"type": "cancel", "date": "2026-11-23", "course_id": mon["id"]}).json()
+    assert ok["ok"] is True and ok["target"]
+
+
+def test_check_move_rejects_inverted_times(client):
+    courses = client.get("/api/courses").json()
+    mon = next(c for c in courses if c["weekday"] == 0)
+    r = client.post("/api/events/check", json={"type": "move", "date": "2026-11-23", "course_id": mon["id"],
+                                               "new_room": "410", "new_start": "23:00"}).json()
+    assert r["ok"] is False
+
+
+def test_settings_exact_margin_accepted(client):
+    assert client.put("/api/settings", json={"comfort_low": 19.6, "sp_heat": 19.9}).status_code == 200
+    client.post("/api/settings/reset")
+
+
+def test_admin_reset_with_key_restores_seed(client):
+    client.post("/api/events", json={"type": "add", "date": "2026-11-26", "room": "409", "start": "18:00",
+                                     "end": "19:00", "title": "임시", "expected_people": 10})
+    r = client.post("/api/admin/reset", headers={"x-operator-key": "test-operator-key"}).json()
+    assert r["events_removed"] >= 1 and r["courses"] == 129
+    assert client.get("/api/events").json() == []
+
+
+def test_meta_does_not_expose_ai_error_text(client):
+    assert "error" not in client.get("/api/meta").json()["ai"]

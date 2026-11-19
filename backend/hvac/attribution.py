@@ -68,10 +68,8 @@ def variants_day(d: date, courses: list, events: list, wx: dict, settings: dict)
         s2 = {**settings, **st}
         plan, _ = plan_ai(by_room, ROOMS, wf_min, init, s2)
         use_vac = name == "ai"
+        # override / command-failure events are kept in every AI variant; only vacancy differs
         anomalies, _ = ai_field_controls(plan, scenario, s2, by_room, vacancy=use_vac)
-        if not use_vac:
-            # keep the non-vacancy field events (override / command failure) identical across variants
-            anomalies = {r: [a for a in lst if a["type"] == "override"] for r, lst in anomalies.items()}
         out[name] = run(plan, anomalies, guard=True)
     return {"date": d.isoformat(), "sessions": len(sessions), "variants": out}
 

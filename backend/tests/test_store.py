@@ -61,3 +61,20 @@ def test_resilient_store_serves_mirror_when_primary_fails(tmp_path):
     s.put_item("event", "E2", {"id": "E2"})  # writes keep working locally
     assert {e["id"] for e in s.list_items("event")} == {"E1", "E2"}
     assert s.status()["mode"] == "local-fallback"
+
+
+def test_freeze_history_keeps_settled_complete_values():
+    from datetime import date
+
+    from app.service import freeze_history
+
+    prev = {"archive": {"2026-11-10T09": {"t": 5.0, "rh": 50, "ghi": 100},
+                        "2026-11-19T09": {"t": 6.0, "rh": 50, "ghi": 100},
+                        "2026-11-09T09": {"t": None, "rh": 50, "ghi": 100}}}
+    src = {"archive": {"2026-11-10T09": {"t": 7.0, "rh": 55, "ghi": 90},
+                       "2026-11-19T09": {"t": 8.0, "rh": 55, "ghi": 90},
+                       "2026-11-09T09": {"t": 4.0, "rh": 55, "ghi": 90}}}
+    out = freeze_history(src, prev, date(2026, 11, 20))
+    assert out["archive"]["2026-11-10T09"]["t"] == 5.0   # settled: frozen
+    assert out["archive"]["2026-11-19T09"]["t"] == 8.0   # recent: refreshed
+    assert out["archive"]["2026-11-09T09"]["t"] == 4.0   # incomplete old value is not frozen

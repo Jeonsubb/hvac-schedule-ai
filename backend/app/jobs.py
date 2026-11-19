@@ -81,20 +81,26 @@ def run(job_id: str) -> dict:
                 job["progress"] = {"steps": out.get("steps", [])}
                 _save(job)
             question = p["messages"][-1]["content"]
+            single = len(p["messages"]) == 1
             try:
-                job["result"] = ai.copilot(p["messages"], progress=progress)
-                ai.record_status(True)
-                if len(p["messages"]) == 1:
-                    ai.cache_put("chat", question, job["result"])
+                result = ai.copilot(p["messages"], progress=progress)
             except ai.QuotaExceeded:
                 raise
             except Exception as e:
-                ai.record_status(False, f"{type(e).__name__}: {e}")
-                cached = ai.cache_get("chat", question)
+                if ai.is_outage(e):
+                    ai.record_status(False, type(e).__name__)
+                cached = ai.cache_get("chat", question) if single else None
                 if not cached:
                     raise RuntimeError("AI(Bedrock) 호출에 실패했습니다. 잠시 후 다시 시도하세요.") from e
-                job["result"] = {**cached, "answer": cached.get("answer", "") +
-                                 f"\n\n> 지금은 AI 연결이 불안정해서 {cached['cached_at'][:16].replace('T', ' ')}에 같은 질문으로 받은 답을 보여드립니다."}
+                # answer text only: stale proposals / drafts must not offer live "적용" buttons
+                result = {"answer": cached.get("answer", "") +
+                          f"\n\n> 지금은 AI 연결이 불안정해서 오늘 {cached['cached_at'][11:16]}에 같은 질문으로 받은 답을 보여드립니다.",
+                          "steps": cached.get("steps", []), "from_cache": True, "cached_at": cached["cached_at"]}
+            else:
+                ai.record_status(True)
+                if single:
+                    ai.cache_put("chat", question, result)
+            job["result"] = result
         elif job["kind"] == "extract":
             import base64
 

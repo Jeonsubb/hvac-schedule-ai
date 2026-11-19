@@ -81,7 +81,7 @@ def meta():
         "now": service.effective_now(ctx),
         "counts": {"courses": len(ctx.courses), "events": len(ctx.events)},
         "storage": getattr(service.get_store(), "status", lambda: {"mode": type(service.get_store()).__name__})(),
-        "ai": service.get_store().get_item("meta", "ai_status") or {"ok": None},
+        "ai": {k: v for k, v in (service.get_store().get_item("meta", "ai_status") or {"ok": None}).items() if k != "error"},
         "weather": {"fetched_at": src.get("fetched_at"), "errors": src.get("errors", {}),
                     "kma_base": (src.get("kma_forecast") or {}).get("base")},
         "models": {"sonnet": os.environ.get("MODEL_SONNET", "global.anthropic.claude-sonnet-5-5"),
@@ -247,21 +247,34 @@ def parse_event(request: Request, body: dict = Body(...)):
     _rate_limit(request, "parse")
     try:
         ev = ai.parse_event(text)
-        ai.record_status(True)
-        ai.cache_put("parse", text, ev)
     except ai.QuotaExceeded as e:
         raise HTTPException(429, str(e))
     except Exception as e:
-        ai.record_status(False, f"{type(e).__name__}: {e}")
+        if not ai.is_outage(e):
+            raise HTTPException(422, "문장을 일정으로 해석하지 못했습니다. 날짜·시간·강의실을 넣어 다시 써 주세요.")
+        ai.record_status(False, type(e).__name__)
         ev = ai.cache_get("parse", text)
         if not ev:
             raise HTTPException(503, "AI(Bedrock) 호출에 실패했습니다. 아래 양식에 직접 입력하거나 잠시 후 다시 시도하세요.")
+    else:
+        ai.record_status(True)
+        ai.cache_put("parse", text, ev)
     try:
         chk = service.check_event(ev)
         ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
     except Exception:
         pass  # incomplete draft: the form shows what is missing
     return ev
+
+
+def _sniff_image(data: bytes) -> str | None:
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 @app.post("/api/events/parse-image")
@@ -272,19 +285,20 @@ async def parse_event_image(request: Request, file: UploadFile = File(...)):
     data = await file.read()
     if len(data) > 4_000_000:
         raise HTTPException(413, "이미지가 너무 큽니다(최대 4MB).")
-    media = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
-        (file.filename or "").lower().rsplit(".", 1)[-1])
+    media = _sniff_image(data)  # by content, not by file name
     if not media:
         raise HTTPException(400, "PNG, JPG, WEBP 이미지만 받을 수 있습니다.")
     _rate_limit(request, "parse")
     try:
         ev = ai.parse_event_image(data, media)
-        ai.record_status(True)
     except ai.QuotaExceeded as e:
         raise HTTPException(429, str(e))
     except Exception as e:
-        ai.record_status(False, f"{type(e).__name__}: {e}")
+        if not ai.is_outage(e):
+            raise HTTPException(422, "이미지에서 일정을 읽지 못했습니다. 공지 부분만 잘라서 올리거나 글로 입력해 주세요.")
+        ai.record_status(False, type(e).__name__)
         raise HTTPException(503, "AI(Bedrock) 호출에 실패했습니다. 공지 내용을 글로 입력해 주세요.")
+    ai.record_status(True)
     try:
         chk = service.check_event(ev)
         ev = {**ev, "check": {k: chk.get(k) for k in ("ok", "conflicts", "capacity_ok", "capacity", "alternatives", "note")}}
@@ -328,7 +342,7 @@ def audit(limit: int = 100):
 def consolidation(weekday: int | None = None):
     if weekday is not None and not 0 <= weekday <= 5:
         raise HTTPException(400, "weekday는 0(월)~5(토)입니다.")
-    return service.consolidation(weekday)
+    return service.consolidation(weekday, allow_stale=weekday is None)
 
 
 @app.get("/api/attribution")
@@ -389,9 +403,11 @@ def admin_reset(request: Request):
         st.delete_item("event", ev["id"])
         removed += 1
     st.put_item("settings", "active", config.default_settings())
-    service.audit("admin", f"데모 초기화: 이벤트 {removed}개 삭제, 운영 규칙 기본값 복원", "운영자")
-    service._queue_precompute()
-    return {"events_removed": removed, "settings": "default"}
+    seed = timetable.parse_grid_csv(service.RAW_CSV.read_text(encoding="utf-8-sig"), source="부산대 시간표 CSV")
+    st.replace_kind("course", {c["id"]: c for c in seed})
+    service.audit("admin", f"데모 초기화: 이벤트 {removed}개 삭제, 운영 규칙 기본값·시간표 원본 복원", "운영자")
+    service._queue_precompute(force=True)
+    return {"events_removed": removed, "settings": "default", "courses": len(seed)}
 
 
 @app.post("/api/precompute")

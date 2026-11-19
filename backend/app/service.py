@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v12"
+ENGINE_VERSION = "v13"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST
@@ -117,14 +117,7 @@ def refresh_weather(save_snapshots: bool = True) -> dict:
         return prev  # nothing usable fetched: keep the previous snapshot untouched
     # Freeze settled history: weather for dates two or more days ago keeps the values that were
     # first used, so past results (and every number quoted from them) stay stable across refreshes.
-    cutoff = (now_kst().date() - timedelta(days=2)).isoformat()
-    for name in ("archive", "prev_day1"):
-        old = prev.get(name) or {}
-        new = src.get(name) or {}
-        for k, v in old.items():
-            if k[:10] <= cutoff:
-                new[k] = v
-        src[name] = new
+    freeze_history(src, prev, now_kst().date())
     get_store().put_blob("weather/sources.json", src)
     if save_snapshots and src.get("kma_forecast", {}).get("hourly"):
         # keep the KMA forecast that was valid before each future day started (planner view)
@@ -136,6 +129,19 @@ def refresh_weather(save_snapshots: bool = True) -> dict:
         for d, hours in by_day.items():
             get_store().put_item("kma_snapshot", d, {"date": d, "base": src["kma_forecast"]["base"], "hours": hours})
     _wx_cache["key"] = None
+    return src
+
+
+def freeze_history(src: dict, prev: dict, today: date, settle_days: int = 3) -> dict:
+    """Keep previously used, complete hourly values for dates settle_days or more in the past."""
+    cutoff = (today - timedelta(days=settle_days)).isoformat()
+    for name in ("archive", "prev_day1"):
+        old = prev.get(name) or {}
+        new = src.get(name) or {}
+        for k, v in old.items():
+            if k[:10] <= cutoff and all(v.get(f) is not None for f in ("t", "rh", "ghi")):
+                new[k] = v
+        src[name] = new
     return src
 
 
@@ -267,12 +273,13 @@ def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
     return out
 
 
-def _queue_precompute() -> None:
-    """Start at most one background precompute per minute."""
+def _queue_precompute(force: bool = False) -> None:
+    """Start at most one background precompute per minute, and none while one is running."""
     st = get_store()
     last = st.get_item("meta", "precompute_queued") or {}
+    running = st.get_item("meta", "precompute_running") or {}
     now = time.time()
-    if now - float(last.get("t", 0)) < 60:
+    if not force and (now - float(last.get("t", 0)) < 60 or now - float(running.get("t", 0)) < 900):
         return
     st.put_item("meta", "precompute_queued", {"t": now})
     from . import jobs
@@ -334,7 +341,19 @@ def check_event(ev: dict) -> dict:
     ctx = Ctx()
     d = date.fromisoformat(ev["date"])
     sessions = timetable.sessions_for_date(d, ctx.courses, ctx.events)
-    out = {"event": ev, "conflicts": [], "capacity_ok": True, "alternatives": [], "ok": True}
+    out = {"event": ev, "conflicts": [], "capacity_ok": True, "capacity": None, "alternatives": [], "ok": True}
+    if ev["type"] in ("cancel", "move"):
+        base_sessions = timetable.sessions_for_date(d, ctx.courses, [])
+        if ev.get("course_id"):
+            target = [s for s in base_sessions if s.get("course_id") == ev["course_id"]]
+        else:
+            target = [s for s in base_sessions if s["room"] == ev.get("room") and (
+                not ev.get("start") or (hm_to_min(s["start"]) < hm_to_min(ev["end"]) and hm_to_min(ev["start"]) < hm_to_min(s["end"])))]
+        if not target:
+            out["ok"] = False
+            out["note"] = f"{ev['date']}에는 해당 강의가 열리지 않습니다(요일·공휴일·학기 기간을 확인하세요)."
+            return out
+        out["target"] = [{k: s[k] for k in ("room", "title", "start", "end")} for s in target]
     if ev["type"] not in ("add", "move"):
         return out
     if ev["type"] == "add":
@@ -347,9 +366,15 @@ def check_event(ev: dict) -> dict:
         s0 = hm_to_min(ev.get("new_start") or course["start"])
         e0 = hm_to_min(ev.get("new_end") or course["end"])
         people, title = course["expected_people"], course["class_name"]
+        if e0 <= s0:
+            out["ok"] = False
+            out["note"] = "변경 후 종료 시각이 시작 시각보다 늦어야 합니다."
+            return out
 
     def busy(r: str) -> list[dict]:
-        return [s for s in sessions if s["room"] == r and s.get("course_id") != ev.get("course_id")
+        # a move ignores only the class being moved; every other session (incl. added events) counts
+        return [s for s in sessions if s["room"] == r
+                and not (ev["type"] == "move" and s.get("course_id") == ev["course_id"])
                 and hm_to_min(s["start"]) < e0 and s0 < hm_to_min(s["end"])]
 
     out["conflicts"] = [{"room": room, "title": s["title"], "start": s["start"], "end": s["end"], "kind": s["kind"]}
@@ -492,13 +517,18 @@ def _inputs_key(ctx: Ctx) -> str:
     return _h([day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
 
 
-def consolidation(weekday: int | None = None, ctx: Ctx | None = None) -> dict:
+def consolidation(weekday: int | None = None, ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
     """Cached per input fingerprint (re-simulates every semester date of each weekday)."""
     ctx = ctx or Ctx()
     if weekday is not None:
         return recommend(ctx.courses, ctx.events, ctx.wx, ctx.settings, weekday=weekday)
     key = f"analysis/consolidation-{_inputs_key(ctx)}.json"
     res = get_store().get_blob(key)
+    if res is None and allow_stale:
+        latest = get_store().get_blob("analysis/consolidation-latest.json")
+        if latest:
+            _queue_precompute()
+            return {**latest, "stale": True}
     if res is None:
         res = recommend(ctx.courses, ctx.events, ctx.wx, ctx.settings)
         get_store().put_blob(key, res)
@@ -511,7 +541,7 @@ def attribution(ctx: Ctx | None = None, allow_stale: bool = False) -> dict | Non
     from hvac import attribution as attr
 
     ctx = ctx or Ctx()
-    key = f"analysis/attribution-{_inputs_key(ctx)}.json"
+    key = f"analysis/attribution-{now_kst().date().isoformat()}-{_inputs_key(ctx)}.json"
     res = get_store().get_blob(key)
     if res is not None:
         return res
@@ -559,11 +589,19 @@ def live_snapshot(ctx: Ctx, at: str | None = None) -> dict:
 
 
 def precompute(log=print) -> dict:
-    t = time.time()
-    ctx = Ctx()
-    sm = semester_summary(ctx)
-    t1 = time.time()
-    consolidation(ctx=ctx)
-    attribution(ctx)
-    log(f"precompute done in {time.time() - t:.1f}s (summary {t1 - t:.1f}s), days={len(sm['days'])}")
-    return {"seconds": round(time.time() - t, 1), "days": len(sm["days"])}
+    st = get_store()
+    running = st.get_item("meta", "precompute_running") or {}
+    if time.time() - float(running.get("t", 0)) < 900:
+        return {"skipped": "another precompute is running"}
+    st.put_item("meta", "precompute_running", {"t": time.time()})
+    try:
+        t = time.time()
+        ctx = Ctx()
+        sm = semester_summary(ctx)
+        t1 = time.time()
+        consolidation(ctx=ctx)
+        attribution(ctx)
+        log(f"precompute done in {time.time() - t:.1f}s (summary {t1 - t:.1f}s), days={len(sm['days'])}")
+        return {"seconds": round(time.time() - t, 1), "days": len(sm["days"])}
+    finally:
+        st.put_item("meta", "precompute_running", {"t": 0})

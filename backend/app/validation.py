@@ -160,7 +160,7 @@ def settings_patch(patch: dict, current: dict) -> dict:
     merged = {**current, **out}
     if merged["sp_heat"] >= merged["sp_cool"]:
         raise InvalidInput("난방 설정온도는 냉방 설정온도보다 낮아야 합니다.")
-    if merged["sp_heat"] - merged["comfort_low"] < 0.3 or merged["comfort_high"] - merged["sp_cool"] < 0.3:
+    if round(merged["sp_heat"] - merged["comfort_low"], 3) < 0.3 or round(merged["comfort_high"] - merged["sp_cool"], 3) < 0.3:
         raise InvalidInput("설정온도는 쾌적 범위 경계에서 0.3℃ 이상 안쪽이어야 합니다 "
                            "(sp_heat ≥ comfort_low + 0.3, sp_cool ≤ comfort_high − 0.3).")
     if _minutes(merged["fixed_off"]) <= _minutes(merged["fixed_on"]):
