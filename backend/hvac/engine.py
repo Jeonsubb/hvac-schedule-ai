@@ -217,7 +217,11 @@ def warm_state(d: date, courses: list[dict], events: list[dict], weather_by_date
         w = weather_by_date.get(wd.isoformat()) or w0
         ss = sessions_for_date(wd, courses, events)
         by_room = {r: [s for s in ss if s["room"] == r] for r in ROOMS}
-        plan = plan_rule(by_room, ROOMS, settings)
+        # warm-up uses the default rule timing so that editing rule parameters does not shift
+        # the shared start-of-day state of the other strategies
+        from .config import DEFAULT_SETTINGS
+        warm_rules = {**settings, **{k: DEFAULT_SETTINGS[k] for k in ("pre_on_min", "early_off_min", "gap_merge_min")}}
+        plan = plan_rule(by_room, ROOMS, warm_rules)
         sim = simulate_day(ROOMS, ODUS, plan, by_room, minute_series(w["actual"]["t"]),
                            minute_series(w["actual"]["rh"]), minute_series(w["actual"]["ghi"]),
                            state, settings, detail=False, clo=clo_for_month(wd.month),
@@ -324,6 +328,8 @@ def summarize_day(day: dict) -> dict:
         out["match_rate"] = v["match_rate"]
         out["plan_coverage"] = v["plan_coverage"]
         out["anomalies"] = v["anomaly_count"]
+        out["auto_actions"] = v["auto_actions"]
+        out["needs_review"] = v["anomaly_count"] - v["auto_actions"]
     dec = {}
     for x in day.get("decisions", []):
         dec[x["type"]] = dec.get(x["type"], 0) + 1

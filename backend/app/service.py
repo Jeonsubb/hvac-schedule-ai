@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v9"
+ENGINE_VERSION = "v10"
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST
@@ -331,15 +331,23 @@ def describe_event(ev: dict) -> str:
     return f"{ev['date']} {room}호 {tm} {ev.get('title', '')} ({t})".replace("  ", " ")
 
 
+def _content_key(c: dict) -> tuple:
+    return (c.get("room"), c.get("weekday"), c.get("date"), c.get("start"), c.get("end"), (c.get("class_name") or "").strip())
+
+
 def preview_courses(new: list[dict]) -> dict:
-    cur = {c["id"]: c for c in courses()}
-    nw = {c["id"]: c for c in new}
-    return {"count": len(new), "added": [c for k, c in nw.items() if k not in cur][:200],
+    """Diff by content (room, day, time, title). Only rooms present in the import are compared,
+    because committing replaces just those rooms (scope='rooms')."""
+    rooms = sorted({c["room"] for c in new})
+    cur = {_content_key(c): c for c in courses() if c["room"] in rooms}
+    nw = {_content_key(c): c for c in new}
+    return {"count": len(new), "rooms": rooms,
+            "added": [c for k, c in nw.items() if k not in cur][:200],
             "removed": [c for k, c in cur.items() if k not in nw][:200],
             "unchanged": sum(1 for k in nw if k in cur), "courses": new}
 
 
-def commit_courses(new: list[dict], source: str, actor: str = "운영자") -> dict:
+def commit_courses(new: list[dict], source: str, actor: str = "운영자", scope: str = "rooms") -> dict:
     from .validation import courses as clean_courses
 
     items = clean_courses(new)
@@ -348,7 +356,11 @@ def commit_courses(new: list[dict], source: str, actor: str = "운영자") -> di
     if not weekly and not dated:
         raise ValueError("반영할 수 있는 강의가 없습니다(강의실·시간 형식을 확인하세요).")
     if weekly:  # only replace the weekly timetable when the import actually contains one
-        get_store().replace_kind("course", {c["id"]: c for c in weekly})
+        keep = []
+        if scope == "rooms":  # replace only the rooms present in this import
+            rooms = {c["room"] for c in weekly}
+            keep = [c for c in courses() if c["room"] not in rooms]
+        get_store().replace_kind("course", {c["id"]: c for c in keep + weekly})
     for c in dated:
         if not (config.SEMESTER["start"].isoformat() <= c["date"] <= config.SEMESTER["end"].isoformat()):
             continue

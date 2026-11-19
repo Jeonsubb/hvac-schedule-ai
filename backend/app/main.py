@@ -180,7 +180,8 @@ async def import_file(request: Request, file: UploadFile = File(...), hint: str 
 @app.post("/api/import/commit")
 def import_commit(body: dict = Body(...)):
     try:
-        res = service.commit_courses(body.get("courses") or [], str(body.get("source", "가져오기"))[:120])
+        res = service.commit_courses(body.get("courses") or [], str(body.get("source", "가져오기"))[:120],
+                                     scope="all" if body.get("scope") == "all" else "rooms")
     except ValueError as e:
         raise HTTPException(400, str(e))
     service._queue_precompute()
