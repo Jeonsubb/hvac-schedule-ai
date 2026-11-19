@@ -68,12 +68,16 @@ cd ../frontend && npm install && npm run dev   # http://localhost:5173 (/api →
 
 ## 배포
 
-```bash
-AWS_PROFILE=hvac KMA_KEY=<인증키> ./infra/deploy.sh          # 최초 배포 (키는 SSM SecureString에 저장)
-AWS_PROFILE=hvac ./infra/deploy.sh backend | frontend         # 부분 배포
-```
+배포 사용자(`hvac-dev-donghun`)에게는 IAM 역할 생성 권한이 없습니다. 그래서 두 가지 모드를 지원합니다.
 
-배포 사용자에게는 `infra/iam-deployer-policy.json`의 권한(이름이 `hvac-ai-`로 시작하는 역할만 관리)이 필요합니다.
+| 모드 | 구성 | 명령 |
+|---|---|---|
+| `lambda` (목표) | CloudFront + S3 웹, Lambda API, DynamoDB + S3 데이터, Bedrock, EventBridge 매시 갱신 | 관리자가 CloudShell에서 `infra/admin-setup.sh`를 한 번 실행한 뒤 `AWS_PROFILE=hvac ./infra/deploy.sh lambda` |
+| `external` (현재) | CloudFront + S3 웹, DynamoDB + S3 데이터, Bedrock은 그대로이고 API 서버만 로컬 Mac에서 실행해 Cloudflare 터널로 연결 | `AWS_PROFILE=hvac ./infra/run-local-api.sh start` → `AWS_PROFILE=hvac ./infra/deploy.sh external "$(cat infra/.run/tunnel.host)"` |
+
+- 기상청 키는 처음 한 번 `KMA_KEY=<인증키>`로 넘기면 SSM Parameter Store(SecureString)에 저장됩니다.
+- API는 CloudFront만 아는 비밀 헤더가 없으면 403으로 거절합니다.
+- 프런트엔드만 다시 올릴 때: `AWS_PROFILE=hvac ./infra/deploy.sh frontend`
 
 ## 가정과 한계
 
