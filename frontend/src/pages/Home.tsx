@@ -33,8 +33,8 @@ function Pipeline() {
           {i > 0 && <span className={cx('h-px w-4 transition-colors duration-300 sm:w-6', n.on ? 'bg-ink-3' : 'bg-well')} aria-hidden />}
           <span
             className={cx(
-              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors duration-300',
-              n.on ? 'border-line-strong bg-well' : 'border-line bg-transparent',
+              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-[0_0_0_4px_var(--color-surface)] transition-colors duration-300',
+              n.on ? 'border-line-strong bg-well' : 'border-line bg-surface',
             )}
             aria-current={n.on ? 'step' : undefined}
           >
@@ -91,7 +91,7 @@ export default function Home() {
     <div className="voice-stage relative overflow-hidden bg-surface text-ink">
       {/* edge to edge under the 64px top bar (plus the chip menu on narrow screens) */}
       <div className="relative flex min-h-[calc(100dvh-113px)] flex-col px-[clamp(18px,3vw,40px)] pt-5 pb-2 lg:min-h-[calc(100dvh-65px)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-start justify-between gap-3 px-[clamp(18px,3vw,40px)] pt-5 [&>*]:pointer-events-auto">
           <Pipeline />
           <div className="flex items-center gap-1.5">
             {(hasCards || v.say) && (
@@ -119,23 +119,23 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={cx('grid flex-1 items-center gap-8 pt-2', hasCards ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,480px)]' : '')}>
+        <div className={cx('grid flex-1 items-center gap-8 pt-9 lg:pt-3', hasCards ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,480px)]' : '')}>
           <section className="flex min-w-0 flex-col items-center text-center" aria-label="온디와 대화">
             <button
               type="button"
               onClick={v.wake}
               className={cx(
                 'group relative aspect-square shrink-0 cursor-pointer rounded-full transition-[width] duration-500 ease-[var(--ease-out)] focus-visible:outline-offset-[-12px]',
-                hasCards ? 'w-[min(46vh,440px,84vw)]' : 'w-[min(52vh,540px,90vw)]',
+                hasCards ? 'w-[min(50vh,560px,84vw)]' : 'w-[min(56vh,760px,90vw)]',
               )}
               aria-label={v.phase === 'listening' ? '듣기 멈추기' : '온디 부르기'}
               title="눌러서 말하기 (Space)"
             >
-              <Orb phase={v.phase} sample={v.sample} className="pointer-events-none absolute inset-[-12%] h-[124%] w-[124%]" />
+              <Orb phase={v.phase} sample={v.sample} className="pointer-events-none absolute inset-[-20%] h-[140%] w-[140%]" />
             </button>
 
-            <div className="relative z-10 mt-1 flex min-h-[120px] w-full max-w-[720px] flex-col items-center">
-              <div className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[0.02em] text-ink-3" role="status" aria-live="polite">
+            <div className="relative z-10 mt-1 flex min-h-[120px] w-full max-w-[760px] flex-col items-center bg-[linear-gradient(to_bottom,transparent,var(--color-surface)_40px)] pb-1">
+              <div className="flex items-center gap-2 rounded-full bg-surface px-2.5 py-0.5 text-[12.5px] font-semibold tracking-[0.02em] text-ink-3" role="status" aria-live="polite">
                 <span
                   className={cx(
                     'h-1.5 w-1.5 rounded-full',
@@ -230,7 +230,7 @@ export default function Home() {
           </section>
 
           {hasCards && (
-            <aside className="thin-scroll min-w-0 space-y-3 self-stretch overflow-y-auto lg:max-h-[calc(100dvh-270px)] lg:pr-1" aria-label="온디가 보여 주는 데이터">
+            <aside className="thin-scroll min-w-0 space-y-3 self-stretch overflow-y-auto lg:mt-14 lg:max-h-[calc(100dvh-200px)] lg:pr-1" aria-label="온디가 보여 주는 데이터">
               {v.cards.map((c, i) => (
                 <VoiceCardView key={c.id} card={c} index={i} />
               ))}

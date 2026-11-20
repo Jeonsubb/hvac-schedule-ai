@@ -25,9 +25,9 @@ interface Look {
 const LOOKS: Record<Phase, Look> = {
   off: { spin: 0.12, react: 0, breathe: 0.016, radius: 0.94, color: [134, 139, 148], glow: 0.05 },
   idle: { spin: 0.16, react: 0.1, breathe: 0.02, radius: 0.96, color: [85, 93, 109], glow: 0.06 },
-  listening: { spin: 0.3, react: 0.55, breathe: 0.03, radius: 1.0, color: [26, 110, 227], glow: 0.16 },
+  listening: { spin: 0.3, react: 0.55, breathe: 0.03, radius: 0.94, color: [26, 110, 227], glow: 0.16 },
   thinking: { spin: 1.5, react: 0, breathe: 0.07, radius: 0.86, color: [109, 80, 203], glow: 0.12 },
-  speaking: { spin: 0.4, react: 0.5, breathe: 0.03, radius: 1.0, color: [7, 145, 113], glow: 0.16 },
+  speaking: { spin: 0.4, react: 0.5, breathe: 0.03, radius: 0.94, color: [7, 145, 113], glow: 0.16 },
 }
 
 export default function Orb({
@@ -121,7 +121,7 @@ export default function Orb({
       ctx.clearRect(0, 0, w, h)
       const cx = w / 2
       const cy = h / 2
-      const R = Math.min(w, h) * 0.38 * cur.radius * (1 + level * cur.react * 0.12)
+      const R = Math.min(w, h) * 0.37 * cur.radius * (1 + level * cur.react * 0.12)
       const [cr, cg, cb] = cur.color
 
       // soft halo that swells with the voice
