@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
 import { useMeta, useCopilot } from '../lib/context'
 import { useAuth } from '../lib/auth'
@@ -23,9 +23,7 @@ export const NAV_GROUPS = [
     desc: '지금 건물 상태, 절감 효과, 쾌적 의견, 운영 규칙',
     tabs: [
       { to: '/', label: '현황' },
-      { to: '/energy', label: '절감 효과' },
       { to: '/comfort', label: '쾌적 의견' },
-      { to: '/settings', label: '운영 규칙' },
     ],
   },
   {
@@ -39,6 +37,13 @@ export const NAV_GROUPS = [
       { to: '/validation', label: '정합성 검증' },
       { to: '/data', label: '일정·데이터' },
     ],
+  },
+  {
+    to: '/settings',
+    label: '설정',
+    icon: SettingsIcon,
+    desc: '온도 범위와 운전 시간 등 운영 규칙 설정',
+    tabs: [{ to: '/settings', label: '설정' }],
   },
 ]
 
@@ -85,7 +90,7 @@ function MainNav() {
 }
 
 /** Tabs of the current section (the screens that used to be separate menu items). */
-function SectionTabs() {
+export function SectionTabs() {
   const loc = useLocation()
   const g = groupOf(loc.pathname)
   return (
@@ -357,9 +362,12 @@ export default function Layout() {
       <div className={cx('min-h-full', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        <div className="mx-auto hidden max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-6 lg:block">
-          <SectionTabs />
-        </div>
+        {/* the dashboard draws its own tabs in its header; one-tab sections need none */}
+        {loc.pathname !== '/' && groupOf(loc.pathname).tabs.length > 1 && (
+          <div className="mx-auto hidden max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-6 lg:block">
+            <SectionTabs />
+          </div>
+        )}
         <main id="main" className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-8 pb-24">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">

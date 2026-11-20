@@ -146,19 +146,6 @@ export const CHAPTERS: TourChapter[] = [
     ],
   },
   {
-    id: 'savings',
-    title: '절감 효과',
-    question: '정말 아끼는가',
-    steps: [
-      {
-        path: '/energy',
-        target: 'energy-hero',
-        title: '공정하게 비교한 절감',
-        body: '같은 날씨, 같은 쾌적 기준으로 운전 방식을 비교합니다. 아래 폭포 그림은 절감이 어느 기능에서 나왔는지 나눠 보여 줍니다.',
-      },
-    ],
-  },
-  {
     id: 'verify',
     title: '정합성 검증',
     question: '계획대로 켜고 껐나',

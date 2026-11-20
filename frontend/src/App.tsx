@@ -10,7 +10,6 @@ const Overview = lazy(() => import('./pages/Overview'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Plan = lazy(() => import('./pages/Plan'))
 const Validation = lazy(() => import('./pages/Validation'))
-const Energy = lazy(() => import('./pages/Energy'))
 const Comfort = lazy(() => import('./pages/Comfort'))
 const DataPage = lazy(() => import('./pages/Data'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
@@ -50,7 +49,6 @@ export default function App() {
               }
             >
               <Route index element={page(<Overview />)} />
-              <Route path="energy" element={page(<Energy />)} />
               <Route path="comfort" element={page(<Comfort />)} />
               <Route path="settings" element={page(<SettingsPage />)} />
               <Route path="schedule" element={page(<Schedule />)} />

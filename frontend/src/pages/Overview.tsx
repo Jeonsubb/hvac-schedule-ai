@@ -6,6 +6,7 @@ import { useMeta } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import TimetableApply, { type AppliedSummary } from '../components/TimetableApply'
 import { Ondy } from '../components/PublicShell'
+import { SectionTabs } from '../components/Layout'
 import type { Day, Live, Meta, OpMode } from '../lib/types'
 import { COLD_START, STRATEGY, decisionLabel, statusInfo } from '../lib/constants'
 import { cx, fmtDateK, fmtKwh, fmtMin, fmtPct, fmtWon, hm, pctSaving } from '../lib/format'
@@ -85,9 +86,14 @@ export default function Overview() {
     <div>
       {/* the page's answer: one sentence from the data, set as the landing's display type, + key numbers.
           Keyed on the view so switching current <-> ON:D AI replays the rise: the change is the moment. */}
+      <div className="mb-7 flex items-center justify-between gap-4">
+        <h1 className="text-[20px] leading-[1.3] font-bold tracking-[-0.02em] text-ink">현재 운영 현황</h1>
+        <div className="hidden shrink-0 lg:block">
+          <SectionTabs />
+        </div>
+      </div>
       <header data-tour="ov-summary" className="mb-9 grid grid-cols-1 gap-x-14 gap-y-7 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
-          <h1 className="sr-only">운영 현황</h1>
           <div className="flex flex-wrap items-center gap-2.5">
             {at && (
               <span className="inline-flex items-center gap-2 rounded-full bg-brand px-3 py-1 text-[13px] font-semibold text-white">
