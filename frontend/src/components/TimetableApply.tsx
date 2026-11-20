@@ -194,8 +194,8 @@ export default function TimetableApply({ open, onClose, onApplied }: { open: boo
       {(stage === 'upload' || stage === 'reading') && (
         <div>
           <More><p>
-            학사 시스템에서 내려받은 강의 시간표를 올리세요. CSV·Excel·JSON은 바로 읽고, 이미지·PDF는 AI(Bedrock)가 표로 옮깁니다. 지금은 시간표가 없어 모든 강의실을 중앙 제어 고정 스케줄로
-            운전하고 있습니다.
+            학사 시스템에서 내려받은 강의 시간표를 올리세요. CSV·Excel·JSON은 바로 읽고, 이미지·PDF는 AI(Bedrock)가 표로 옮깁니다. 지금은 시간표가 없어 중앙 제어는 정부 지침 온도 범위만 지키게 하고 18시에 일괄로 끄며,
+            켜고 끄는 일은 강의실에 맡겨 두고 있습니다.
           </p></More>
           <input
             ref={input}
@@ -298,7 +298,7 @@ export default function TimetableApply({ open, onClose, onApplied }: { open: boo
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-[16px] bg-well px-4 py-3">
-              <div className="text-[12.5px] font-medium text-ink-3">현재 운영 (고정 스케줄)</div>
+              <div className="text-[12.5px] font-medium text-ink-3">현재 운영 (18시 일괄 정지)</div>
               <div className="tnum mt-0.5 text-[22px] font-[780] tracking-[-0.035em] text-ink-2">
                 {fmtKwh(plan.summary.baseline_kwh)} <span className="text-[13px] font-medium text-ink-3">kWh</span>
               </div>

@@ -63,6 +63,9 @@ def test_tiers_cover_the_ideas(client):
 
 
 def test_feedback_creates_proposal_and_approval_applies_it(client):
+    # the default policy is the government guideline band (heating at most 20 ℃), which leaves no room to
+    # raise a 20 ℃ setpoint; widen it here so the feedback → proposal → approval path can be exercised
+    assert client.put("/api/policy", json={"heat_max": 22.0}).status_code == 200
     # a room with classes that day and no broader (weekly) proposal open
     for a in client.get("/api/adjustments?status=pending").json():
         client.post(f"/api/adjustments/{a['id']}/reject")

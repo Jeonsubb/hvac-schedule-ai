@@ -209,7 +209,7 @@ export function WaterfallLegend() {
     <>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: STRATEGY.fixed.color }} aria-hidden />
-        고정 스케줄
+        현재 운영
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: STRATEGY.rule.color }} aria-hidden />

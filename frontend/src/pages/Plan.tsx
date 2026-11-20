@@ -808,7 +808,7 @@ function WeekVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader title="이번 주 7일" sub="주간 예보와 행사를 반영한 날별 AI 계획 전력입니다. 회색 막대는 현재 운영(고정 스케줄)입니다." />
+        <CardHeader title="이번 주 7일" sub="주간 예보와 행사를 반영한 날별 AI 계획 전력입니다. 회색 막대는 현재 운영(첫 수업에 켜고 18시 일괄 정지)입니다." />
         {days.length === 0 ? (
           <Empty title="주간 데이터가 없습니다" />
         ) : (
@@ -958,7 +958,7 @@ function RoomDayTimeline({ rooms, meta, nowMinute }: { rooms: TierRoomRow[]; met
   const range: [number, number] = [420, 1410]
   const [r0, r1] = range
   const opOn = hm(String(meta.settings?.fixed_on ?? '08:30'))
-  const opOff = hm(String(meta.settings?.fixed_off ?? '22:30'))
+  const opOff = hm(String(meta.settings?.fixed_off ?? '18:00'))
   const labelW = 184
   const color = '#14a673'
   const focus = nowMinute != null && nowMinute >= r0 && nowMinute <= r1 ? nowMinute : null

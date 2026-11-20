@@ -228,7 +228,7 @@ TOOLS = [
     },
     {
         "name": "get_room_week",
-        "description": "강의실 하나의 7일간 일별 강의 수, AI/규칙/고정 전력량, 쾌적도를 돌려줍니다.",
+        "description": "강의실 하나의 7일간 일별 강의 수, AI/규칙/현재 운영 전력량, 쾌적도를 돌려줍니다.",
         "input_schema": {"type": "object", "properties": {
             "room": {"type": "string", "enum": list(config.ROOMS)},
             "start_date": {"type": "string", "description": "YYYY-MM-DD"}},
@@ -341,10 +341,11 @@ def run_tool(name: str, inp: dict, out: dict) -> dict:
 
 
 def copilot_system(ctx_now: dict) -> str:
+    st = service.settings()
     return (
         "당신은 부산대학교 IT관 냉난방(HVAC) 운영 코파일럿입니다. 사용자는 시설 담당자입니다.\n"
         "시스템 구성: 강의 시간표·이벤트·기상청/Open-Meteo 날씨로 강의실별 운전 계획을 만들고, 실내기(IDU)/실외기(ODU) 시뮬레이터로 실행합니다. "
-        "비교 전략: fixed(고정 스케줄 08:30~22:30), manual(수동 운영), rule(시작 10분 전 On·종료 5분 전 Off·15분 이내 연속 유지), "
+        f"비교 전략: fixed(현재 운영: 중앙은 정부 지침 온도 범위만 지키게 하고 {st['fixed_off']}에 전체 일괄 차단하고 그 뒤에는 다시 켤 수 없음, 강의실은 첫 수업 때 켜서 차단 시각까지 운전), manual(수동 운영), rule(시작 10분 전 On·종료 5분 전 Off·15분 이내 연속 유지), "
         "ai(AI 예측 제어: 열모델+예보로 최적 기동·가동 생략·외기 냉방·관성 정지·재실 감지 정지·피드백 보정).\n"
         f"기준 시각: {ctx_now['date']} {ctx_now['minute'] // 60:02d}:{ctx_now['minute'] % 60:02d} ({ctx_now['reason']}).\n"
         "규칙:\n"
@@ -355,7 +356,7 @@ def copilot_system(ctx_now: dict) -> str:
         "불쾌 지표(discomfort_dm)와 수업 시작 시 저온·고온 횟수(cold_starts) 변화를 반드시 적습니다. "
         "쾌적 범위 경계에 설정온도를 맞추는 식으로 지표만 좋아 보이게 하는 제안은 하지 않습니다.\n"
         "- 원인을 더 확인할 수 있는 도구가 있으면 사용자에게 되묻지 말고 먼저 조회한 뒤 결론을 냅니다(도구 호출은 최대 5회).\n"
-        "- 도구·함수 이름(get_day 등)이나 내부 키(ai, rule 등)를 답변에 쓰지 않습니다. 'AI 예측 제어', '규칙 기반', '고정 스케줄', '수동 운영'처럼 화면의 이름을 씁니다.\n"
+        "- 도구·함수 이름(get_day 등)이나 내부 키(ai, rule 등)를 답변에 쓰지 않습니다. 'AI 예측 제어', '규칙 기반', '현재 운영', '수동 운영'처럼 화면의 이름을 씁니다.\n"
         "- 답변은 한국어로, 시설 담당자가 바로 행동할 수 있게 짧고 구체적으로 씁니다. 표가 도움이 되면 마크다운 표를 씁니다."
     )
 

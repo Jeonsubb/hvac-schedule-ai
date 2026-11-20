@@ -164,7 +164,7 @@ def settings_patch(patch: dict, current: dict) -> dict:
         raise InvalidInput("설정온도는 쾌적 범위 경계에서 0.3℃ 이상 안쪽이어야 합니다 "
                            "(sp_heat ≥ comfort_low + 0.3, sp_cool ≤ comfort_high − 0.3).")
     if _minutes(merged["fixed_off"]) <= _minutes(merged["fixed_on"]):
-        raise InvalidInput("고정 스케줄 종료는 시작보다 늦어야 합니다.")
+        raise InvalidInput("일괄 정지 시각은 운영 시작보다 늦어야 합니다.")
     return out
 
 

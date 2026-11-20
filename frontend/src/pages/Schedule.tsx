@@ -171,7 +171,7 @@ export default function Schedule() {
             <div className={cx('transition-opacity duration-200', day.loading || day.data.date !== date ? 'opacity-50' : '')}>
               {day.data.sessions.length === 0 && (
                 <div className="mb-3">
-                  <Note icon={<Sun size={15} className="text-ink-3" aria-hidden />}>이 날은 강의가 없어 AI·규칙·수동 운전 모두 가동하지 않습니다. 고정 스케줄만 평일에 켜집니다.</Note>
+                  <Note icon={<Sun size={15} className="text-ink-3" aria-hidden />}>이 날은 강의가 없어 현재 운영·AI·규칙·수동 운전 모두 가동하지 않습니다.</Note>
                 </div>
               )}
               <Gantt
@@ -250,8 +250,8 @@ function MonthCalendar({
             <ChevronRight size={18} />
           </IconButton>
         </div>
-        <div className="flex items-center gap-2 text-[13px] text-ink-3" aria-label="칸 색: 고정 스케줄 대비 AI 절감률">
-          <span>고정 대비 AI 절감</span>
+        <div className="flex items-center gap-2 text-[13px] text-ink-3" aria-label="칸 색: 현재 운영 대비 AI 절감률">
+          <span>현재 운영 대비 AI 절감</span>
           <span className="tnum">50%</span>
           <span className="flex gap-0.5" aria-hidden>
             {[...SAVE_STEPS].reverse().map((s, i) => (
@@ -288,7 +288,7 @@ function MonthCalendar({
               disabled={!inSem}
               onClick={() => onSelect(d)}
               aria-pressed={sel}
-              aria-label={`${fmtDateK(d)}${hol ? `, ${hol}` : ''}${sv != null ? `, 고정 대비 AI 절감 ${sv.toFixed(0)}%${future ? ' 예상' : ''}` : ''}${!future && review > 0 ? `, 확인 필요 ${review}건` : ''}`}
+              aria-label={`${fmtDateK(d)}${hol ? `, ${hol}` : ''}${sv != null ? `, 현재 운영 대비 AI 절감 ${sv.toFixed(0)}%${future ? ' 예상' : ''}` : ''}${!future && review > 0 ? `, 확인 필요 ${review}건` : ''}`}
               className={cx(
                 'relative flex h-[60px] flex-col rounded-[10px] px-2 py-1.5 text-left transition-[box-shadow,background-color] duration-150',
                 sel ? 'shadow-[0_0_0_2px_var(--color-brand)]' : 'hover:shadow-[0_0_0_1px_var(--color-ink-4)]',
@@ -298,7 +298,7 @@ function MonthCalendar({
               style={{ background: sv != null ? saveBg(sv) : undefined }}
               title={
                 s
-                  ? `${fmtDateK(d)}${hol ? `, ${hol}` : ''}\n강의 ${s.sessions}건${s.events ? ` (이벤트 ${s.events})` : ''}\nAI ${fmtKwh(s.strategies.ai.kwh)} kWh, 고정 ${fmtKwh(s.strategies.fixed.kwh)} kWh${sv != null ? ` (−${sv.toFixed(0)}%)` : ''}\n정합성 ${fmtPct(s.match_rate)}${future ? '\n(예보·평년 기반 예상)' : ''}`
+                  ? `${fmtDateK(d)}${hol ? `, ${hol}` : ''}\n강의 ${s.sessions}건${s.events ? ` (이벤트 ${s.events})` : ''}\nAI ${fmtKwh(s.strategies.ai.kwh)} kWh, 현재 운영 ${fmtKwh(s.strategies.fixed.kwh)} kWh${sv != null ? ` (−${sv.toFixed(0)}%)` : ''}\n정합성 ${fmtPct(s.match_rate)}${future ? '\n(예보·평년 기반 예상)' : ''}`
                   : fmtDateK(d)
               }
             >
@@ -379,7 +379,7 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
       </p>
       <div className="mt-6 flex flex-wrap gap-x-10 gap-y-5">
         <Figure label="AI 전력" value={fmtKwh(ai.kwh)} unit="kWh" accent={STRATEGY.ai.color} />
-        <Figure label="고정 스케줄 대비" value={sv != null ? `−${sv.toFixed(0)}` : '–'} unit={sv != null ? '%' : undefined} />
+        <Figure label="현재 운영 대비" value={sv != null ? `−${sv.toFixed(0)}` : '–'} unit={sv != null ? '%' : undefined} />
         <Figure label="강의 중 쾌적" value={ai.comfort_pct != null ? ai.comfort_pct.toFixed(1) : '–'} unit={ai.comfort_pct != null ? '%' : undefined} />
       </div>
       <div className="mt-8">
@@ -406,7 +406,7 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
             <tr className="text-[13px] text-ink-3">
               <th className="pb-2 text-left font-medium">운전 방식</th>
               <th className="pb-2 text-right font-medium">전력량</th>
-              <th className="pb-2 text-right font-medium">고정 대비</th>
+              <th className="pb-2 text-right font-medium">현재 운영 대비</th>
               <th className="pb-2 text-right font-medium">요금</th>
               <th className="pb-2 text-right font-medium">쾌적</th>
             </tr>

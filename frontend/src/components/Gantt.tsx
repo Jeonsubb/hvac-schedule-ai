@@ -213,7 +213,7 @@ export default function Gantt({
 
   // regular operating hours (current operation) — the rest is hatched like an off-limits column
   const opOn = hm(String(meta.settings?.fixed_on ?? '08:30'))
-  const opOff = hm(String(meta.settings?.fixed_off ?? '22:30'))
+  const opOff = hm(String(meta.settings?.fixed_off ?? '18:00'))
 
   const plan_ = !compact && showPlan
   const lecTop = compact ? 5 : 7

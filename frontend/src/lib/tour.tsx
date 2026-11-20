@@ -34,7 +34,7 @@ export const CHAPTERS: TourChapter[] = [
         path: '/overview',
         target: 'ov-summary',
         title: '핵심 지표 세 가지',
-        body: '오늘 쓸 전기와 요금, 모든 강의실을 종일 켜 둘 때와의 차이, 수업 시간 중 실내가 쾌적했던 비율입니다. 모두 시뮬레이션 값입니다.',
+        body: '오늘 쓸 전기와 요금, 현재 운영 방식과의 차이, 수업 시간 중 실내가 쾌적했던 비율입니다. 모두 시뮬레이션 값입니다.',
       },
       {
         path: '/overview',

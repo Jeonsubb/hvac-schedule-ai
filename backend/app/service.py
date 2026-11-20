@@ -18,7 +18,7 @@ from hvac.timetable import hm_to_min, min_to_hm
 
 from .store import get_store
 
-ENGINE_VERSION = "v14"
+ENGINE_VERSION = "v15"  # v15: current operation = on at first class, cut off at fixed_off with no restart
 DATA_DIR = Path(__file__).resolve().parents[1] / "seed"
 RAW_CSV = DATA_DIR / "timetable_3_4.csv"
 KST = weather.KST

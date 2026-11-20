@@ -399,7 +399,7 @@ export function RoomDetails({ day, meta, room }: { day: Day; meta: Meta; room: s
   const inb = (aiRd?.sessions ?? []).reduce((a, s) => a + s.in_band_minutes, 0)
   const issues = vals.filter((v) => statusInfo(v.status).group !== 'normal').length
   const curRd = day.strategies.fixed?.rooms[room]
-  const cmp = compare(curRd, aiRd, meta.settings.fixed_on, meta.settings.fixed_off)
+  const cmp = compare(curRd, aiRd, meta.settings.fixed_off)
   return (
     <div className="space-y-6">
       <section className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5 rounded-[14px] border border-line bg-surface px-7 py-6" aria-label="하루 요약">
@@ -602,7 +602,7 @@ export default function RoomDrawer({
 }
 
 /** One sentence and a percentage from the day's numbers. Works on the kWh as displayed, so the legend values subtract to the stated saving. */
-function compare(cur: RoomDay | undefined, ai: RoomDay | undefined, on: string, off: string) {
+function compare(cur: RoomDay | undefined, ai: RoomDay | undefined, off: string) {
   const shown = (v: number | undefined) => Number(fmtKwh(v ?? 0).replace(/,/g, ''))
   const c = shown(cur?.kwh)
   const a = shown(ai?.kwh)
@@ -616,9 +616,9 @@ function compare(cur: RoomDay | undefined, ai: RoomDay | undefined, on: string, 
   if (c <= 0 && a <= 0) sentence = '이 날은 현재 운영과 AI 모두 냉난방을 켜지 않습니다.'
   else if (c <= 0) sentence = `현재 운영은 이 날 가동하지 않고, AI는 일정에 맞춰 ${fmtKwh(a)} kWh를 씁니다.`
   else if (a <= 0)
-    sentence = `${ai?.sessions.length ? `AI는 가동을 생략해 전력을 쓰지 않습니다.${comfort}` : '강의가 없어 AI는 냉난방을 켜지 않습니다.'} 현재 운영은 ${on}–${off} 고정 가동으로 ${fmtKwh(c)} kWh를 씁니다.`
-  else if (saved >= 0) sentence = `AI는 현재 운영(${on}–${off} 고정 가동)보다 전력을 ${fmtKwh(saved)} kWh 덜 씁니다.${comfort}`
-  else sentence = `AI는 현재 운영(${on}–${off} 고정 가동)보다 전력을 ${fmtKwh(-saved)} kWh 더 씁니다.${comfort}`
+    sentence = `${ai?.sessions.length ? `AI는 가동을 생략해 전력을 쓰지 않습니다.${comfort}` : '강의가 없어 AI는 냉난방을 켜지 않습니다.'} 현재 운영은 첫 수업에 켜서 ${off} 일괄 정지까지 돌려 ${fmtKwh(c)} kWh를 씁니다.`
+  else if (saved >= 0) sentence = `AI는 현재 운영(첫 수업에 켜고 ${off} 일괄 정지)보다 전력을 ${fmtKwh(saved)} kWh 덜 씁니다.${comfort}`
+  else sentence = `AI는 현재 운영(첫 수업에 켜고 ${off} 일괄 정지)보다 전력을 ${fmtKwh(-saved)} kWh 더 씁니다.${comfort}`
   return { saved, pct, sentence }
 }
 

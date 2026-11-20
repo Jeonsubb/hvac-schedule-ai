@@ -264,7 +264,7 @@ export default function SettingsPage() {
               <p className="mb-4 text-[13.5px] text-ink-3">{AI_SECTION.desc}</p>
               {fields(AI_SECTION)}
             </Disclosure>
-            <Disclosure title="비교 기준과 시연 옵션" summary={optChanged ? `변경 ${optChanged}개` : `${STRATEGY[(form.baseline as StrategyKey) ?? 'fixed']?.label ?? '고정 스케줄'} 기준, 현장 이상 ${form.anomalies ? '켜짐' : '꺼짐'}`}>
+            <Disclosure title="비교 기준과 시연 옵션" summary={optChanged ? `변경 ${optChanged}개` : `${STRATEGY[(form.baseline as StrategyKey) ?? 'fixed']?.label ?? '현재 운영'} 기준, 현장 이상 ${form.anomalies ? '켜짐' : '꺼짐'}`}>
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <Field label={SETTING_LABEL.baseline} hint="절감률(%)을 무엇과 비교할지 정합니다.">
                   <select
@@ -310,7 +310,7 @@ export default function SettingsPage() {
               </div>
               <div className="tnum mt-5 grid grid-cols-2 gap-x-4 gap-y-2 rounded-[12px] bg-well p-4 text-[13.5px] text-ink-2">
                 <div>
-                  고정 스케줄 <b className="text-ink">{S.fixed_on}–{S.fixed_off}</b>
+                  현재 운영 <b className="text-ink">{S.fixed_on}부터, {S.fixed_off} 일괄 정지</b>
                 </div>
                 <div>
                   수동 운영 정지 지연 <b className="text-ink">{S.manual_off_delay_min}분</b>

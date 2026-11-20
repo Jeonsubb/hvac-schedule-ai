@@ -1,6 +1,7 @@
 """Operating strategies -> per-room plans (intervals in minutes from 00:00).
 
-fixed  : building-wide fixed hours on weekdays (baseline A)
+fixed  : current operation (baseline A): occupants switch units on, the central controller keeps the
+         setpoint inside the guideline band and cuts everything off at `fixed_off` (18:00), no restart afterwards
 manual : on at first lecture, off 30 min after last lecture (baseline B)
 rule   : requirement 5 rules (pre-on N min, early-off M min, bridge gaps <= G min)
 ai     : predictive optimisation with the room thermal model and the weather forecast
@@ -18,10 +19,28 @@ def _sessions_minutes(sessions):
 
 
 def plan_fixed(sessions_by_room: dict, rooms: dict, is_workday: bool, settings: dict) -> dict:
+    """Current operation as the PNU facility office described it on the phone (2026-11), consistent
+    with 채널PNU 2020-06-13: the central controller does not schedule rooms. It only keeps setpoints
+    inside the government guideline band and cuts every unit off at `fixed_off` (18:00). After the
+    cut-off units stay blocked for the rest of the day (confirmed by the team: no restart), so classes
+    after `fixed_off` run without heating or cooling.
+
+    Occupant behaviour (assumptions): a room is switched on when its first class starts (not before
+    `fixed_on`) and nobody switches it off before the cut-off. Rooms without a class before the
+    cut-off stay off. The setpoint is the guideline limit (heating maximum / cooling minimum),
+    i.e. the settings' sp_*."""
     if not is_workday:
         return {r: [] for r in rooms}
-    a, b = hm_to_min(settings["fixed_on"]), hm_to_min(settings["fixed_off"])
-    return {r: [{"s": a, "e": b, "kind": "cond", "reason": "고정 운전 시간"}] for r in rooms}
+    a, cut = hm_to_min(settings["fixed_on"]), hm_to_min(settings["fixed_off"])
+    out = {}
+    for r in rooms:
+        day = [x for x in _sessions_minutes(sessions_by_room.get(r, [])) if x[0] < cut]
+        ivs: list[dict] = []
+        if day and max(day[0][0], a) < cut:
+            ivs.append({"s": max(day[0][0], a), "e": cut, "kind": "cond",
+                        "reason": f"첫 수업에 켜고 {settings['fixed_off']} 일괄 차단까지 운전 (이후 재가동 불가)"})
+        out[r] = ivs
+    return out
 
 
 def plan_manual(sessions_by_room: dict, rooms: dict, settings: dict) -> dict:

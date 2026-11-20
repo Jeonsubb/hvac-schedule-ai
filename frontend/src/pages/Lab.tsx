@@ -213,7 +213,7 @@ export default function Lab() {
             </div>
             <h1 className="mt-3 text-[30px] font-bold tracking-[-0.025em] text-ink">에이전트 판단으로 운전하면 전력은 얼마나 달라지나</h1>
             <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
-              날마다 관리자 온디와 사용자 온디가 강의실별 설정온도를 협의하고, 그 결과로 하루 운전을 다시 시뮬레이션합니다. 현재 운영(중앙 22℃ 고정)·규칙·AI 단독과 전력·요금·체감 쾌적을 나란히
+              날마다 관리자 온디와 사용자 온디가 강의실별 설정온도를 협의하고, 그 결과로 하루 운전을 다시 시뮬레이션합니다. 현재 운영(지침 온도 범위·18시 일괄 정지)·규칙·AI 단독과 전력·요금·체감 쾌적을 나란히
               비교하고, 실측 전력량을 올리면 실제 사용량과도 비교합니다. 운영 중인 계획과 제어 명령에는 영향을 주지 않습니다.
             </p>
           </div>
@@ -956,7 +956,7 @@ function EvaluationPanel() {
         <span className="text-[13px] text-ink-3">scripts/eval_agents.py · {ev.created_at.slice(0, 16).replace('T', ' ')} 실행</span>
       </div>
       <p className="mt-1 text-[14px] text-ink-2">
-        {fmtDateK(p.dates[0])}~{fmtDateK(p.dates[p.dates.length - 1])} 수업일 {p.dates.length}일을 규칙 기반 에이전트로 돌리고, LLM 에이전트는 표본 날짜를 반복 실행해 수치 근거와 일관성을 쟀습니다.
+        {fmtDateK(p.dates[0])}~{fmtDateK(p.dates[p.dates.length - 1])} 수업일 {p.dates.length}일을 규칙 기반 에이전트로 돌리고, LLM 에이전트는 표본 날짜를 반복 실행해 수치 근거와 일관성을 쟀습니다. 이 평가는 시설 담당자 확인 전의 가정(현재 운영 08:30~22:30·22℃ 고정, 난방 상한 22℃)으로 계산한 기록이라, 위의 랩 실행 결과와 숫자가 다릅니다.
       </p>
 
       <h3 className="mt-5 text-[15px] font-semibold text-ink">1. 기간 성과 (같은 날씨·재실, 시뮬레이션)</h3>

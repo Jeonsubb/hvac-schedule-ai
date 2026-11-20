@@ -170,13 +170,13 @@ def _d(s: str | None, default: date) -> date:
 TOOLS = [
     {
         "name": "get_status",
-        "description": "지금 건물 냉난방이 어떻게 돌아가고 있는지: 기준 시각, 가동 중인 강의실과 수업, 외기, 오늘 지금까지 전력(고정 스케줄 대비), "
+        "description": "지금 건물 냉난방이 어떻게 돌아가고 있는지: 기준 시각, 가동 중인 강의실과 수업, 외기, 오늘 지금까지 전력(현재 운영 대비), "
                        "운전 모드, 승인 대기 조정안, 최근 계획 실행 기록. '지금 어때', '작업 어떻게 돌아가', '현황' 질문에 씁니다.",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "get_savings",
-        "description": "절감 효과: 고정 스케줄 대비 AI 운전의 전력·요금·CO₂ 절감과 쾌적도, 절감이 어떤 기능에서 나왔는지. scope는 today(오늘), to_date(학기 시작~오늘), semester(학기 전체 예상).",
+        "description": "절감 효과: 현재 운영(첫 수업에 켜고 18시 일괄 차단, 이후 재가동 불가) 대비 AI 운전의 전력·요금·CO₂ 절감과 쾌적도, 절감이 어떤 기능에서 나왔는지. scope는 today(오늘), to_date(학기 시작~오늘), semester(학기 전체 예상).",
         "input_schema": {"type": "object", "properties": {"scope": {"type": "string", "enum": ["today", "to_date", "semester"]}},
                          "required": ["scope"], "additionalProperties": False},
     },
@@ -288,7 +288,7 @@ def _t_status(inp: dict, out: dict, ctx: service.Ctx) -> dict:
             {"label": "냉난방 가동", "value": f"{len(on)}", "unit": f"/ {len(rooms)}실"},
             {"label": "수업 중", "value": f"{len(in_class)}", "unit": "실"},
             {"label": "오늘 지금까지", "value": f"{k.get('ai', 0):.1f}", "unit": "kWh",
-             "delta": f"고정 스케줄 대비 {save:+.0f}%".replace("+", "−") if save is not None and save > 0 else None, "tone": "good"},
+             "delta": f"현재 운영 대비 {save:+.0f}%".replace("+", "−") if save is not None and save > 0 else None, "tone": "good"},
             {"label": "외기", "value": f"{live['outdoor']['t']:.1f}", "unit": "℃"},
         ],
         "rows": rows, "note": "실내온도·전력은 시뮬레이션 값입니다.",
@@ -328,9 +328,9 @@ def _t_savings(inp: dict, out: dict, ctx: service.Ctx) -> dict:
     rows = [{"label": n, "value": f"{v['kwh']:,.0f} kWh",
              "sub": f"{_won(v['cost_krw'])} · 쾌적 {v['comfort_pct']}%" if v.get("comfort_pct") is not None else _won(v["cost_krw"]),
              "bar": v["kwh"] / top, "tone": tone}
-            for k_, n, v, tone in (("fixed", "고정 스케줄", fx, "off"), ("rule", "규칙 기반", rule, "fan"), ("ai", "AI 예측 제어", ai_, "on")) if v]
+            for k_, n, v, tone in (("fixed", "현재 운영", fx, "off"), ("rule", "규칙 기반", rule, "fan"), ("ai", "AI 예측 제어", ai_, "on")) if v]
     out["cards"].append({
-        "kind": "savings", "title": "절감 효과", "subtitle": f"{label} · 고정 스케줄 대비", "to": "/energy", "to_label": "절감 효과 화면에서 보기",
+        "kind": "savings", "title": "절감 효과", "subtitle": f"{label} · 현재 운영 대비", "to": "/energy", "to_label": "절감 효과 화면에서 보기",
         "stats": [
             {"label": "전력 절감", "value": f"{pct:.0f}" if pct is not None else "-", "unit": "%", "tone": "good"},
             {"label": "줄인 전력", "value": f"{dk:,.0f}", "unit": "kWh"},
@@ -339,7 +339,7 @@ def _t_savings(inp: dict, out: dict, ctx: service.Ctx) -> dict:
         ],
         "rows": rows, "note": "같은 날씨·같은 시간표로 다시 시뮬레이션해 비교한 값입니다.",
     })
-    res = {"scope": label, "baseline": "고정 스케줄(08:30~22:30)", "saving_pct": pct, "saved_kwh": round(dk, 1), "saved_cost_krw": round(dc),
+    res = {"scope": label, "baseline": f"현재 운영(첫 수업에 켜고 {ctx.settings['fixed_off']} 일괄 정지, 정부 지침 온도 범위)", "saving_pct": pct, "saved_kwh": round(dk, 1), "saved_cost_krw": round(dc),
            "saved_co2_kg": round(dco, 1), "ai": {k_: ai_.get(k_) for k_ in ("kwh", "cost_krw", "comfort_pct")},
            "fixed_schedule": {k_: fx.get(k_) for k_ in ("kwh", "cost_krw", "comfort_pct")}, "simulated": True}
     if scope != "today":
@@ -548,7 +548,7 @@ def _t_room(inp: dict, out: dict, ctx: service.Ctx) -> dict:
             {"label": "운전", "value": STATE_LABEL[lr["state"]], "tone": "good" if lr["state"] == "ON" else None},
             {"label": "예측 실내", "value": f"{lr['ta']:.1f}", "unit": "℃"},
             {"label": "설정", "value": f"{sp:.1f}", "unit": "℃"},
-            {"label": "오늘 전력", "value": f"{rr['kwh']:.1f}", "unit": "kWh", "delta": f"고정 {fx['kwh']:.1f}"},
+            {"label": "오늘 전력", "value": f"{rr['kwh']:.1f}", "unit": "kWh", "delta": f"현재 운영 {fx['kwh']:.1f}"},
         ],
         "rows": [{"label": f"{s['start']}–{s['end']}", "value": s["title"], "sub": f"{s['expected_people']}명",
                   "tone": "on" if lr["session"] and lr["session"]["start"] == s["start"] else "off"} for s in sess][:8],
@@ -649,7 +649,7 @@ def system_prompt(now: dict, page: str | None, day: str | None, memos: list[str]
         "- 한국어 존댓말로, 사람이 말하듯 짧게 답합니다. 두 문장 이내, 합쳐서 80자 안팎입니다. 더 궁금해하면 그때 이어서 말합니다.\n"
         "- 목록, 표, 마크다운, 이모지, 괄호를 쓰지 않습니다. 화면에 카드가 함께 뜨므로 강의실 번호나 숫자를 나열하지 않고 가장 중요한 숫자 한두 개만 말합니다.\n"
         "- 수치는 반드시 이번 대화의 도구 결과에 있는 값만 말합니다. 도구 없이 수치를 말하지 않습니다. 실내온도·전력·요금은 시뮬레이션 값입니다.\n"
-        "- 도구 이름이나 내부 키를 말하지 않습니다. '고정 스케줄', 'AI 예측 제어', '관리자 온디', '사용자 온디'처럼 화면의 이름을 씁니다.\n"
+        "- 도구 이름이나 내부 키를 말하지 않습니다. '현재 운영', 'AI 예측 제어', '관리자 온디', '사용자 온디'처럼 화면의 이름을 씁니다.\n"
         "- 호출어(\"온디\", \"헤이 온디\")를 답에 넣지 않습니다.\n\n"
         "일하는 방식:\n"
         "- 데이터 질문에는 되묻지 말고 먼저 도구로 조회합니다. 음성 인식이 틀릴 수 있으니('언디', '온 디', 숫자 띄어 읽기) 의도를 너그럽게 해석합니다.\n"
@@ -673,7 +673,7 @@ def _fallback(text: str, out: dict, ctx: service.Ctx) -> str:
         r = run_tool("get_savings", {"scope": "today" if "오늘" in t else "semester" if "학기전체" in t else "to_date"}, out, ctx)
         if "error" in r:
             return r["error"]
-        return f"{r['scope']} 기준으로 고정 스케줄보다 전력을 {r['saving_pct']}% 줄였고, 요금으로는 {_won(r['saved_cost_krw'])}입니다."
+        return f"{r['scope']} 기준으로 현재 운영보다 전력을 {r['saving_pct']}% 줄였고, 요금으로는 {_won(r['saved_cost_krw'])}입니다."
     if any(k in t for k in ("시나리오", "협의", "최적")):
         if any(k in t for k in ("다른", "새", "만들", "생성")):
             r = run_tool("make_scenario", {"name": "전체 0.5도 절감", "delta": -0.5, "rooms": [], "date": None}, out, ctx)

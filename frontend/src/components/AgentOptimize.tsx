@@ -123,14 +123,14 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
         </dl>
         {fx && ai ? (
           <div className="mt-5 border-t border-line pt-4">
-            <div className="text-[13.5px] font-semibold text-ink">첫 번째 비교 · 고정 스케줄 vs 기본 예측 제어</div>
+            <div className="text-[13.5px] font-semibold text-ink">첫 번째 비교 · 현재 운영 vs 기본 예측 제어</div>
             <More className="mt-0.5"><p>물리 계산 엔진의 효과입니다. AI Agent 협의와는 별개이며, 같은 시간표·날씨·초기 조건으로 계산했습니다.</p></More>
             <div className="mt-3 space-y-2">
-              <HBar label={`고정 스케줄 (${meta.settings.fixed_on}~${meta.settings.fixed_off} 일괄)`} kwh={fx.kwh} max={Math.max(fx.kwh, ai.kwh)} color={GREY} comfort={fx.comfort_pct} />
+              <HBar label={`현재 운영 (첫 수업에 켜고 ${meta.settings.fixed_off} 일괄 정지)`} kwh={fx.kwh} max={Math.max(fx.kwh, ai.kwh)} color={GREY} comfort={fx.comfort_pct} />
               <HBar label={`기본 예측 제어${cmp?.state === 'applied' ? ' (AI 협의 설정온도 적용 중)' : ''}`} kwh={ai.kwh} max={Math.max(fx.kwh, ai.kwh)} color={INK} comfort={ai.comfort_pct} />
             </div>
             <p className="tnum mt-2 text-[13px] text-ink-2">
-              {fx.kwh > 0 ? `예상 소비량 ${signed(ai.kwh - fx.kwh, 1)} kWh (${signed(((ai.kwh - fx.kwh) / fx.kwh) * 100, 1)}%)` : '고정 스케줄 운전이 없는 날입니다'} · 하루 전체 · 시뮬레이션
+              {fx.kwh > 0 ? `예상 소비량 ${signed(ai.kwh - fx.kwh, 1)} kWh (${signed(((ai.kwh - fx.kwh) / fx.kwh) * 100, 1)}%)` : '현재 운영도 가동하지 않는 날입니다'} · 하루 전체 · 시뮬레이션
             </p>
           </div>
         ) : (

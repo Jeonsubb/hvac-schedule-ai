@@ -808,7 +808,7 @@ function defaultFor(q: OnboardQuestion): unknown {
   const d = q.default
   switch (q.kind) {
     case 'time_range':
-      return Array.isArray(d) && d.length === 2 ? [String(d[0]), String(d[1])] : ['08:30', '22:30']
+      return Array.isArray(d) && d.length === 2 ? [String(d[0]), String(d[1])] : ['08:30', '18:00']
     case 'temp_range':
       return Array.isArray(d) && d.length === 2 ? [Number(d[0]), Number(d[1])] : [18, 22]
     case 'number':

@@ -114,9 +114,12 @@ DEFAULT_SETTINGS = {
     "sp_cool": 26.0,
     "comfort_low": 19.5,
     "comfort_high": 26.5,
-    # baselines
+    # baselines. Current operation as told by the PNU facility office on the phone (2026-11): the central
+    # control keeps each room inside a min–max temperature band (government energy guideline) and
+    # switches everything off after 18:00; occupants switch units on themselves (strategies.plan_fixed).
+    # fixed_on is the earliest time the current operation runs a unit (not confirmed, assumption).
     "fixed_on": "08:30",
-    "fixed_off": "22:30",
+    "fixed_off": "18:00",
     "manual_off_delay_min": 30,
     "baseline": "fixed",
     # AI optimiser bounds
@@ -142,7 +145,7 @@ DEFAULT_SETTINGS = {
 }
 
 STRATEGIES = {
-    "fixed": "고정 스케줄",
+    "fixed": "현재 운영",
     "manual": "수동 운영",
     "rule": "규칙 기반",
     "ai": "AI 예측 제어",

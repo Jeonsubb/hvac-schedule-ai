@@ -72,8 +72,8 @@ export default function Energy() {
         title="절감 효과"
         desc={
           vs30 != null
-            ? `모든 강의실을 종일 켜 두던 방식과 시간표·날씨에 맞춘 AI 운전을 같은 조건으로 비교했습니다. 쾌적도를 똑같이 맞춘 규칙 운전(30분 전 켜기)과 비교해도 AI가 전력을 ${vs30 >= 0 ? '덜' : '더'} 씁니다.`
-            : '모든 강의실을 종일 켜 두던 방식과 시간표·날씨에 맞춘 AI 운전을 같은 시간표, 같은 날씨로 비교했습니다.'
+            ? `지금의 운영 방식(현재 운영)과 시간표·날씨에 맞춘 AI 운전을 같은 조건으로 비교했습니다. 쾌적도를 똑같이 맞춘 규칙 운전(30분 전 켜기)과 비교해도 AI가 전력을 ${vs30 >= 0 ? '덜' : '더'} 씁니다.`
+            : '지금의 운영 방식(현재 운영)과 시간표·날씨에 맞춘 AI 운전을 같은 시간표, 같은 날씨로 비교했습니다.'
         }
         right={
           <Segmented
@@ -179,7 +179,7 @@ function Hero({
       <div className="min-w-0">
         <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
           <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
-          이전 운영(중앙 제어 고정 스케줄) 대비 전력
+          현재 운영(중앙 제어) 대비 전력
           {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
         </span>
         <span className="mt-2 flex items-baseline gap-1.5">
@@ -296,7 +296,7 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
         </div>
       ),
     },
-    { label: '고정 스케줄 대비', cell: (k) => (k === 'fixed' ? <span className="text-ink-3">비교 기준</span> : <span className="font-semibold text-good-ink">−{pctSaving(T.fixed.kwh, T[k].kwh)?.toFixed(1)}%</span>) },
+    { label: '현재 운영 대비', cell: (k) => (k === 'fixed' ? <span className="text-ink-3">비교 기준</span> : <span className="font-semibold text-good-ink">−{pctSaving(T.fixed.kwh, T[k].kwh)?.toFixed(1)}%</span>) },
     { label: '전기요금', cell: (k) => `${fmtNum(T[k].cost_krw)}원`, best: (k) => T[k].cost_krw === minOf((x) => T[x].cost_krw) },
     { label: '탄소 배출', cell: (k) => `${(T[k].co2_kg / 1000).toFixed(2)} tCO₂`, best: (k) => T[k].co2_kg === minOf((x) => T[x].co2_kg) },
     { label: '최대 전력', cell: (k) => `${T[k].peak_kw.toFixed(1)} kW`, best: (k) => T[k].peak_kw === minOf((x) => T[x].peak_kw) },
@@ -524,7 +524,7 @@ function CumulativeChart({ S }: { S: Summary }) {
       },
       series: [
         {
-          name: '고정 스케줄 대비',
+          name: '현재 운영 대비',
           type: 'line',
           showSymbol: false,
           lineStyle: { width: 2, color: STRATEGY.fixed.color },
@@ -559,14 +559,14 @@ function CumulativeChart({ S }: { S: Summary }) {
       sub="AI 예측 제어가 각 방식보다 덜 쓴 전력을 쌓아 올린 값입니다. 오늘 이후는 예상입니다."
       legend={
         <>
-          <LegendItem color={STRATEGY.fixed.color} label="고정 스케줄 대비" kind="line" />
+          <LegendItem color={STRATEGY.fixed.color} label="현재 운영 대비" kind="line" />
           <LegendItem color={STRATEGY.rule.color} label="규칙 기반 대비" kind="line" />
         </>
       }
       table={{
         columns: ['기준', '오늘까지 누적 kWh', '학기 말 예상 kWh'],
         rows: [
-          ['고정 스케줄 대비', +(S.totals.to_date.fixed.kwh - S.totals.to_date.ai.kwh).toFixed(1), +(S.totals.all.fixed.kwh - S.totals.all.ai.kwh).toFixed(1)],
+          ['현재 운영 대비', +(S.totals.to_date.fixed.kwh - S.totals.to_date.ai.kwh).toFixed(1), +(S.totals.all.fixed.kwh - S.totals.all.ai.kwh).toFixed(1)],
           ['규칙 기반 대비', +(S.totals.to_date.rule.kwh - S.totals.to_date.ai.kwh).toFixed(1), +(S.totals.all.rule.kwh - S.totals.all.ai.kwh).toFixed(1)],
         ],
       }}
@@ -595,7 +595,7 @@ function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: A
     if (A) {
       const V = A.variants
       return [
-        ...(V.fixed ? [{ key: 'fixed', name: '고정 스케줄', short: '고정', kwh: V.fixed.kwh, comfort: V.fixed.comfort_pct ?? 0, cold: V.fixed.cold_starts, dm: V.fixed.discomfort_dm, color: STRATEGY.fixed.color, symbol: 'circle', pos: 'left' }] : []),
+        ...(V.fixed ? [{ key: 'fixed', name: '현재 운영', short: '현재', kwh: V.fixed.kwh, comfort: V.fixed.comfort_pct ?? 0, cold: V.fixed.cold_starts, dm: V.fixed.discomfort_dm, color: STRATEGY.fixed.color, symbol: 'circle', pos: 'left' }] : []),
         ...RULE_VARIANTS.filter((r) => V[r.v]).map((r) => ({
           key: r.v,
           name: r.name,
@@ -683,7 +683,7 @@ function ScatterChart({ T, A, scope }: { T: Record<StrategyKey, TotalsRow>; A: A
       sub={`${scope === 'all' ? '학기 전체(예상)' : '오늘까지'} 기준입니다. 왼쪽 위로 갈수록 적게 쓰고 쾌적한 운전이며, 규칙 기반은 켜는 시점과 재실 감지를 바꾼 경우도 함께 놓았습니다.`}
       legend={
         <>
-          <LegendItem color={STRATEGY.fixed.color} label="고정 스케줄" kind="dot" />
+          <LegendItem color={STRATEGY.fixed.color} label="현재 운영" kind="dot" />
           {RULE_VARIANTS.map((r) => (
             <span key={r.v} className="inline-flex items-center gap-1.5 whitespace-nowrap">
               <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden>

@@ -1,7 +1,7 @@
 """Savings attribution and equal-comfort comparison (ablation runs of the same day).
 
 Variants (same day, same weather, same seeded field scenario, same start-of-day state):
-  fixed            building-wide fixed hours
+  fixed            current operation (on at first class, batch switch-off at 18:00)
   rule             requirement-5 rule (10 min before / 5 min before end / 15 min bridge)
   rule30           the rule with a 30-minute lead: what the rule needs to approach AI comfort
   rule_vacancy     the rule plus the same occupancy-sensor auto-off the AI uses
@@ -24,7 +24,7 @@ from .weather import minute_series
 
 VARIANTS = ["fixed", "rule", "rule30", "rule_vacancy", "ai_predictive", "ai_weather", "ai"]
 LABELS = {
-    "fixed": "고정 스케줄",
+    "fixed": "현재 운영",
     "rule": "규칙 기반(10분 전)",
     "rule30": "규칙 기반(30분 전)",
     "rule_vacancy": "규칙 기반 + 재실 감지",
@@ -92,7 +92,7 @@ def aggregate(days: list[dict]) -> dict:
         res[v] = {"label": LABELS[v], "kwh": round(t["kwh"], 1), "discomfort_dm": round(t["discomfort_dm"], 1),
                   "cold_starts": t["cold_starts"], "peak_kw": round(t["peak_kw"], 1),
                   "comfort_pct": round(100 * t["in_band"] / t["occ"], 2) if t["occ"] else None}
-    steps = [("고정 스케줄", "fixed", None),
+    steps = [("현재 운영", "fixed", None),
              ("수업 시간에만 운전 (규칙 ⑤)", "rule", "fixed"),
              ("예측 기동·관성 정지", "ai_predictive", "rule"),
              ("날씨 판단 (생략·외기 냉방·지연 기동)", "ai_weather", "ai_predictive"),

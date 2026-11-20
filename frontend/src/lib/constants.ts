@@ -4,11 +4,11 @@ export const STRATEGY_KEYS: StrategyKey[] = ['fixed', 'manual', 'rule', 'ai']
 
 export const STRATEGY: Record<StrategyKey, { label: string; short: string; color: string; wash: string; desc: string }> = {
   fixed: {
-    label: '고정 스케줄',
-    short: '고정',
+    label: '현재 운영',
+    short: '현재',
     color: '#565a60',
     wash: 'rgba(86,90,96,0.14)',
-    desc: '평일 전 강의실 08:30–22:30 가동',
+    desc: '강의실에서 첫 수업 때 켜고 중앙이 18:00에 일괄 차단(이후 재가동 불가), 온도는 정부 지침 범위 안(켜는 시각은 가정)',
   },
   manual: {
     label: '수동 운영',
@@ -127,8 +127,8 @@ export const SETTING_LABEL: Record<string, string> = {
   ai_gap_eval_max_min: 'AI 공백 평가 상한(분)',
   baseline: '절감 비교 기준',
   anomalies: '현장 이상 상황 시뮬레이션',
-  fixed_on: '고정 스케줄 시작',
-  fixed_off: '고정 스케줄 종료',
+  fixed_on: '현재 운영 시작',
+  fixed_off: '중앙 일괄 정지 시각',
   manual_off_delay_min: '수동 운영 정지 지연(분)',
   auto_off_after_min: '빈 강의실 자동 정지(분)',
 }

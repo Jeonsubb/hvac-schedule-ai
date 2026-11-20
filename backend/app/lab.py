@@ -1,6 +1,7 @@
 """Simulation lab: replay the agent-negotiated schedule day by day and compare its electricity with
 
-- 현재 운영 (central control as found in the field interview: fixed hours 08:30–22:30, heating 22 ℃ / cooling 26 ℃)
+- 현재 운영 (as the PNU facility office described it, 2026-11: occupants switch units on, the central controller keeps
+  setpoints inside the guideline band and switches everything off at 18:00; see strategies.plan_fixed)
 - 시간표 연동 규칙 (rule-based), AI 예측 제어 (AI without agents)
 - measured meter data, when the operator uploads it (hourly or daily kWh), with ASHRAE Guideline 14
   calibration metrics (NMBE, CV(RMSE)) of the simulated current operation against the meter.
@@ -19,18 +20,20 @@ from datetime import date, datetime, timedelta
 from hvac import config, engine
 from hvac.timetable import sessions_for_date
 
-from . import agents, service
+from . import agents, planning, service
 from .store import get_store
 
-LABELS = {"current": "현재 운영 (중앙 22℃ 고정)", "rule": "시간표 연동 규칙", "ai": "AI 예측 제어", "agents": "AI + 에이전트 협의"}
+LABELS = {"current": "현재 운영 (지침 온도 범위·18시 일괄 정지)", "rule": "시간표 연동 규칙", "ai": "AI 예측 제어", "agents": "AI + 에이전트 협의"}
 MAX_DAYS = {"rule": 10, "llm": 3}
 # ASHRAE Guideline 14-2014 calibration criteria (whole-building, measured vs simulated)
 G14 = {"hour": {"nmbe": 10.0, "cvrmse": 30.0}, "month": {"nmbe": 5.0, "cvrmse": 15.0}}
 
 
 def current_settings(ctx: service.Ctx) -> dict:
-    """Current operation per the field interview: central control holds 22 ℃ (heating); cooling assumed 26 ℃."""
-    return {**ctx.settings, "sp_heat": 22.0, "sp_cool": 26.0}
+    """Current operation: occupants may set anything inside the guideline band and are assumed to sit at its
+    comfort end (heating maximum, cooling minimum)."""
+    pol = planning.policy()
+    return {**ctx.settings, "sp_heat": float(pol["heat_max"]), "sp_cool": float(pol["cool_min"])}
 
 
 def _metrics(sim: dict, lo: float, hi: float) -> dict:
@@ -139,7 +142,8 @@ def run(start: date, days: int, mode: str = "rule", progress=None) -> dict:
     res = {"params": {"start": start.isoformat(), "days": days, "mode": mode}, "dates": [r["date"] for r in rows],
            "labels": LABELS, "days": rows, "totals": totals, "kpis": kpis, "measured": calibration(rows),
            "ai_used": any(r["agents"]["ai"] for r in rows), "created_at": service.now_kst().isoformat(timespec="seconds"),
-           "notes": ["현재 운영은 현장 인터뷰(중앙 제어 22℃ 고정, 08:30~22:30)를 재현한 시뮬레이션입니다.",
+           "notes": [f"현재 운영은 시설 담당자 설명을 재현한 시뮬레이션입니다. 강의실에서 첫 수업 때 켜고 {cur_st['fixed_off']}에 중앙에서 일괄 정지하며, "
+                     f"설정온도는 정부 지침 범위의 끝(난방 {cur_st['sp_heat']:g}℃, 냉방 {cur_st['sp_cool']:g}℃)으로 둡니다.",
                      "랩은 격리 실행입니다. 조정안·제어 명령을 만들지 않고, 적용된 조정도 무시합니다.",
                      "실측 전력량을 올리면 현재 운영 시뮬레이션과 비교해 보정 오차(NMBE, CV(RMSE))를 계산합니다."]}
     get_store().put_blob("lab/last.json", res)

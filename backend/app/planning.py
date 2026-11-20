@@ -36,9 +36,11 @@ from .store import get_store
 
 ORIENTS = ("남", "북", "동", "서")
 DEFAULT_POLICY = {
-    # 학교보건법 교실 18~28℃, 에너지이용 합리화법 난방 20℃ 이하·냉방 26℃ 이상, 강의실은 학교가 탄력 운영
+    # The central controller keeps setpoints inside the government guideline (PNU facility office, phone,
+    # 2026-11): 에너지이용 합리화법 난방 20℃ 이하·냉방 26℃ 이상 (PNU 2020: 냉방 26℃ 하한),
+    # 학교보건법 교실 난방 18~20℃·냉방 26~28℃
     "heat_min": 18.0,
-    "heat_max": 22.0,
+    "heat_max": 20.0,
     "cool_min": 26.0,
     "cool_max": 28.0,
     "co2_max": 1000,  # 학교보건법 시행규칙 교실 CO2 기준
@@ -974,7 +976,7 @@ def tier1(anchor: date) -> dict:
                f"강 단계가 필요한 강의 {len(high_courses)}개 / 전체 {len(ctx.courses)}개",
                "ok", "예상 인원으로 강의마다 환기 단계(약·중·강)를 정했습니다. 2차에서 실제 재실로 다시 맞춥니다.", idea=13),
         _check("t1-cost", "월 예상 요금", ["tariff", "simulator"],
-               f"현재 운영(고정 08:30~22:30) {base:,.0f} kWh",
+               f"현재 운영(첫 수업에 켜고 {ctx.settings['fixed_off']} 일괄 정지) {base:,.0f} kWh",
                f"AI 계획 {kwh:,.0f} kWh · {cost:,.0f}원", "ok",
                f"한전 교육용(을) 시간대별 요금으로 계산했습니다. 현재 운영 대비 {_sentence_pct(pct)} 절감 예상입니다."),
     ]
