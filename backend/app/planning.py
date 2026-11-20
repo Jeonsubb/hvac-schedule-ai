@@ -726,6 +726,16 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+def sp_range(season: str, pol: dict, settings: dict) -> tuple[float, float]:
+    """Setpoints the AI may propose: the policy range, but never outside the comfort band that the
+    validation uses. A heating setpoint below the band would mark every class of that room 'not ready'."""
+    if season == "heat":
+        lo = max(float(pol["heat_min"]), math.ceil(float(settings["comfort_low"]) * 2 - 1e-9) / 2)
+        return min(lo, float(pol["heat_max"])), float(pol["heat_max"])
+    hi = min(float(pol["cool_max"]), math.floor(float(settings["comfort_high"]) * 2 + 1e-9) / 2)
+    return float(pol["cool_min"]), max(hi, float(pol["cool_min"]))
+
+
 def _fb_by_room(items: list[dict]) -> dict:
     """Thermal votes per room. Votes tagged 'stuffy' are an air-quality signal (ventilation), not a
     temperature one, so they are counted separately and left out of the setpoint statistics."""
@@ -772,7 +782,7 @@ def _feedback_proposals(tier: int, dates: list[date], fb: dict, ctx: service.Ctx
     ranked = sorted(fb.items(), key=lambda kv: -(max(kv[1]["cold"], kv[1]["hot"]) * 10 + abs(kv[1]["mean"])))
     fb = dict(ranked[:top])
     key = "sp_heat" if season == "heat" else "sp_cool"
-    lo, hi = (pol["heat_min"], pol["heat_max"]) if season == "heat" else (pol["cool_min"], pol["cool_max"])
+    lo, hi = sp_range(season, pol, ctx.settings)
     for r, b in sorted(fb.items()):
         if r not in config.ROOMS or b["n"] < min_n:
             continue

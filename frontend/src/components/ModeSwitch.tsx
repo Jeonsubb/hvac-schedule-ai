@@ -23,7 +23,7 @@ function period(a: Adjustment) {
 }
 
 /** Pending adjustments, loaded only while the popover is open. */
-function PendingList({ onDone }: { onDone: () => void }) {
+export function PendingList({ onDone }: { onDone: () => void }) {
   const q = useApi<Adjustment[]>('/api/adjustments?status=pending', { maxAgeMs: 10_000 })
   const [busy, setBusy] = useState<string | null>(null)
   const list = Array.isArray(q.data) ? q.data : []

@@ -224,9 +224,16 @@ def test_negotiation_compare_same_conditions(client):
         c2 = client.get(f"/api/negotiate/compare?date={d}").json()
         assert c2["state"] == "applied" and c2["same_conditions"] is True
         assert ai_kwh() == c2["after"]["kwh"]  # the operating plan is now the negotiated one
-        # a second run never reuses a decided adjustment's id
+        # negotiating the same day again starts from the plan without the earlier agreement, so it reaches the
+        # same setpoints instead of moving them another step, and the agreement in force stays in force
         again = agents.negotiate(3, d, use_ai=False)
-        assert not set(again["adjustment_ids"]) & {a["id"] for a in c["adjustments"]}
+        assert again["final"]["proposal"] == res["final"]["proposal"] and again["base_sp"] == res["base_sp"]
+        assert set(again["adjustment_ids"]) == {a["id"] for a in c["adjustments"]}
+        assert client.get(f"/api/negotiate/compare?date={d}").json()["state"] == "applied" and ai_kwh() == c2["after"]["kwh"]
+        # and no proposal ever leaves the comfort band the classes are checked against
+        lo = service.settings()["comfort_low"]
+        assert all(v["sp_heat"] >= lo for v in again["final"]["proposal"].values())
+        assert planning.sp_range("heat", planning.policy(), service.settings())[0] == 19.5
     # the timetable changes: the stored result is no longer comparable
     ev = client.post("/api/events", json={"type": "add", "date": d.isoformat(), "room": "406", "start": "19:00", "end": "20:30",
                                           "title": "특강", "expected_people": 30})

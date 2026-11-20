@@ -24,6 +24,8 @@ export interface PlanModel {
   /** 'applied' | 'recommended' … shown next to the label */
   badge?: string
   kwh: number
+  /** electricity cost of the day (won), time-of-use tariff */
+  costKrw: number | null
   comfortPct: number | null
   /** minutes of class outside the comfort band / minutes of class */
   outBandMin: number | null
@@ -62,7 +64,7 @@ export function fromStrategy(key: PlanKey, label: string, sd: StrategyDay, day: 
     const applied = key === 'fixed' ? undefined : day.room_sp?.[r]?.[spKey]
     rooms[r] = { plan: sd.plan[r] ?? [], ta: rd?.ta ?? null, sp: applied ?? Number(meta.settings[spKey]), kwh: rd?.kwh ?? null, pmv: mean(pm) }
   }
-  return { key, label, badge, kwh: sd.kwh, comfortPct: sd.comfort_pct, outBandMin: out, classMin: cls, pmvMean: mean(pmvs), rooms }
+  return { key, label, badge, kwh: sd.kwh, costKrw: sd.cost_krw ?? null, comfortPct: sd.comfort_pct, outBandMin: out, classMin: cls, pmvMean: mean(pmvs), rooms }
 }
 
 export function fromView(key: PlanKey, label: string, v: PlanView, meta: Meta, spKey: SpKey, badge?: string): PlanModel {
@@ -71,7 +73,7 @@ export function fromView(key: PlanKey, label: string, v: PlanView, meta: Meta, s
     const x = v.rooms[r]
     rooms[r] = { plan: x?.plan ?? [], ta: x?.ta ?? null, sp: x ? x[spKey] : null, kwh: x?.kwh ?? null, pmv: x?.pmv ?? null }
   }
-  return { key, label, badge, kwh: v.kwh, comfortPct: v.comfort_pct, outBandMin: v.out_band_min, classMin: v.class_min, pmvMean: v.pmv_mean, rooms }
+  return { key, label, badge, kwh: v.kwh, costKrw: v.cost_krw ?? null, comfortPct: v.comfort_pct, outBandMin: v.out_band_min, classMin: v.class_min, pmvMean: v.pmv_mean, rooms }
 }
 
 /** Join intervals that touch (the engine splits pre-heating and class time) so one run is one bar. */
@@ -108,7 +110,7 @@ export function negoBlock(cmp: NegCompare | undefined): string | null {
   if (!cmp) return '협의 기록을 확인하는 중입니다.'
   if (cmp.state === 'none') return '이 날짜에는 아직 AI 협의 기록이 없습니다.'
   if (cmp.same_conditions === false) return `협의 이후 ${changedLabel(cmp)}이(가) 바뀌어 같은 조건으로 비교할 수 없습니다. 다시 협의해야 합니다.`
-  if (!cmp.before || !cmp.after || cmp.same_conditions == null) return '이전 버전에서 실행한 협의라 운전계획 비교 자료가 없습니다. 다시 협의해야 합니다.'
+  if (!cmp.before || !cmp.after || cmp.same_conditions == null) return '이 날짜의 협의 기록에는 전후 비교 자료가 없습니다. AI 최적화에서 다시 협의하면 표시됩니다.'
   if (cmp.state === 'no_change') return 'AI 협의 결과 설정온도 변경이 없습니다.'
   return null
 }

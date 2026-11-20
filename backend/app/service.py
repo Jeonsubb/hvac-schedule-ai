@@ -205,9 +205,15 @@ def room_setpoints(d: date, ctx: Ctx) -> dict:
     """Per-room setpoints active on date d (later decisions win)."""
     iso = d.isoformat()
     out: dict = {}
+    lo, hi = ctx.settings.get("comfort_low"), ctx.settings.get("comfort_high")
     for a in getattr(ctx, "adjustments", []):
         if a.get("date_from", "") <= iso <= a.get("date_to", ""):
             ch = {k: float(v) for k, v in (a.get("change") or {}).items() if k in ("sp_heat", "sp_cool")}
+            # never run a room outside the comfort band the classes are checked against
+            if "sp_heat" in ch and lo is not None:
+                ch["sp_heat"] = max(ch["sp_heat"], float(lo))
+            if "sp_cool" in ch and hi is not None:
+                ch["sp_cool"] = min(ch["sp_cool"], float(hi))
             if ch:
                 for r in a.get("rooms", []):
                     out.setdefault(r, {}).update(ch)

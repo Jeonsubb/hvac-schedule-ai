@@ -137,7 +137,7 @@ def preview(kind: str, d: date | None = None) -> dict:
         key = "sp_heat" if planning.season_for([d], ctx) == "heat" else "sp_cool"
         cur = planning._base_sp(d, r, ctx)[0 if key == "sp_heat" else 1]
         pol = planning.policy()
-        lo, hi = (pol["heat_min"], pol["heat_max"]) if key == "sp_heat" else (pol["cool_min"], pol["cool_max"])
+        lo, hi = planning.sp_range("heat" if key == "sp_heat" else "cool", pol, ctx.settings)
         new = max(lo, min(hi, cur + (0.5 if key == "sp_heat" else 0.5)))
         rs = {k: dict(v) for k, v in (sd.get("room_sp") or {}).items()}
         rs.setdefault(r, {})[key] = new

@@ -159,7 +159,7 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
           </button>
         </div>
         <p className="mt-3 text-[13px] text-ink-3">
-          실행 대상: {fmtDateK(date)} 하루 · 협의 대상은 설정온도뿐이며 켜고 끄는 시각은 엔진이 다시 계산합니다 ·{' '}
+          실행 대상: {fmtDateK(date)} 하루 · 협의 대상은 설정온도뿐이며 켜고 끄는 시각은 엔진이 다시 계산합니다 · 다시 협의하면 이전 협의안 위에 쌓이지 않고 새 결과로 바뀝니다 · 설정온도는 쾌적 범위 아래로 내려가지 않습니다 ·{' '}
           {mode === 'auto'
             ? '자동 운전 모드: 0.5℃ 이내 변경은 바로 적용되고, 그보다 큰 변경은 승인을 기다립니다.'
             : '추천 모드: 결과는 승인 대기 추천안으로만 저장되고, 승인하기 전에는 운영계획이 바뀌지 않습니다.'}
@@ -361,14 +361,23 @@ function Result({
             <div className="rounded-[12px] border border-line p-4">
               <h3 className="text-[14px] font-semibold text-ink">쾌적성 (수업 중)</h3>
               <dl className="tnum mt-3 space-y-3 text-[13.5px]">
-                <Cmp k="평균 예측 PMV" before={b.pmv_mean != null ? signed(b.pmv_mean, 2) : '—'} after={a.pmv_mean != null ? signed(a.pmv_mean, 2) : '—'} note={b.pmv_mean == null ? '수업 중 PMV 산출값이 없습니다' : '0에 가까울수록 쾌적, ±0.5 안이 권장 범위'} />
-                {b.pmv_mean != null && a.pmv_mean != null && <PmvScale before={b.pmv_mean} after={a.pmv_mean} />}
                 <Cmp
-                  k="쾌적 범위 밖 시간"
+                  k="쾌적 범위를 벗어난 수업 시간"
                   before={`${b.out_band_min}분`}
                   after={`${a.out_band_min}분`}
-                  note={`수업 ${a.class_min}분 중 예측 실내온도가 ${meta.settings.comfort_low}~${meta.settings.comfort_high}℃를 벗어난 시간`}
+                  note={`수업 ${a.class_min}분 중 예측 실내온도가 ${meta.settings.comfort_low}~${meta.settings.comfort_high}℃를 벗어난 시간입니다. 운영 기준으로 보는 값입니다.`}
                 />
+                <Cmp
+                  k="체감 지표 (PMV)"
+                  before={b.pmv_mean != null ? signed(b.pmv_mean, 2) : '—'}
+                  after={a.pmv_mean != null ? signed(a.pmv_mean, 2) : '—'}
+                  note={
+                    b.pmv_mean == null
+                      ? '수업 중 PMV 산출값이 없습니다'
+                      : '0에 가까울수록 쾌적합니다. 난방을 수업 때만 켜면 벽과 바닥이 차가워 같은 실내온도에서도 서늘한 쪽으로 계산됩니다. 그래서 춥다는 의견이 반복된 강의실은 쾌적 Agent가 온도를 올립니다.'
+                  }
+                />
+                {b.pmv_mean != null && a.pmv_mean != null && <PmvScale before={b.pmv_mean} after={a.pmv_mean} />}
               </dl>
             </div>
           </div>

@@ -23,6 +23,7 @@ export const NAV_GROUPS = [
     desc: '선택한 날짜의 전체 운전계획과 예상 효과',
     tabs: [
       { to: '/', label: '현황' },
+      { to: '/energy', label: '절감 효과' },
       { to: '/comfort', label: '쾌적 의견' },
     ],
   },

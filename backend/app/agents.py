@@ -135,7 +135,7 @@ def build_dossier(tier: int, d: date, ctx: service.Ctx, fb_until: date | None = 
     dates = _dates_for(tier, d, ctx)
     season = planning.season_for(dates, ctx)
     key = "sp_heat" if season == "heat" else "sp_cool"
-    lo, hi = (pol["heat_min"], pol["heat_max"]) if season == "heat" else (pol["cool_min"], pol["cool_max"])
+    lo, hi = planning.sp_range(season, pol, ctx.settings)
     busy = sorted(planning._rooms_with_classes(dates, ctx))
     base_sp = {r: planning._base_sp(dates[0], r, ctx)[0 if season == "heat" else 1] for r in busy}
     baseline = planning.evaluate(dates, ctx, feedback=None)
@@ -184,7 +184,9 @@ def build_dossier(tier: int, d: date, ctx: service.Ctx, fb_until: date | None = 
         "feedback": fb, "feedback_sources": fb_sources, "weather": wx, "people": {r: max(v) for r, v in people.items()}, "co2": co2,
         "orient": {r: pol["orient"].get(r, "남") for r in busy}, "tariff": season_tariff, "co2_max": pol["co2_max"],
         "comfort_won": float(pol.get("comfort_won", COMFORT_WON)),
-        "policy": {"heat_min": pol["heat_min"], "heat_max": pol["heat_max"], "cool_min": pol["cool_min"], "cool_max": pol["cool_max"]},
+        # the range the agents may actually use (policy range inside the comfort band)
+        "policy": {"heat_min": lo if season == "heat" else pol["heat_min"], "heat_max": pol["heat_max"],
+                   "cool_min": pol["cool_min"], "cool_max": hi if season != "heat" else pol["cool_max"]},
     }
 
 
@@ -461,6 +463,12 @@ def negotiate(tier: int, d: date, progress=None, use_ai: bool = True, sandbox: b
               ctx: service.Ctx | None = None, fb_until: date | None = None) -> dict:
     """sandbox=True (simulation lab): same negotiation, but no adjustments, no stored result, no audit."""
     ctx = ctx or service.Ctx()
+    if not sandbox:
+        # start from the plan without the earlier agreement of this same period, so that running the
+        # negotiation twice gives the same answer instead of moving the setpoints another step each time
+        first = _dates_for(tier, d, ctx)[0].isoformat()
+        ctx.adjustments = [a for a in ctx.adjustments
+                           if not (a.get("origin") == "agents" and a.get("tier") == tier and a.get("date_from") == first)]
     ds = build_dossier(tier, d, ctx, fb_until)
     dates = [date.fromisoformat(x) for x in ds["dates"]]
     turns: list[dict] = []
@@ -592,12 +600,29 @@ def negotiate(tier: int, d: date, progress=None, use_ai: bool = True, sandbox: b
     run_tag = service.now_kst().strftime("%H%M%S")
     adj_id = lambda sp: f"T{tier}-{ds['dates'][0]}-agents-{str(sp).replace('.', '_')}-{run_tag}"  # noqa: E731
     new_ids = {adj_id(sp) for sp in groups}
+    # the same conclusion as the agreement already in force: keep that one instead of asking again
+    same = {}
     for a in st.list_items("adjustment"):
-        if (a.get("status") == "pending" and a.get("origin") == "agents" and a.get("tier") == tier
+        if (a.get("status") == "applied" and a.get("origin") == "agents" and a.get("tier") == tier
+                and a.get("date_from") == ds["dates"][0]):
+            sp0 = (a.get("change") or {}).get(ds["key"])
+            if sp0 in groups and sorted(a.get("rooms", [])) == sorted(groups[sp0]):
+                same[sp0] = a["id"]
+    new_ids |= set(same.values())
+    replaced_applied = False
+    for a in st.list_items("adjustment"):
+        if (a.get("status") in ("pending", "applied") and a.get("origin") == "agents" and a.get("tier") == tier
                 and a.get("date_from") == ds["dates"][0] and a["id"] not in new_ids):
+            replaced_applied = replaced_applied or a.get("status") == "applied"
             st.put_item("adjustment", a["id"], {**a, "status": "rejected", "decided_at": service.now_kst().isoformat(timespec="seconds"),
                                                 "decided_by": "새 협의안으로 대체"})
+    if replaced_applied:
+        planning.clear_cache()
+        service._queue_precompute()
     for sp, rooms in sorted(groups.items()):
+        if sp in same:
+            adj_ids.append(same[sp])
+            continue
         kb = sum(base["rooms"].get(r, {}).get("kwh", 0) for r in rooms)
         ka = sum(final_ev["rooms"].get(r, {}).get("kwh", 0) for r in rooms)
         dkr = round(ka - kb, 2)

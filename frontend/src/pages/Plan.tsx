@@ -122,7 +122,7 @@ export default function Plan() {
       <div>
         <PageHeader
           title="AI 최적화"
-          desc="비용·쾌적 두 Agent가 설정온도를 협의하고, 물리 시뮬레이터가 검증한 결과를 같은 조건의 협의 전후로 비교합니다."
+          desc="전기요금을 줄이려는 AI와 이용자 쾌적을 지키려는 AI가 강의실별 설정온도를 조율합니다. 조율안은 시뮬레이터로 검증해 협의 전후를 같은 조건으로 비교하고, 담당자가 승인한 것만 적용합니다."
           right={viewSwitch}
         />
         {meta ? <AgentOptimize date={anchor} meta={meta} /> : <PageSkeleton label="불러오는 중…" />}
