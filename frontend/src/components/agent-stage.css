@@ -4,8 +4,12 @@
 .agent-stage-side { display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .agent-stage-bubble { position: relative; width: 100%; padding: 15px 18px; border: 1px solid var(--color-line); border-radius: 16px; background: var(--agent-bg); transition: border-color .25s, box-shadow .25s; animation: agent-bubble-in .3s ease-out; }
 .agent-stage-bubble::after { content: ''; position: absolute; bottom: -7px; left: calc(50% - 7px); width: 12px; height: 12px; background: var(--agent-bg); border-right: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); transform: rotate(45deg); }
-.agent-stage-turn { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--agent-ink); }
-.agent-stage-bubble p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; min-height: 66px; margin-top: 6px; font-size: 14px; line-height: 22px; color: var(--color-ink-2); overflow-wrap: anywhere; }
+.agent-stage-turn { display: block; overflow-wrap: anywhere; font-size: 12px; font-weight: 600; color: var(--agent-ink); }
+.agent-stage-bubble p { min-height: 66px; margin-top: 6px; font-size: 14px; line-height: 22px; color: var(--color-ink-2); overflow-wrap: anywhere; white-space: pre-wrap; }
+.agent-stage-full-message { margin-top: 10px; }
+.agent-stage-full-message summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--agent-ink); }
+.agent-stage-full-message summary:focus-visible { outline: 2px solid var(--agent-color); outline-offset: 3px; border-radius: 2px; }
+.agent-stage-full-message p { min-height: 0; padding-top: 8px; border-top: 1px solid var(--color-line); }
 .agent-stage-character { position: relative; width: 156px; height: 184px; margin-top: 14px; transform-origin: center bottom; }
 .agent-stage-body, .agent-stage-spark { position: absolute; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
 .agent-stage-spark { opacity: 0; }
@@ -29,7 +33,8 @@
   .agent-stage-pair { gap: 26px; }
   .agent-stage-character { width: 115px; height: 140px; }
   .agent-stage-bubble { padding: 12px; }
-  .agent-stage-bubble p { min-height: 84px; -webkit-line-clamp: 4; font-size: 13px; line-height: 21px; }
+  .agent-stage-bubble p { min-height: 84px; font-size: 13px; line-height: 21px; }
+  .agent-stage-full-message p { min-height: 0; }
   .agent-stage-name { font-size: 12px; }
   .agent-stage-exchange { width: 22px; left: calc(50% - 11px); }
 }

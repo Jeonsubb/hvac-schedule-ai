@@ -5,6 +5,20 @@ import { AGENT_CHARACTER, AGENT_META } from './Characters'
 import { cx } from '../lib/format'
 import './agent-stage.css'
 
+/** Keep complete sentences and numeric evidence intact; the original stays available below. */
+function summarizeMessage(message: string) {
+  const original = message.trim()
+  const sentences = original.split(/(?<=[.!?。！？])\s+/u)
+  let summary = sentences[0] || ''
+  let included = 1
+  for (const sentence of sentences.slice(1, 2)) {
+    if (summary.length + sentence.length + 1 > 100) break
+    summary += ` ${sentence}`
+    included++
+  }
+  return included < sentences.length ? summary : original
+}
+
 /** Only server progress and recorded turns drive the characters; no scripted conversation. */
 export default function AgentStage({ turns, running, phase, completed = false, failed = false, fallback = false }: {
   turns: AgentTurn[]
@@ -33,12 +47,20 @@ export default function AgentStage({ turns, running, phase, completed = false, f
           const character = AGENT_CHARACTER[side]
           const speaking = active === side
           const turn = [...turns].reverse().find((t) => t.agent === side)
+          const message = turn?.message?.trim() || ''
+          const summary = summarizeMessage(message)
           const goal = side === 'building' ? '에너지와 요금을 아끼는 설정을 제안해요.' : '수업 중 쾌적함과 사용자 의견을 살펴봐요.'
           return (
             <div key={side} className={cx('agent-stage-side', speaking && 'is-speaking')} style={{ '--agent-color': meta.color, '--agent-bg': meta.bg, '--agent-ink': meta.ink } as CSSProperties}>
               <div className="agent-stage-bubble" key={`${side}:${turns.length}:${speaking}`}>
                 <span className="agent-stage-turn">{speaking ? '자료 확인 · 시뮬레이션 중' : turn ? `${turn.round}라운드 · ${turn.stance || '제안'}` : side === 'building' ? '비용 Agent' : '쾌적 Agent'}</span>
-                <p>{speaking ? (phase?.includes('시뮬레이터') ? '제안할 설정온도를 시뮬레이터로 계산하고 있어요.' : '시간표와 날씨, 상대의 제안을 확인하고 있어요.') : turn?.message || goal}</p>
+                <p>{speaking ? (phase?.includes('시뮬레이터') ? '제안할 설정온도를 시뮬레이터로 계산하고 있어요.' : '시간표와 날씨, 상대의 제안을 확인하고 있어요.') : summary || goal}</p>
+                {!speaking && summary !== message && (
+                  <details className="agent-stage-full-message">
+                    <summary>전체 발언 보기</summary>
+                    <p>{message}</p>
+                  </details>
+                )}
                 {speaking && <span className="agent-stage-dots" aria-hidden><i /><i /><i /></span>}
               </div>
               <div className="agent-stage-character" aria-hidden="true">
