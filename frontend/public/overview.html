@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>ThermoPlan 서비스 설명 (v5)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --ink: #142033; --ink2: #4a5668; --ink3: #667183; --line: #e5e9f0; --paper: #f7f9fc; --surface: #fff;
+    --brand: #2f6fde; --brand-ink: #1f56b8; --brand-bg: #eaf1fd;
+    --ai: #14a673; --ai-ink: #0d7f5a; --rule: #2a78d6; --fixed: #565a60; --agents: #6250d6; --agents-bg: #f6f5fe;
+    --occ: #e8894f; --occ-bg: #fdf0e7; --shark: #3d6fb6; --shark-bg: #e9f0fa;
+    --good: #0a6b0a; --good-bg: #eaf6ea; --warn: #8a5a00; --warn-bg: #fff4dc;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.65; word-break: keep-all; }
+  a { color: var(--brand-ink); text-underline-offset: 3px; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 40px; }
+  header.top { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 24px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; font-size: 17px; }
+  nav.toc { display: flex; gap: 4px; flex-wrap: wrap; }
+  nav.toc a { text-decoration: none; color: var(--ink2); font-size: 14px; font-weight: 600; padding: 6px 10px; border-radius: 999px; }
+  nav.toc a:hover { background: #eef2f8; color: var(--ink); }
+  section { padding: 40px 0 8px; }
+  h1 { font-size: 40px; line-height: 1.2; letter-spacing: -0.03em; margin: 0; }
+  h2 { font-size: 26px; letter-spacing: -0.025em; margin: 0 0 6px; }
+  h3 { font-size: 18px; letter-spacing: -0.015em; margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  .lead { font-size: 18px; color: var(--ink2); max-width: 900px; }
+  .sub { color: var(--ink2); margin-bottom: 18px; max-width: 980px; }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 700; color: var(--brand-ink); background: var(--brand-bg); padding: 4px 12px; border-radius: 999px; margin-bottom: 14px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .grid { display: grid; gap: 16px; }
+  .g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .fig { font-size: 34px; font-weight: 750; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .fig small { font-size: 15px; font-weight: 600; color: var(--ink3); margin-left: 3px; }
+  .label { font-size: 13.5px; color: var(--ink3); font-weight: 600; }
+  .note { font-size: 14px; color: var(--ink3); }
+  .tag { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #eef2f8; color: var(--ink2); vertical-align: 1px; }
+  .tag.sim { background: #eaf2fc; color: #1c5cab; }
+  .tag.ok { background: var(--good-bg); color: var(--good); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 13.5px; color: var(--ink3); font-weight: 650; background: #f4f6f9; padding: 10px 14px; }
+  td { padding: 11px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.hl td { background: #f6f5fe; }
+  .tablebox { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; }
+  /* flow */
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .step { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; position: relative; }
+  .step .n { width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .step:not(:last-child)::after { content: ""; position: absolute; right: -12px; top: 50%; width: 10px; height: 10px; border-top: 2px solid #b9c3d1; border-right: 2px solid #b9c3d1; transform: translateY(-50%) rotate(45deg); }
+  .steps6 { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .s6 { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 14px; color: var(--ink2); }
+  .s6 b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
+  .s6 .k { font-size: 12.5px; font-weight: 700; color: var(--brand-ink); }
+  /* tiers */
+  .tiers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .tier { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; border-top: 4px solid var(--brand); }
+  .tier.t2 { border-top-color: var(--rule); }
+  .tier.t3 { border-top-color: var(--ai); }
+  .tier dl { margin: 10px 0 0; display: grid; grid-template-columns: 64px 1fr; gap: 6px 10px; font-size: 14.5px; }
+  .tier dt { color: var(--ink3); font-weight: 650; }
+  .tier dd { margin: 0; color: var(--ink2); }
+  /* agents */
+  .agents { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 16px; align-items: stretch; }
+  .agent { border-radius: 16px; padding: 20px; border: 1px solid var(--line); background: var(--surface); }
+  .agent.shark { background: var(--shark-bg); border-color: #cfdcf3; }
+  .agent.occ { background: var(--occ-bg); border-color: #f4d3bd; }
+  .agent .who { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .agent .who b { font-size: 18px; }
+  .loop { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .loop ol { margin: 6px 0 0; padding-left: 20px; color: var(--ink2); font-size: 15px; }
+  .loop li { margin-bottom: 4px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .mode { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .mode h3 { display: flex; align-items: center; gap: 8px; }
+  /* screens */
+  .screens { display: grid; grid-template-columns: 220px 1fr 1fr; gap: 16px; }
+  .side { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .side .item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-weight: 650; font-size: 15px; color: var(--ink2); }
+  .side .item.on { color: var(--brand); background: var(--brand-bg); box-shadow: inset 3px 0 0 var(--brand); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+  .tabs span { font-size: 13.5px; font-weight: 650; padding: 5px 12px; border-radius: 999px; background: #edf1f7; color: var(--ink2); }
+  .tabs span.new { background: var(--brand-bg); color: var(--brand-ink); }
+  ul.clean { margin: 0; padding-left: 18px; color: var(--ink2); }
+  ul.clean li { margin-bottom: 4px; }
+  /* architecture */
+  .arch { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+    /* full-bleed: the diagram gets the whole projector width so 12px labels stay close to their size */
+    width: min(1640px, calc(100vw - 32px)); position: relative; left: 50%; transform: translateX(-50%); }
+  .arch svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13.5px; color: var(--ink2); margin-top: 10px; }
+  .legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--ink2); vertical-align: 4px; margin-right: 6px; }
+  .legend i.b { border-top-color: var(--brand); }
+  .legend i.dash { border-top: 2px dashed var(--fixed); }
+  .access { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .access code { font-size: 14.5px; background: #f1f4f8; padding: 2px 8px; border-radius: 6px; word-break: break-all; }
+  footer { color: var(--ink3); font-size: 13.5px; padding: 36px 0 48px; }
+  @media (max-width: 1100px) {
+    .g4, .flow, .steps6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .g3, .tiers, .agents, .screens, .access, .modes, .g2 { grid-template-columns: 1fr; }
+    .step::after { display: none; }
+  }
+  @media print {
+    @page { size: A4 landscape; margin: 12mm; }
+    body { background: #fff; font-size: 12.5px; }
+    header.top { position: static; }
+    nav.toc { display: none; }
+    .wrap { max-width: none; padding: 0; }
+    section { padding: 16px 0 0; break-inside: auto; }
+    .panel, .step, .s6, .tier, .agent, .loop, .mode, .side, .tablebox, .arch { break-inside: avoid; }
+    .arch { width: 100%; left: 0; transform: none; padding: 6px; }
+    #arch-section { break-before: page; }
+    h1 { font-size: 28px; } h2 { font-size: 20px; } .fig { font-size: 24px; } .lead { font-size: 14px; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <span class="brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2f6fde"/><path d="M16 6.5 25.5 16 16 25.5 6.5 16z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M11.2 16h9.6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.1" fill="#9cc0f5"/></svg>
+      ThermoPlan
+    </span>
+    <nav class="toc" aria-label="목차">
+      <a href="#problem">문제</a><a href="#flow">흐름</a><a href="#tiers">1·2·3차</a><a href="#agents">에이전트</a><a href="#screens">화면</a><a href="#arch-section">아키텍처</a><a href="#ai">생성형 AI</a><a href="#results">결과</a><a href="#access">접속</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- hero -->
+  <section id="problem" style="padding-top:48px">
+    <span class="eyebrow">2026 AWS x PNU AI 해커톤 · 과제 3 · 스케줄 기반 HVAC 자동 운전 AI</span>
+    <h1>일정이 바뀌면, 냉난방도 바로 다시 계산합니다</h1>
+    <p class="lead" style="margin-top:14px">ThermoPlan은 강의 시간표·행사·날씨·재실·CO₂·재실자 의견으로 강의실별 냉난방 운전 계획을 만들고, 비용은 줄이면서 쾌적은 지키도록 자동 운전하거나 담당자에게 추천하는 건물 운영 서비스입니다.</p>
+    <div class="grid g3" style="margin-top:22px">
+      <div class="panel"><div class="label">문제</div><p style="margin-top:6px">학교·쇼핑몰처럼 운영 일정이 자주 바뀌는 건물은 고정 스케줄로는 효율적인 냉난방이 어렵습니다. 빈 강의실을 데우고, 사람이 몰린 날에는 늦게 데우며, 민원은 감으로 처리됩니다.</p></div>
+      <div class="panel"><div class="label">고객</div><p style="margin-top:6px">건물 시설 담당자·운영자입니다. 중앙제어 PC로 시스템 에어컨을 운영하고, 전기요금과 "춥다·덥다" 문의를 함께 감당하는 사람입니다.</p></div>
+      <div class="panel"><div class="label">데모 건물</div><p style="margin-top:6px">부산대학교 IT관 3·4층 강의실 10실(실내기 19대, 실외기 3대), 2026년 2학기 실제 시간표와 기상청·Open-Meteo 날씨입니다. 설비 제어는 열모델 시뮬레이터로 대신합니다.</p></div>
+    </div>
+    <div class="grid g4" style="margin-top:16px">
+      <div class="panel"><div class="label">학기 전기 사용 (AI 예측 제어) <span class="tag sim">시뮬레이션</span></div><div class="fig" style="margin-top:6px">−55.0<small>%</small></div><div class="note">고정 스케줄 6,365 → 2,864 kWh</div></div>
+      <div class="panel"><div class="label">학기 전기요금 <span class="tag sim">시뮬레이션</span></div><div class="fig" style="margin-top:6px">326,416<small>원</small></div><div class="note">고정 스케줄 749,938원 대비 · 한전 교육용(을)</div></div>
+      <div class="panel"><div class="label">같은 쾌적도로 비교 <span class="tag sim">시뮬레이션</span></div><div class="fig" style="margin-top:6px">−12.0<small>%</small></div><div class="note">30분 전에 켜는 규칙 운전 3,254 kWh 대비</div></div>
+      <div class="panel"><div class="label">LLM 수치 직접 인용률</div><div class="fig" style="margin-top:6px">96~97<small>%</small></div><div class="note">대조군(가짜 수치)은 32~36%만 통과</div></div>
+    </div>
+  </section>
+
+  <!-- flow -->
+  <section id="flow">
+    <h2>서비스 흐름</h2>
+    <p class="sub">처음 쓰는 건물은 건물 설정 6단계를 거쳐 첫 월간 계획까지 만들고, 그 뒤로는 운영 화면에서 매일 검증·조정합니다.</p>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><h3>랜딩</h3><p class="note">문제와 동작 방식, 두 에이전트, 자동 운전·추천 모드를 소개합니다. (<code>/welcome</code>)</p></div>
+      <div class="step"><span class="n">2</span><h3>로그인·가입</h3><p class="note">목업 인증입니다. 데모 계정 <b>부산대학교 / 부산대학교</b>는 설정을 마친 IT관으로 바로 들어갑니다.</p></div>
+      <div class="step"><span class="n">3</span><h3>건물 설정 6단계</h3><p class="note">새 계정만 거칩니다. 마치면 정책·운영 규칙·운전 모드가 저장됩니다.</p></div>
+      <div class="step"><span class="n">4</span><h3>운영 화면</h3><p class="note">운전 현황과 스케줄 타임라인 두 메뉴에서 매일 확인하고 승인합니다.</p></div>
+    </div>
+    <div class="steps6">
+      <div class="s6"><span class="k">1단계</span><b>건물 알려주기</b>건물을 말로 설명하면 AI가 이름·기관·유형으로 정리합니다.</div>
+      <div class="s6"><span class="k">2단계</span><b>중앙제어기 연결</b>현장 게이트웨이를 설치하고 중앙제어 PC 주소·프로토콜(BACnet/IP 47808 등)로 연결을 시험합니다.</div>
+      <div class="s6"><span class="k">3단계</span><b>데이터 수집</b>시간표·설비 포인트·날씨·센서·의견을 서버에서 한 번에 가져옵니다.</div>
+      <div class="s6"><span class="k">4단계</span><b>부족한 정보 확인</b>AI가 묻고 담당자가 답합니다: 허용 온도 범위, 운전 시간, 출석률, 공휴일 등.</div>
+      <div class="s6"><span class="k">5단계</span><b>AI 1차 스케줄</b>시간표 → 학사일정 → 날씨 → 설비 → 요금 → 정책을 거쳐 월간 계획을 만듭니다.</div>
+      <div class="s6"><span class="k">6단계</span><b>운전 모드</b>자동 운전 또는 추천만 받기를 고릅니다.</div>
+    </div>
+    <p class="note" style="margin-top:10px">중앙제어 PC는 폐쇄망에 있어 클라우드가 직접 접속할 수 없으므로, 같은 망의 게이트웨이가 클라우드로 아웃바운드 TLS만 엽니다. 데모에서는 이 연결 과정을 시뮬레이션하고 IT관 열모델 시뮬레이터가 중앙제어기 역할을 합니다.</p>
+  </section>
+
+  <!-- tiers -->
+  <section id="tiers">
+    <h2>1·2·3차 스케줄과 정합성 점검</h2>
+    <p class="sub">계획은 세 번 만들고, 매번 새로 들어온 데이터와 계획이 아직 맞는지 점검합니다. 맞지 않으면 조정안을 만들고, 운전 모드에 따라 바로 적용하거나 승인을 기다립니다.</p>
+    <div class="tiers">
+      <div class="tier"><h3>1차 · 월간 기본 계획</h3>
+        <dl><dt>데이터</dt><dd>시간표, 학사일정·공휴일, 실측·예보·평년 기후, 설비, 요금, 정책</dd>
+            <dt>점검</dt><dd>시간표 반영, 공휴일, 정원 대비 인원, 실외기 동시 기동, 정책 온도, 예보 기반 예열, CO₂ 환기 계획, 월 예상 요금</dd>
+            <dt>조정안</dt><dd>없음 (기본 계획)</dd></dl></div>
+      <div class="tier t2"><h3>2차 · 주간 조정</h3>
+        <dl><dt>데이터</dt><dd>행사·예약, 주간 예보, 최근 7일 의견, 재실 밀도, CO₂</dd>
+            <dt>점검</dt><dd>행사 반영, 예보와 지난주 비교, 의견 패턴, 재실 추세, CO₂ 환기, 일사·방향, 잔열·잔냉</dd>
+            <dt>조정안</dt><dd>의견이 반복된(3건 이상) 강의실 설정온도, 환기 단계</dd></dl></div>
+      <div class="tier t3"><h3>3차 · 일일 검증</h3>
+        <dl><dt>데이터</dt><dd>초단기실황, 실내 온도 센서, CO₂ 센서, 재실 밀도, 오늘 일정, 어제·오늘 의견</dd>
+            <dt>점검</dt><dd>날씨 급변(편차가 기준 이상이면 실황으로 다시 계획), 예열, 일정 정합, 실내 센서, CO₂, 재실 감지, 잔열, 일사, 쾌적 의견</dd>
+            <dt>조정안</dt><dd>오늘 의견이 들어온 강의실 설정온도, 강 단계 환기</dd></dl></div>
+    </div>
+    <div class="tablebox" style="margin-top:16px">
+      <table>
+        <thead><tr><th style="width:70px">#</th><th style="width:220px">과제 아이디어</th><th>ThermoPlan 구현</th></tr></thead>
+        <tbody>
+          <tr><td>11</td><td>기상 예보 기반 예냉·예열</td><td>열모델과 예보로 강의실마다 켜는 시각을 계산합니다(최적 기동). 1·2·3차 점검에 횟수·선행 시간·내일 예보를 표시합니다.</td></tr>
+          <tr><td>12</td><td>일사량·방향 기반 제어</td><td>강의실 방향(가정값, 운영 규칙에서 변경)과 시간별 일사로 오후 일사 부하(kW)를 계산해 2·3차 점검에 반영합니다.</td></tr>
+          <tr><td>13</td><td>CO₂ 기반 환기 계획</td><td>예상 인원과 환기 단계로 CO₂를 1분 간격으로 계산하고, 기준(1,000ppm)을 넘는 수업은 강 단계, 인원이 적은 수업은 약 단계 조정안을 만듭니다.</td></tr>
+          <tr><td>14</td><td>잔열·잔냉 활용</td><td>종료 전에 꺼도 쾌적 범위에 남는 수업만 일찍 끄는 관성 정지입니다. 2·3차 점검에 횟수를 표시합니다.</td></tr>
+          <tr><td>15</td><td>날씨 급변 대응</td><td>3차 점검에서 계획 예보와 실황의 편차가 기준(기본 2℃) 이상이면 실황으로 다시 계획해 예열 변화를 보여 줍니다. 매시 갱신 때 바뀐 날짜만 재계산합니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- agents -->
+  <section id="agents">
+    <h2>쾌적 의견과 두 에이전트</h2>
+    <p class="sub">전기요금을 줄이면 누군가는 춥고, 쾌적을 높이면 요금이 오릅니다. 재실자 의견을 모아 조정안을 만들고, 비용 쪽과 쾌적 쪽 두 에이전트가 같은 자료와 시뮬레이터 결과로 강의실별 설정온도를 주고받습니다.</p>
+    <div class="agents">
+      <div class="agent shark">
+        <div class="who"><svg width="56" height="56" viewBox="0 0 100 100" role="img" aria-label="관리자 에이전트 북항이"><circle cx="50" cy="50" r="49" fill="#15304f"/><path d="M70 70 L86 60 L81.5 73 L88 84 L70 79 Z" fill="#3d6fb6"/><path d="M44 22 L55 5.5 C59 12 61 17 61 23 Z" fill="#3d6fb6"/><path d="M25 60 C25 34 37 20 51 20 C67 20 77 35 77 58 C77 76 66 87 51 87 C36 87 25 76 25 60 Z" fill="#3d6fb6"/><path d="M34 63 C34 53 42 48.5 51 48.5 C60 48.5 68 53 68 63 C68 75 60 82.5 51 82.5 C42 82.5 34 75 34 63 Z" fill="#d7e6f7"/><path d="M29.5 43 q2.5 3 0 6 M32.5 41.5 q2.5 3 0 6" fill="none" stroke="#2a5591" stroke-width="1.6" stroke-linecap="round"/><circle cx="42.5" cy="37" r="6" fill="#fff"/><circle cx="60" cy="37" r="6" fill="#fff"/><circle cx="43.4" cy="38" r="3.1" fill="#15304f"/><circle cx="60.9" cy="38" r="3.1" fill="#15304f"/><circle cx="44.4" cy="36.8" r="1" fill="#fff"/><circle cx="61.9" cy="36.8" r="1" fill="#fff"/><circle cx="35.5" cy="48" r="3.2" fill="#f4a3a3" opacity="0.65"/><circle cx="67" cy="48" r="3.2" fill="#f4a3a3" opacity="0.65"/><path d="M39 51.5 Q51 64 63.5 51.5 Q51 56.5 39 51.5 Z" fill="#15304f"/><path d="M43 53.3 L45 56.4 L47 54.2 Z M49.3 54.6 L51.3 57.8 L53.3 54.6 Z M55.6 54.2 L57.6 56.4 L59.6 53.3 Z" fill="#fff"/><path d="M27 64 Q16 66 18 75 Q24 73 30.5 70 Z" fill="#3d6fb6"/><path d="M75 63 Q84 62 86 69 Q80 70 74.5 70 Z" fill="#3d6fb6"/><g transform="rotate(-38 83 62)"><rect x="80.8" y="56" width="4.4" height="15" rx="2" fill="#f2b84b"/><path d="M78 52.5 a5 5 0 1 0 10 0 l-2.4 0 l0 3 l-5.2 0 l0 -3 Z" fill="#f2b84b"/></g></svg><div><b>북항이</b><div class="note">관리자 에이전트 · 비용</div></div></div>
+        <ul class="clean"><li>전기요금·피크·정부 냉난방 지침이 근거입니다.</li><li>의견이 없는 강의실은 0.5℃씩 아끼는 안을 냅니다.</li><li>시뮬레이터가 보여 준 쾌적 악화는 인정하고 양보합니다.</li></ul>
+      </div>
+      <div class="loop">
+        <h3>제안–검증 루프 (LLM-Modulo)</h3>
+        <ol>
+          <li>자료 묶음: 정책 범위, 요금, 예보, 강의실별 설정온도 후보마다 시뮬레이터로 계산한 전력·PMV, 최근 의견, 예상 인원·CO₂</li>
+          <li>북항이 제안 → <b>시뮬레이터 검증</b> → 사용자 에이전트 반박 → 검증, 2라운드</li>
+          <li>각 발언은 JSON 구조화 출력: 입장, 메시지, 확인한 근거(어떤 자료에서 무엇을 확인했는지), 강의실별 제안</li>
+          <li><b>결정적 판정</b>: 합의하면 그 안, 아니면 강의실마다 전기요금 + 쾌적 벌점이 가장 작은 설정온도. 비교를 위해 정책 범위 전체의 최적안도 함께 계산</li>
+          <li>같은 설정온도로 바뀌는 강의실끼리 묶어 조정안을 만듭니다</li>
+        </ol>
+        <p class="note" style="margin-top:8px">Bedrock Claude Haiku 5.5로 4턴에 약 21~30초가 걸리고, 실패하면 같은 절차를 규칙 기반 에이전트로 이어 갑니다.</p>
+      </div>
+      <div class="agent occ">
+        <div class="who"><svg width="56" height="56" viewBox="0 0 100 100" role="img" aria-label="사용자 에이전트"><circle cx="50" cy="50" r="49" fill="#231f1c"/><g transform="translate(50 51) scale(0.92) translate(-50 -50)"><circle cx="16.5" cy="62" r="8.5" fill="#e8894f"/><circle cx="84" cy="62" r="8.5" fill="#e8894f"/><path d="M19.5 88 V28 C19.5 14 28.5 4.5 42 4.5 H60 C73.5 4.5 82.5 14 82.5 28 V88 H60.5 V81 C60.5 78.8 59.2 77.6 57 77.6 H44.5 C42.3 77.6 41 78.8 41 81 V88 Z" fill="#e8894f"/><circle cx="35" cy="23" r="9.6" fill="#fff" stroke="#231f1c" stroke-width="2"/><circle cx="63.5" cy="23" r="9.6" fill="#fff" stroke="#231f1c" stroke-width="2"/><ellipse cx="35" cy="19.2" rx="4.4" ry="5.1" fill="#231f1c"/><ellipse cx="63.5" cy="19.2" rx="4.4" ry="5.1" fill="#231f1c"/><path d="M25 45.5 Q47.5 66 72 45" fill="none" stroke="#231f1c" stroke-width="3.6" stroke-linecap="round"/></g></svg><div><b>사용자 에이전트</b><div class="note">건물 이용자 · 쾌적</div></div></div>
+        <ul class="clean"><li>재실자 의견 집계·체감 쾌적(PMV)·CO₂가 근거입니다.</li><li>의견이 반복된 강의실은 0.5~1℃ 조정을 요구합니다.</li><li>PMV 하락이 0.1 이내면 절감에 양보합니다.</li></ul>
+      </div>
+    </div>
+    <div class="modes">
+      <div class="mode"><h3><span class="tag ok">자동 운전</span> AI가 조정안을 바로 적용</h3><p class="note">현장 게이트웨이를 거쳐 실내기 설정온도·환기 단계 쓰기 명령을 보내고 모두 기록합니다. 다만 의견 3건 미만으로 만든 조정이나 한 번에 0.5℃를 넘는 변경은 자동 운전에서도 담당자 승인을 기다립니다.</p></div>
+      <div class="mode"><h3><span class="tag">추천 모드</span> 담당자가 승인한 것만 적용</h3><p class="note">조정안과 예상 효과(전력·요금·체감)를 보여 주고, 상단 "승인 대기"나 AI 스케줄링 화면에서 승인·거절합니다. 처음 도입할 때 권합니다.</p></div>
+    </div>
+    <p class="note" style="margin-top:10px">재실자는 강의실 QR(<code>/feedback?room=306</code>)로 7점 척도(춥다~덥다)와 "답답해요" 같은 태그를 남기고, 관리자는 전화·메일로 받은 불편을 같은 형식으로 입력합니다. "답답해요"는 온도가 아니라 환기 근거로 씁니다. 같은 사람·같은 강의실은 30분에 한 번만 받습니다.</p>
+  </section>
+
+  <!-- screens -->
+  <section id="screens">
+    <h2>화면 구성</h2>
+    <p class="sub">사이드바에는 메뉴 두 개만 두고, 나머지 화면은 각 메뉴의 탭으로 넣었습니다. 시뮬레이션 랩과 재실자 의견 페이지는 별도 페이지입니다.</p>
+    <div class="screens">
+      <div class="side">
+        <div class="item on">▦ 운전 현황</div>
+        <div class="item">▤ 스케줄 타임라인</div>
+        <p class="note" style="margin-top:12px">상단: 자동/추천 전환, 승인 대기, 시스템 상태, 기준 시각·외기, AI 코파일럿</p>
+      </div>
+      <div class="panel"><h3>운전 현황</h3>
+        <div class="tabs"><span>현황</span><span>절감 효과</span><span class="new">쾌적 의견</span><span>운영 규칙</span></div>
+        <ul class="clean"><li>층별 등각 평면도: 강의실마다 온도·운전 상태, 누르면 강의실 화면(예상 재실 인원, 목표 온도, 실내온도와 전력)</li><li>절감 효과: 4개 운전 방식 비교, 절감 요인 분해</li><li>쾌적 의견: 강의실별 체감, 강의실 × 시간대 의견, QR 링크</li><li>운영 규칙: 정책 온도 범위·쾌적 가중치·강의실 방향, 건물 연결 정보, 제어 명령 기록</li></ul></div>
+      <div class="panel"><h3>스케줄 타임라인</h3>
+        <div class="tabs"><span>타임라인</span><span class="new">AI 스케줄링</span><span>정합성 검증</span><span>일정·데이터</span></div>
+        <ul class="clean"><li>타임라인: 강의실 × 시간 간트(수업·가동·예열·관성 정지)</li><li>AI 스케줄링: 1·2·3차 계획, 데이터 출처, 정합성 점검, 조정안 승인, 에이전트 협의</li><li>정합성 검증: 계획대로 켜고 껐는지 매일 확인</li><li>일정·데이터: 자연어·공지 이미지로 일정 등록, 시간표 가져오기</li></ul></div>
+    </div>
+    <div class="grid g3" style="margin-top:16px">
+      <div class="panel"><h3>시뮬레이션 랩 <code>/lab</code></h3><p class="note">에이전트가 정한 설정온도로 하루 운전을 다시 시뮬레이션해서 현재 운영·규칙·AI 단독·실측 전력량과 비교합니다. 실측 CSV를 올리면 ASHRAE Guideline 14 보정 오차(NMBE, CV(RMSE))를 계산합니다. 격리 실행이라 운영에 영향이 없습니다.</p></div>
+      <div class="panel"><h3>재실자 의견 <code>/feedback</code></h3><p class="note">모바일 화면, 로그인 없음. 의견을 남기면 지금 강의실 상태와 온도 정책, 다음에 무엇이 반영되는지를 바로 보여 줍니다.</p></div>
+      <div class="panel"><h3>건물 설정 <code>/setup</code></h3><p class="note">새 계정의 6단계 온보딩입니다. 입력은 새로 고쳐도 남고, 데모 계정은 운영 규칙 화면에서 "온보딩 다시 보기"로 다시 열 수 있습니다.</p></div>
+    </div>
+  </section>
+
+  <!-- architecture -->
+  <section id="arch-section">
+    <h2>아키텍처</h2>
+    <p class="sub">CloudFront 주소 하나로 웹과 API를 내보내고, API는 Lambda 하나에서 돕니다. 오래 걸리는 AI 작업은 Lambda가 자기 자신을 비동기로 호출해서 처리하고, 매시 20분 스케줄러가 날씨 갱신과 재검증을 돌립니다. 모든 리소스는 CloudFormation 스택 하나로 관리합니다.</p>
+    <div class="arch" id="arch">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="100%" role="img" aria-label="ThermoPlan v5 아키텍처">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4a5668"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2f6fde"/>
+    </marker>
+    <style>
+      #arch text { font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; fill: #142033; }
+      #arch .zt { font-size: 15px; font-weight: 700; fill: #4a5668; letter-spacing: -0.01em; }
+      #arch .t { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+      #arch .tl { font-size: 17px; font-weight: 700; letter-spacing: -0.015em; }
+      #arch .d { font-size: 12.5px; fill: #4a5668; }
+      #arch .m { font-size: 13.5px; font-weight: 700; }
+      #arch .l { font-size: 12px; fill: #4a5668; font-weight: 600; }
+      #arch .lb { font-size: 12px; fill: #2f6fde; font-weight: 700; }
+      #arch .card { fill: #ffffff; stroke: #e5e9f0; stroke-width: 1.2; }
+      #arch .ln { fill: none; stroke: #4a5668; stroke-width: 1.6; }
+      #arch .lnB { fill: none; stroke: #2f6fde; stroke-width: 1.8; }
+      #arch .dot { fill: none; stroke: #8a94a3; stroke-width: 1.4; stroke-dasharray: 4 4; }
+    
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+  <text x="20" y="34" style="font-size:22px;font-weight:800;letter-spacing:-0.02em">ThermoPlan 아키텍처 (v5)</text>
+  <text x="20" y="58" class="d" style="font-size:13.5px">서버 없이 관리형 서비스로 운영합니다. 수치는 결정적 엔진(열모델 시뮬레이터)이 내고, 생성형 AI는 해석·협의·설명을 맡습니다.</text>
+
+  <!-- ===================== zone: users ===================== -->
+  <rect x="20" y="76" width="222" height="420" rx="18" fill="#f7f9fc" stroke="#e5e9f0"/>
+  <text x="36" y="104" class="zt">사용자</text>
+  <rect x="36" y="120" width="190" height="150" rx="12" class="card"/>
+  <rect x="52" y="138" width="34" height="24" rx="4" fill="none" stroke="#2f6fde" stroke-width="2"/>
+  <path d="M62 168 h14" stroke="#2f6fde" stroke-width="2"/>
+  <text x="96" y="156" class="t">시설 담당자</text>
+  <text x="52" y="194" class="d">운영 화면 · 건물 설정</text>
+  <text x="52" y="214" class="d">시뮬레이션 랩(/lab)</text>
+  <text x="52" y="234" class="d">로그인(목업) 후 사용</text>
+  <text x="52" y="254" class="d">PC · 발표용 프로젝터</text>
+
+  <rect x="36" y="292" width="190" height="186" rx="12" class="card"/>
+  <rect x="54" y="308" width="20" height="34" rx="4" fill="none" stroke="#e8894f" stroke-width="2"/>
+  <circle cx="64" cy="336" r="1.8" fill="#e8894f"/>
+  <text x="96" y="330" class="t">건물 이용자</text>
+  <text x="52" y="366" class="d">강의실 QR → /feedback</text>
+  <text x="52" y="386" class="d">"춥다·덥다·답답해요"</text>
+  <text x="52" y="406" class="d">로그인 없음</text>
+  <text x="52" y="426" class="d">같은 강의실 30분에 1회</text>
+  <text x="52" y="456" class="l">모바일 브라우저</text>
+
+  <!-- ===================== zone: AWS ===================== -->
+  <rect x="268" y="76" width="934" height="806" rx="20" fill="#f5f8fd" stroke="#cfdcf3"/>
+  <text x="290" y="104" class="zt">AWS 클라우드 · ap-northeast-2 · CloudFormation 스택 하나</text>
+
+  <!-- CloudFront -->
+  <rect x="290" y="120" width="204" height="122" rx="12" class="card"/>
+  <text x="306" y="146" class="t">Amazon CloudFront</text>
+  <text x="306" y="172" class="d">HTTPS 주소 하나</text>
+  <text x="306" y="192" class="d">/* → 웹, /api/* → API</text>
+  <text x="306" y="212" class="d">API에는 비밀 헤더를 붙임</text>
+  <text x="306" y="230" class="l">SPA 경로는 index.html</text>
+
+  <!-- S3 web -->
+  <rect x="290" y="288" width="204" height="110" rx="12" class="card"/>
+  <text x="306" y="314" class="t">Amazon S3 (웹)</text>
+  <text x="306" y="340" class="d">React 정적 파일</text>
+  <text x="306" y="360" class="d">overview.html</text>
+  <text x="306" y="380" class="d">OAC로만 읽기</text>
+
+  <!-- Bedrock -->
+  <rect x="290" y="436" width="204" height="210" rx="12" fill="#f6f5fe" stroke="#d9d3f7" stroke-width="1.2"/>
+  <text x="306" y="462" class="t">Amazon Bedrock</text>
+  <text x="306" y="490" class="m" style="fill:#4a3aa7">Claude Sonnet 5.5</text>
+  <text x="306" y="510" class="d">시간표 이미지·PDF 추출</text>
+  <text x="306" y="528" class="d">운영 코파일럿(도구 호출)</text>
+  <text x="306" y="558" class="m" style="fill:#4a3aa7">Claude Haiku 5.5</text>
+  <text x="306" y="578" class="d">자연어 일정 · 공지 이미지</text>
+  <text x="306" y="596" class="d">건물 설명 해석</text>
+  <text x="306" y="614" class="d">두 에이전트 협의(4턴)</text>
+  <text x="306" y="634" class="l">JSON 스키마 구조화 출력</text>
+
+  <!-- EventBridge -->
+  <rect x="290" y="676" width="204" height="190" rx="12" class="card"/>
+  <text x="306" y="702" class="t">EventBridge Scheduler</text>
+  <text x="306" y="728" class="d">매시 20분 → Lambda</text>
+  <text x="306" y="750" class="d">① 날씨 갱신·예보 저장</text>
+  <text x="306" y="770" class="d">② 바뀐 날짜만 재계산</text>
+  <text x="306" y="790" class="d">③ 3차(오늘)·2차(이번 주)</text>
+  <text x="322" y="808" class="d">재검증</text>
+  <text x="306" y="840" class="l">자동 운전이면 조정안 적용</text>
+
+  <!-- Lambda -->
+  <rect x="530" y="120" width="650" height="420" rx="14" fill="#ffffff" stroke="#2f6fde" stroke-width="1.8"/>
+  <text x="550" y="150" class="tl">AWS Lambda · Function URL</text>
+  <text x="550" y="172" class="d">FastAPI + Mangum · Python 3.13 arm64 · 비밀 헤더가 없으면 거절</text>
+
+  <g>
+    <rect x="550" y="190" width="300" height="96" rx="10" fill="#f3fbf7" stroke="#cbead9"/>
+    <rect x="550" y="190" width="5" height="96" rx="2" fill="#14a673"/>
+    <text x="568" y="216" class="m">hvac/ 결정적 엔진</text>
+    <text x="568" y="240" class="d">2R2C 열모델 · VRF 부분부하 · PMV</text>
+    <text x="568" y="260" class="d">4개 운전 전략 · 1분 간격 시뮬레이션</text>
+    <text x="568" y="278" class="l">모든 kWh·요금·쾌적 수치의 출처</text>
+  </g>
+  <g>
+    <rect x="862" y="190" width="300" height="96" rx="10" fill="#f2f7fe" stroke="#cfe0f8"/>
+    <rect x="862" y="190" width="5" height="96" rx="2" fill="#2a78d6"/>
+    <text x="880" y="216" class="m">planning · 1·2·3차 스케줄</text>
+    <text x="880" y="240" class="d">월간 계획 → 주간 조정 → 일일 검증</text>
+    <text x="880" y="260" class="d">정합성 점검 · 조정안 · 운전 모드</text>
+    <text x="880" y="278" class="l">쾌적 의견 · CO₂·일사 계산</text>
+  </g>
+  <g>
+    <rect x="550" y="300" width="300" height="96" rx="10" fill="#f6f5fe" stroke="#ddd7f8"/>
+    <rect x="550" y="300" width="5" height="96" rx="2" fill="#6250d6"/>
+    <text x="568" y="326" class="m">agents · 두 에이전트 협의</text>
+    <text x="568" y="350" class="d">북항이(비용) ⇄ 사용자 에이전트(쾌적)</text>
+    <text x="568" y="370" class="d">제안마다 시뮬레이터 검증</text>
+    <text x="568" y="388" class="l">결정적 판정 · 규칙 기반 대체</text>
+  </g>
+  <g>
+    <rect x="862" y="300" width="300" height="96" rx="10" fill="#f2f6fd" stroke="#d4e1f7"/>
+    <rect x="862" y="300" width="5" height="96" rx="2" fill="#2f6fde"/>
+    <text x="880" y="326" class="m">onboarding · 건물 설정</text>
+    <text x="880" y="350" class="d">건물 설명 해석 · 게이트웨이 연결</text>
+    <text x="880" y="370" class="d">데이터 수집 · 부족한 정보 질문</text>
+    <text x="880" y="388" class="l">답은 정책·운영 규칙에 바로 반영</text>
+  </g>
+  <g>
+    <rect x="550" y="410" width="300" height="110" rx="10" fill="#fbfaff" stroke="#e5e1fb"/>
+    <rect x="550" y="410" width="5" height="110" rx="2" fill="#6250d6"/>
+    <text x="568" y="436" class="m">lab · 시뮬레이션 랩</text>
+    <text x="568" y="460" class="d">에이전트 운전을 날마다 재시뮬레이션</text>
+    <text x="568" y="480" class="d">현재 운영·규칙·AI와 비교 (격리 실행)</text>
+    <text x="568" y="500" class="d">실측 CSV → NMBE·CV(RMSE)</text>
+  </g>
+  <g>
+    <rect x="862" y="410" width="300" height="110" rx="10" fill="#f7f8fa" stroke="#e5e9f0"/>
+    <rect x="862" y="410" width="5" height="110" rx="2" fill="#565a60"/>
+    <text x="880" y="436" class="m">jobs · 비동기 작업</text>
+    <text x="880" y="460" class="d">협의 · 랩 · 시간표 이미지 추출</text>
+    <text x="880" y="480" class="d">Lambda가 자기 자신을 비동기 호출</text>
+    <text x="880" y="500" class="d">작업 상태는 DynamoDB, 화면은 폴링</text>
+  </g>
+
+  <!-- self-invoke loop -->
+  <path d="M1112 120 C1112 84 1168 84 1168 116" class="lnB" marker-end="url(#arrB)"/>
+  <text x="1018" y="96" class="lb">비동기 자기 호출</text>
+
+  <!-- DynamoDB / S3 data -->
+  <rect x="530" y="584" width="316" height="124" rx="12" class="card"/>
+  <text x="546" y="610" class="t">Amazon DynamoDB</text>
+  <text x="546" y="636" class="d">강의 · 이벤트 · 운영 규칙 · 정책</text>
+  <text x="546" y="656" class="d">조정안 · 쾌적 의견 · 제어 명령</text>
+  <text x="546" y="676" class="d">작업 상태 · 변경 기록 · 운전 모드</text>
+  <text x="546" y="696" class="l">사용자·외부 입력</text>
+
+  <rect x="864" y="584" width="316" height="124" rx="12" class="card"/>
+  <text x="880" y="610" class="t">Amazon S3 (데이터)</text>
+  <text x="880" y="636" class="d">날짜별 계산 결과(입력 지문으로 캐시)</text>
+  <text x="880" y="656" class="d">날씨 캐시 · 예보 스냅숏</text>
+  <text x="880" y="676" class="d">협의 기록 · 랩 결과 · 실측 CSV</text>
+  <text x="880" y="696" class="l">계산 결과·큰 데이터</text>
+
+  <!-- SSM / IAM -->
+  <rect x="530" y="742" width="316" height="124" rx="12" class="card"/>
+  <text x="546" y="768" class="t">SSM Parameter Store</text>
+  <text x="546" y="794" class="d">기상청 인증키 (SecureString)</text>
+  <text x="546" y="814" class="d">운영자 키 (데모 초기화)</text>
+  <text x="546" y="834" class="d">CloudFront 비밀 헤더 값</text>
+  <text x="546" y="856" class="l">Lambda가 시작할 때 읽음</text>
+
+  <rect x="864" y="742" width="316" height="124" rx="12" class="card"/>
+  <text x="880" y="768" class="t">IAM 실행 역할 2개</text>
+  <text x="880" y="794" class="d">API: 이 프로젝트의 테이블·버킷·</text>
+  <text x="880" y="814" class="d">파라미터와 Bedrock 호출만 허용</text>
+  <text x="880" y="834" class="d">스케줄러: Lambda 호출만 허용</text>
+
+  <!-- ===================== zone: external data ===================== -->
+  <rect x="1240" y="76" width="340" height="250" rx="18" fill="#f7f9fc" stroke="#e5e9f0"/>
+  <text x="1256" y="104" class="zt">외부 데이터</text>
+  <rect x="1256" y="118" width="308" height="88" rx="12" class="card"/>
+  <text x="1272" y="144" class="t">기상청 API (공공데이터포털)</text>
+  <text x="1272" y="168" class="d">단기예보 · 초단기실황</text>
+  <text x="1272" y="188" class="d">예보는 하루 전 스냅숏으로 저장</text>
+  <rect x="1256" y="220" width="308" height="88" rx="12" class="card"/>
+  <text x="1272" y="246" class="t">Open-Meteo</text>
+  <text x="1272" y="270" class="d">시간별 실측 · 전날 예보 · 평년 기후</text>
+  <text x="1272" y="290" class="d">기온 · 습도 · 일사</text>
+
+  <!-- ===================== zone: building site ===================== -->
+  <rect x="1240" y="352" width="340" height="530" rx="18" fill="#fbfbfa" stroke="#565a60" stroke-width="1.5" stroke-dasharray="7 6"/>
+  <text x="1256" y="380" class="zt">건물 현장 (폐쇄망)</text>
+  <text x="1256" y="400" class="l" style="fill:#8a5a00">데모에서는 열모델 시뮬레이터가 응답</text>
+
+  <rect x="1256" y="416" width="308" height="112" rx="12" class="card" style="stroke:#cfdcf3"/>
+  <text x="1272" y="442" class="t">현장 게이트웨이 (Docker)</text>
+  <text x="1272" y="466" class="d">클라우드로는 아웃바운드 TLS만</text>
+  <text x="1272" y="486" class="d">연결 코드로 짝짓기</text>
+  <text x="1272" y="506" class="d">포인트 탐색 · 강의실 자동 매핑</text>
+
+  <rect x="1256" y="574" width="308" height="112" rx="12" class="card"/>
+  <text x="1272" y="600" class="t">중앙제어 PC (시스템 에어컨)</text>
+  <text x="1272" y="624" class="d">BACnet/IP 47808 · Modbus TCP 502</text>
+  <text x="1272" y="644" class="d">제조사 API(HTTPS) · OPC UA 4840</text>
+  <text x="1272" y="664" class="d">현재: 22℃ 고정, 운전 시간 고정</text>
+
+  <rect x="1256" y="732" width="308" height="132" rx="12" class="card"/>
+  <text x="1272" y="758" class="t">설비와 센서</text>
+  <text x="1272" y="782" class="d">실내기 19대 · 실외기 3대</text>
+  <text x="1272" y="802" class="d">IT관 3·4층 강의실 10실</text>
+  <text x="1272" y="822" class="d">실내온도 · CO₂ · 재실(Wi-Fi)</text>
+  <text x="1272" y="846" class="l">CO₂·재실은 데모에서 시뮬레이션</text>
+
+  <!-- ===================== arrows ===================== -->
+  <!-- users -> CloudFront -->
+  <path d="M226 176 H288" class="ln" marker-end="url(#arr)"/>
+  <text x="236" y="168" class="l">HTTPS</text>
+  <path d="M226 384 H256 V214 H288" class="ln" marker-end="url(#arr)"/>
+  <!-- CloudFront -> S3 web -->
+  <path d="M392 242 V284" class="ln" marker-end="url(#arr)"/>
+  <text x="400" y="268" class="l">/* 정적 파일</text>
+  <!-- CloudFront -> Lambda -->
+  <path d="M494 160 H527" class="lnB" marker-end="url(#arrB)"/>
+  <text x="511" y="151" class="lb" text-anchor="middle">/api/*</text>
+  <!-- Lambda -> Bedrock -->
+  <path d="M530 474 H498" class="ln" marker-end="url(#arr)"/>
+  <!-- EventBridge -> Lambda -->
+  <path d="M494 770 H514 V514 H527" class="lnB" marker-end="url(#arrB)"/>
+  <!-- Lambda <-> DynamoDB / S3 data -->
+  <path d="M688 540 V580" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="696" y="565" class="l">읽기·쓰기</text>
+  <path d="M1022 540 V580" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="1030" y="565" class="l">읽기·쓰기</text>
+  <!-- Lambda -> weather -->
+  <path d="M1180 162 H1252" class="ln" marker-end="url(#arr)"/>
+  <text x="1186" y="152" class="l">날씨 수집</text>
+  <!-- gateway <-> Lambda -->
+  <path d="M1256 472 H1221 V300 H1184" class="lnB" marker-start="url(#arrB)" marker-end="url(#arrB)"/>
+  <text transform="translate(1236 388) rotate(-90)" class="lb" text-anchor="middle">상태 수집 · 제어 명령</text>
+  <!-- gateway <-> PC <-> equipment -->
+  <path d="M1410 530 V570" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="1419" y="555" class="l">포인트 읽기·쓰기</text>
+  <path d="M1410 688 V728" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="1419" y="713" class="l">설정온도·운전 명령 / 상태</text>
+</svg>
+
+      <div class="legend"><span><i></i>요청·데이터 흐름</span><span><i class="b"></i>API·작업·현장 연결</span><span><i class="dash"></i>건물 현장(데모에서는 시뮬레이터)</span></div>
+    </div>
+  </section>
+
+  <!-- AI -->
+  <section id="ai">
+    <h2>생성형 AI가 맡는 곳</h2>
+    <p class="sub">수치 제어는 결정적 엔진이 맡고, Claude(Amazon Bedrock)는 사람이 하던 해석·입력·협의·설명을 맡습니다. 모든 수치는 엔진이나 도구 결과에서만 인용합니다.</p>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:230px">기능</th><th style="width:190px">모델</th><th>하는 일</th><th style="width:300px">실패할 때</th></tr></thead>
+        <tbody>
+          <tr><td>시간표 이미지·PDF 추출</td><td>Claude Sonnet 5.5</td><td>시간표 사진을 표준 스키마(강의실·요일·시간·과목)로 추출합니다.</td><td>CSV·Excel·JSON을 직접 올립니다.</td></tr>
+          <tr><td>자연어 일정·공지 이미지</td><td>Claude Haiku 5.5</td><td>"다음 주 수요일 405호 18~21시 특강 70명", 휴강 공지 캡처 → 일정 초안과 겹침·정원 확인</td><td>같은 문장의 이전 결과를 쓰거나 양식에 직접 입력합니다.</td></tr>
+          <tr><td>운영 코파일럿</td><td>Claude Sonnet 5.5</td><td>학기 현황·일자 분석·규칙 시뮬레이션 도구를 호출해 근거 있는 답을 만들고, 검증한 규칙 변경만 제안합니다.</td><td>같은 질문의 이전 답을 보여 줍니다.</td></tr>
+          <tr><td>건물 설명 해석 (온보딩)</td><td>Claude Haiku 5.5</td><td>"부산대 IT관, 3·4층 강의실 10개…" → 건물 프로필</td><td>규칙으로 해석합니다.</td></tr>
+          <tr><td>두 에이전트 협의</td><td>Claude Haiku 5.5</td><td>북항이와 사용자 에이전트가 4턴 동안 설정온도를 주고받고, 확인한 근거를 남깁니다.</td><td>규칙 기반 에이전트로 이어 갑니다.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- results -->
+  <section id="results">
+    <h2>결과</h2>
+    <p class="sub">모든 수치는 IT관 열모델 시뮬레이션입니다(실측 계량값 없음). 요금은 한전 교육용(을) 고압A 선택I 시간대별 요금, 탄소는 0.4173 kgCO₂/kWh로 환산했습니다.</p>
+    <h3>학기 전체 (2026-09-01~12-18, 강의실 10실) <span class="tag sim">시뮬레이션</span></h3>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>운전 방식</th><th class="num">전력량</th><th class="num">전기요금</th><th class="num">쾌적 시간</th><th class="num">불쾌 지표(K·분)</th><th class="num">최대 피크</th></tr></thead>
+        <tbody>
+          <tr><td><span class="dot" style="background:#565a60"></span>고정 스케줄</td><td class="num">6,365 kWh</td><td class="num">749,938원</td><td class="num">99.88%</td><td class="num">391</td><td class="num">45.1 kW</td></tr>
+          <tr><td><span class="dot" style="background:#e09a00"></span>수동 운영</td><td class="num">3,626 kWh</td><td class="num">428,407원</td><td class="num">98.44%</td><td class="num">11,889</td><td class="num">28.4 kW</td></tr>
+          <tr><td><span class="dot" style="background:#2a78d6"></span>규칙 기반</td><td class="num">2,993 kWh</td><td class="num">346,868원</td><td class="num">98.51%</td><td class="num">3,775</td><td class="num">24.9 kW</td></tr>
+          <tr class="hl"><td><span class="dot" style="background:#14a673"></span><b>AI 예측 제어</b></td><td class="num"><b>2,864 kWh</b></td><td class="num"><b>326,416원</b></td><td class="num">99.94%</td><td class="num">32</td><td class="num">24.7 kW</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:8px">AI 예측 제어는 고정 스케줄 대비 55.0%, 수동 운영 대비 21.0%, 규칙 기반 대비 4.3% 적게 쓰고 CO₂를 1,461 kg 줄입니다. 같은 쾌적도로 맞추면 30분 전에 켜는 규칙 운전(3,254 kWh)보다 12.0% 적게 씁니다.</p>
+
+    <h3 style="margin-top:22px">에이전트 평가 (2026-11-02~11-20 수업일 15일) <span class="tag sim">시뮬레이션</span></h3>
+    <p class="note">여기서 "현재 운영"은 현장 인터뷰를 재현한 중앙 제어(08:30~22:30, 22℃ 고정)입니다. 위 표의 고정 스케줄(20℃)과 다릅니다.</p>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>운전 방식</th><th class="num">전력량</th><th class="num">현재 운영 대비</th><th class="num">PMV ±0.5 안</th><th class="num">평균 PMV</th><th class="num">의견 강의실 PMV</th></tr></thead>
+        <tbody>
+          <tr><td><span class="dot" style="background:#565a60"></span>현재 운영 (22℃ 고정)</td><td class="num">1,618.7 kWh</td><td class="num">기준</td><td class="num">60.0%</td><td class="num">−0.39</td><td class="num">−0.45</td></tr>
+          <tr><td><span class="dot" style="background:#2a78d6"></span>시간표 연동 규칙</td><td class="num">370.8 kWh</td><td class="num">−77.1%</td><td class="num">34.8%</td><td class="num">−0.71</td><td class="num">−0.81</td></tr>
+          <tr><td><span class="dot" style="background:#14a673"></span>AI 예측 제어</td><td class="num">324.6 kWh</td><td class="num">−79.9%</td><td class="num">32.4%</td><td class="num">−0.74</td><td class="num">−0.83</td></tr>
+          <tr class="hl"><td><span class="dot" style="background:#6250d6"></span><b>AI + 에이전트 협의</b></td><td class="num"><b>332.1 kWh</b></td><td class="num"><b>−79.5%</b></td><td class="num">32.4%</td><td class="num">−0.73</td><td class="num">−0.79</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="panel"><div class="label">절감의 대가</div><p style="margin-top:6px">전력은 79.5% 줄지만 PMV ±0.5 안 비율도 60.0%에서 32.4%로 낮아집니다. 절감의 대부분은 빈 강의실 정지에서 옵니다.</p></div>
+      <div class="panel"><div class="label">판정 최적안과의 차이</div><p style="margin-top:6px">협의는 현재 계획과 정책 범위 전체 최적안 사이 차이의 <b>18%</b>만 줄입니다. "더 나은 답을 찾는 장치"가 아니라 "근거를 남기며 한 단계씩 조정하는 장치"입니다.</p></div>
+      <div class="panel"><div class="label">LLM 수치 근거</div><p style="margin-top:6px">메시지·근거의 수치 <b>96.2~97.0%</b>가 자료 값을 그대로 인용했습니다. 같은 검사를 가짜 수치는 32.2~35.7%만 통과합니다.</p></div>
+      <div class="panel"><div class="label">반복 일관성</div><p style="margin-top:6px">같은 날을 3번 반복하면 강의실의 <b>60.0~66.7%</b>가 같은 결론이고, 차이는 최대 1.0℃입니다. LLM과 규칙 기반 에이전트의 결과 품질은 거의 같습니다.</p></div>
+    </div>
+    <p class="note" style="margin-top:10px">쾌적 가중치를 올려도 평균 PMV는 −0.65에서 멈춥니다(난방 상한 22℃). 열모델에서 체감은 설정온도보다 예열·운전 시간에 더 좌우되므로, 다음 단계는 에이전트가 예열 시작 시각도 고르게 하는 것입니다. 자세한 내용: <code>docs/evaluation_agents.md</code>, <code>docs/research/literature_v5_agents.md</code></p>
+
+    <h3 style="margin-top:22px">가정과 한계</h3>
+    <ul class="clean">
+      <li>실제 설비 제어와 계량값이 없습니다. 운전·전력·쾌적은 강의실별 2R2C 열모델 + VRF 곡선 시뮬레이션이고, 실측을 받으면 랩에서 Guideline 14(시간 NMBE ±10%, CV(RMSE) 30%)로 먼저 보정합니다.</li>
+      <li>CO₂ 센서·재실 밀도(Wi-Fi)는 시뮬레이션이고, 중앙제어기 연결은 게이트웨이 핸드셰이크를 시뮬레이션합니다. 데모 건물의 지난 의견도 시뮬레이션 PMV로 만든 값이며 화면에 표시합니다.</li>
+      <li>시간표에 없는 값(수강 인원, 면적, 설비 용량, 강의실 방향)은 가정값이며 화면에 "가정값"으로 표시합니다.</li>
+      <li>로그인·회원가입은 목업이고, 백엔드는 건물 하나(IT관)만 계산합니다. 새 계정의 온보딩도 같은 시뮬레이터에 연결됩니다.</li>
+    </ul>
+  </section>
+
+  <!-- access -->
+  <section id="access">
+    <h2>접속 방법</h2>
+    <div class="access">
+      <div class="panel"><h3>운영 화면</h3><p><a href="https://d32ggz3cj7s7bx.cloudfront.net/login">d32ggz3cj7s7bx.cloudfront.net/login</a></p><p class="note">아이디 <b>부산대학교</b>, 비밀번호 <b>부산대학교</b>. 랜딩의 "부산대 IT관 데모 보기"를 누르면 미리 채워집니다.</p></div>
+      <div class="panel"><h3>시뮬레이션 랩</h3><p><a href="https://d32ggz3cj7s7bx.cloudfront.net/lab">d32ggz3cj7s7bx.cloudfront.net/lab</a></p><p class="note">로그인 없이 열립니다. 기간과 에이전트(규칙 기반 / LLM)를 고르고 실행합니다.</p></div>
+      <div class="panel"><h3>재실자 QR 의견</h3><p><a href="https://d32ggz3cj7s7bx.cloudfront.net/feedback?room=306">d32ggz3cj7s7bx.cloudfront.net/feedback?room=306</a></p><p class="note">휴대폰으로 열어 의견을 남기면, 다음 3차 검증에 바로 반영됩니다.</p></div>
+    </div>
+  </section>
+
+  <footer>ThermoPlan · 2026 AWS x PNU AI 해커톤 과제 3 · 2026-11-20 기준 v5 · 설계 docs/design_v5.md · API docs/api_v5.md</footer>
+</main>
+</body>
+</html>
