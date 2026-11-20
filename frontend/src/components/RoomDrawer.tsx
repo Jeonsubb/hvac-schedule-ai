@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Download, Fan, Users } from 'lucide-react'
-import type { Day, Meta, StrategyKey } from '../lib/types'
-import { CHART, STRATEGY, STRATEGY_KEYS, statusInfo, decisionLabel } from '../lib/constants'
+import type { Day, Meta, RoomDay } from '../lib/types'
+import { CHART, STRATEGY, statusInfo, decisionLabel } from '../lib/constants'
 import { cx, fmtDateK, fmtDuration, fmtKwh, fmtMin, hm } from '../lib/format'
 import { MODE, type Mode, type RoomState } from '../lib/thermal'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from './EChart'
@@ -12,13 +12,24 @@ import { ModeIcon } from './BuildingView'
 /** The room's state at the minute the overview shows, with its outdoor unit (opened from the building view). */
 export type RoomNow = RoomState & { minute: number; label: string; odu?: { id: string; on: boolean; power_w: number; mode: Mode } }
 
+/** The room chart compares exactly two ways of running: today's operation (the fixed schedule) and AI. */
+const PAIR = [
+  { key: 'fixed', name: '현재 운영' },
+  { key: 'ai', name: 'AI' },
+] as const
+
+function comfortPct(rd: RoomDay | undefined): number | null {
+  const occ = (rd?.sessions ?? []).reduce((a, s) => a + s.minutes, 0)
+  if (!occ) return null
+  return ((rd?.sessions ?? []).reduce((a, s) => a + s.in_band_minutes, 0) / occ) * 100
+}
+
 export default function RoomDrawer({
   open,
   onClose,
   day,
   meta,
   room,
-  initial = ['ai', 'rule'],
   now,
 }: {
   open: boolean
@@ -26,14 +37,10 @@ export default function RoomDrawer({
   day: Day | undefined
   meta: Meta
   room: string | null
-  initial?: StrategyKey[]
   now?: RoomNow
 }) {
-  const [sel, setSel] = useState<StrategyKey[]>(initial)
   const [showOdu, setShowOdu] = useState(false)
   const rm = room ? meta.rooms[room] : undefined
-
-  const toggle = (k: StrategyKey) => setSel((s) => (s.includes(k) ? (s.length > 1 ? s.filter((x) => x !== k) : s) : [...s, k]))
 
   const option = useMemo<EChartsOption | null>(() => {
     if (!day || !room) return null
@@ -42,24 +49,51 @@ export default function RoomDrawer({
     const lo = meta.settings.comfort_low
     const hi = meta.settings.comfort_high
     const sessions = day.sessions.filter((s) => s.room === room)
-    const keys = STRATEGY_KEYS.filter((k) => sel.includes(k) && day.strategies[k]?.rooms[room])
-    const taSeries = keys.map((k) => ({
-      name: `${STRATEGY[k].short} 실내`,
+    const pair = PAIR.filter((x) => day.strategies[x.key]?.rooms[room])
+    // power on top: it carries the comparison; the temperature pane below shows comfort held
+    const pSeries = pair.map((x) => ({
+      name: `${x.name} 전력`,
       type: 'line' as const,
       xAxisIndex: 0,
       yAxisIndex: 0,
+      step: 'middle' as const,
       showSymbol: false,
-      lineStyle: { width: 2, color: STRATEGY[k].color },
-      itemStyle: { color: STRATEGY[k].color },
-      data: day.strategies[k]!.rooms[room].ta.map((v, i) => [i * 5 + 2.5, v]).filter((p) => p[0] >= r0 && p[0] <= r1),
-      z: k === 'ai' ? 5 : 3,
+      lineStyle: { width: 2, color: STRATEGY[x.key].color },
+      itemStyle: { color: STRATEGY[x.key].color },
+      ...(x.key === 'ai' ? { areaStyle: { color: STRATEGY.ai.wash } } : {}),
+      data: day.strategies[x.key]!.rooms[room].p.map((v, i) => [i * 5 + 2.5, +(v / 1000).toFixed(2)]).filter((p) => p[0] >= r0 && p[0] <= r1),
+      z: x.key === 'ai' ? 5 : 3,
+    }))
+    const sessArea = {
+      name: '강의',
+      type: 'line' as const,
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      data: [],
+      markArea: {
+        silent: true,
+        itemStyle: { color: 'rgba(20,32,51,0.06)' },
+        label: { show: false },
+        data: sessions.map((s) => [{ xAxis: hm(s.start), name: s.title }, { xAxis: hm(s.end) }]) as never,
+      },
+    }
+    const taSeries = pair.map((x) => ({
+      name: `${x.name} 실내`,
+      type: 'line' as const,
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      showSymbol: false,
+      lineStyle: { width: 2, color: STRATEGY[x.key].color },
+      itemStyle: { color: STRATEGY[x.key].color },
+      data: day.strategies[x.key]!.rooms[room].ta.map((v, i) => [i * 5 + 2.5, v]).filter((p) => p[0] >= r0 && p[0] <= r1),
+      z: x.key === 'ai' ? 5 : 3,
     }))
     const wx = day.weather.actual
     const outdoor = {
       name: '외기',
       type: 'line' as const,
-      xAxisIndex: 0,
-      yAxisIndex: 0,
+      xAxisIndex: 1,
+      yAxisIndex: 1,
       showSymbol: false,
       lineStyle: { width: 1.5, color: CHART.outdoor, type: 'solid' as const },
       itemStyle: { color: CHART.outdoor },
@@ -69,8 +103,8 @@ export default function RoomDrawer({
     const band = {
       name: '쾌적 범위',
       type: 'line' as const,
-      xAxisIndex: 0,
-      yAxisIndex: 0,
+      xAxisIndex: 1,
+      yAxisIndex: 1,
       data: [],
       markArea: {
         silent: true,
@@ -79,31 +113,7 @@ export default function RoomDrawer({
         data: [[{ yAxis: lo }, { yAxis: hi }]] as never,
       },
     }
-    const sessArea = {
-      name: '강의',
-      type: 'line' as const,
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      data: [],
-      markArea: {
-        silent: true,
-        itemStyle: { color: 'rgba(20,32,51,0.06)' },
-        label: { show: false },
-        data: sessions.map((s) => [{ xAxis: hm(s.start), name: s.title }, { xAxis: hm(s.end) }]) as never,
-      },
-    }
-    const pSeries = keys.map((k) => ({
-      name: `${STRATEGY[k].short} 전력`,
-      type: 'line' as const,
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      step: 'middle' as const,
-      showSymbol: false,
-      lineStyle: { width: 2, color: STRATEGY[k].color },
-      itemStyle: { color: STRATEGY[k].color },
-      data: day.strategies[k]!.rooms[room].p.map((v, i) => [i * 5 + 2.5, +(v / 1000).toFixed(2)]).filter((p) => p[0] >= r0 && p[0] <= r1),
-    }))
-    const all = keys.flatMap((k) => day.strategies[k]!.rooms[room].ta.slice(84, 283))
+    const all = pair.flatMap((x) => day.strategies[x.key]!.rooms[room].ta.slice(84, 283))
     const rawMin = Math.min(lo - 1, ...all, ...wx.t.slice(7, 24))
     const rawMax = Math.max(hi + 1, ...all, ...wx.t.slice(7, 24))
     const step = rawMax - rawMin > 18 ? 5 : rawMax - rawMin > 9 ? 3 : 2
@@ -121,8 +131,8 @@ export default function RoomDrawer({
     })
     return {
       grid: [
-        { left: 44, right: 16, top: 16, height: 210 },
-        { left: 44, right: 16, top: 276, height: 100 },
+        { left: 44, right: 16, top: 24, height: 150 },
+        { left: 44, right: 16, top: 216, height: 150 },
       ],
       axisPointer: { link: [{ xAxisIndex: 'all' }], lineStyle: { color: CHART.muted } },
       tooltip: {
@@ -146,6 +156,14 @@ export default function RoomDrawer({
         {
           type: 'value',
           gridIndex: 0,
+          name: 'kW',
+          splitNumber: 3,
+          ...axisCommon,
+          nameTextStyle: { color: CHART.muted, fontSize: 12, padding: [0, 24, 0, 0] },
+        },
+        {
+          type: 'value',
+          gridIndex: 1,
           min: tmin,
           max: tmax,
           interval: step,
@@ -153,18 +171,10 @@ export default function RoomDrawer({
           ...axisCommon,
           nameTextStyle: { color: CHART.muted, fontSize: 12, padding: [0, 24, 0, 0] },
         },
-        {
-          type: 'value',
-          gridIndex: 1,
-          name: 'kW',
-          splitNumber: 2,
-          ...axisCommon,
-          nameTextStyle: { color: CHART.muted, fontSize: 12, padding: [0, 24, 0, 0] },
-        },
       ],
-      series: [band, outdoor, ...taSeries, sessArea, ...pSeries] as never,
+      series: [sessArea, ...pSeries, band, outdoor, ...taSeries] as never,
     }
-  }, [day, room, sel, meta])
+  }, [day, room, meta])
 
   if (!room || !rm) return null
   const sessions = day?.sessions.filter((s) => s.room === room) ?? []
@@ -175,6 +185,8 @@ export default function RoomDrawer({
   const occ = (aiRd?.sessions ?? []).reduce((a, s) => a + s.minutes, 0)
   const inb = (aiRd?.sessions ?? []).reduce((a, s) => a + s.in_band_minutes, 0)
   const issues = vals.filter((v) => statusInfo(v.status).group !== 'normal').length
+  const curRd = day?.strategies.fixed?.rooms[room]
+  const cmp = compare(curRd, aiRd, meta.settings.fixed_on, meta.settings.fixed_off)
 
   return (
     <Drawer
@@ -212,48 +224,48 @@ export default function RoomDrawer({
           </div>
 
           <section aria-labelledby="rd-chart">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h3 id="rd-chart" className="text-[17px] font-[650] text-ink">
-                실내온도와 전력
-              </h3>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="차트에 그릴 운전 방식">
-                {STRATEGY_KEYS.map((k) => {
-                  const on = sel.includes(k)
-                  const rd = day.strategies[k]?.rooms[room]
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => toggle(k)}
-                      aria-pressed={on}
-                      title={`${STRATEGY[k].label}: ${fmtKwh(rd?.kwh ?? 0)} kWh, 가동 ${fmtDuration(rd?.on_minutes ?? 0)}`}
-                      className={cx(
-                        'inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-2.5 text-[13px] font-medium transition-colors duration-150',
-                        on ? 'border-ink-3 bg-surface text-ink' : 'border-line bg-surface text-ink-3 hover:border-line-strong hover:text-ink',
-                      )}
-                    >
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-[3px]"
-                        style={{ background: on ? STRATEGY[k].color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${STRATEGY[k].color}` }}
-                        aria-hidden
-                      />
-                      {STRATEGY[k].short}
-                      <span className="tnum text-ink-3">{fmtKwh(rd?.kwh ?? 0)}</span>
-                    </button>
-                  )
-                })}
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+              <div>
+                <h3 id="rd-chart" className="text-[17px] font-[650] text-ink">
+                  현재 운영 vs AI 전력
+                </h3>
+                <p className="mt-1 max-w-[56ch] text-[14px] text-ink-2">{cmp.sentence}</p>
               </div>
+              {cmp.pct != null && (
+                <div className="text-right">
+                  <div className="text-[13px] font-medium text-ink-3">{cmp.saved >= 0 ? '전력 절감' : '전력 증가'}</div>
+                  <div className="tnum mt-1 text-[28px] leading-none font-[650] tracking-[-0.025em]" style={{ color: cmp.saved >= 0 ? STRATEGY.ai.color : CHART.ink }}>
+                    {Math.abs(cmp.pct).toFixed(0)}
+                    <span className="ml-0.5 text-[15px] font-medium text-ink-3">%</span>
+                  </div>
+                </div>
+              )}
             </div>
+            <ul className="mb-2 flex flex-wrap gap-x-6 gap-y-1.5 text-[14px] text-ink-2" aria-label="비교하는 두 운전 방식">
+              {PAIR.map((x) => {
+                const rd = x.key === 'ai' ? aiRd : curRd
+                return (
+                  <li key={x.key} className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: STRATEGY[x.key].color }} aria-hidden />
+                    <span className="font-medium text-ink">{x.name}</span>
+                    <b className="tnum font-semibold text-ink">{fmtKwh(rd?.kwh ?? 0)} kWh</b>
+                    <span className="tnum text-ink-3">가동 {fmtDuration(rd?.on_minutes ?? 0)}</span>
+                  </li>
+                )
+              })}
+            </ul>
             <div className="mb-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-4 rounded-[3px] bg-[rgb(20_32_51/0.08)]" aria-hidden />
+                강의 시간
+              </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="inline-block h-[2px] w-4 rounded-full" style={{ background: CHART.outdoor }} aria-hidden />
                 외기온도
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-4 rounded-[3px] bg-[rgb(20_32_51/0.08)]" aria-hidden />
-                강의 시간(아래 칸)
+              <span className="text-ink-3">
+                현재 운영: 평일 {meta.settings.fixed_on}–{meta.settings.fixed_off} 고정 가동
               </span>
-              <span className="text-ink-3">버튼으로 운전 방식 선을 켜고 끕니다</span>
             </div>
             {option && <EChart option={option} height={400} />}
           </section>
@@ -386,6 +398,27 @@ export default function RoomDrawer({
       )}
     </Drawer>
   )
+}
+
+/** One sentence and a percentage from the day's numbers. Works on the kWh as displayed, so the legend values subtract to the stated saving. */
+function compare(cur: RoomDay | undefined, ai: RoomDay | undefined, on: string, off: string) {
+  const shown = (v: number | undefined) => Number(fmtKwh(v ?? 0).replace(/,/g, ''))
+  const c = shown(cur?.kwh)
+  const a = shown(ai?.kwh)
+  const saved = c - a
+  const pct = c > 0 ? (saved / c) * 100 : null
+  const cc = comfortPct(cur)
+  const ca = comfortPct(ai)
+  const comfort =
+    ca == null || cc == null ? '' : Math.round(cc) === Math.round(ca) ? ` 강의 중 쾌적은 ${ca.toFixed(0)}%로 같습니다.` : ` 강의 중 쾌적은 현재 운영 ${cc.toFixed(0)}%, AI ${ca.toFixed(0)}%입니다.`
+  let sentence: string
+  if (c <= 0 && a <= 0) sentence = '이 날은 현재 운영과 AI 모두 냉난방을 켜지 않습니다.'
+  else if (c <= 0) sentence = `현재 운영은 이 날 가동하지 않고, AI는 일정에 맞춰 ${fmtKwh(a)} kWh를 씁니다.`
+  else if (a <= 0)
+    sentence = `${ai?.sessions.length ? `AI는 가동을 생략해 전력을 쓰지 않습니다.${comfort}` : '강의가 없어 AI는 냉난방을 켜지 않습니다.'} 현재 운영은 ${on}–${off} 고정 가동으로 ${fmtKwh(c)} kWh를 씁니다.`
+  else if (saved >= 0) sentence = `AI는 현재 운영보다 전력을 ${fmtKwh(saved)} kWh 덜 씁니다.${comfort}`
+  else sentence = `AI는 현재 운영보다 전력을 ${fmtKwh(-saved)} kWh 더 씁니다.${comfort}`
+  return { saved, pct, sentence }
 }
 
 function NowBlock({ now }: { now: RoomNow }) {

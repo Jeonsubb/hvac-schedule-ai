@@ -163,7 +163,6 @@ export default function Schedule() {
         day={day.data?.date === date ? day.data : undefined}
         meta={meta}
         room={room}
-        initial={overlay ? [primary, overlay] : primary === 'ai' ? ['ai', 'rule'] : [primary, 'ai']}
       />
     </div>
   )
