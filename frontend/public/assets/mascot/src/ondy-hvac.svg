@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="56 34 326 366" width="326" height="366">
+  <defs>
+    <radialGradient id="b" cx="42%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#fffdfb"/>
+      <stop offset="1" stop-color="#f3eeea"/>
+    </radialGradient>
+  </defs>
+  <!-- snowflake -->
+  <g stroke="#9db3cc" stroke-width="9" stroke-linecap="round" fill="none" transform="translate(338 82)">
+    <path d="M0 -34 V34 M-29 -17 L29 17 M-29 17 L29 -17"/>
+    <path d="M-9 -26 L0 -17 L9 -26 M-9 26 L0 17 L9 26 M-27 -4 L-15 -9 L-19 -21 M27 4 L15 9 L19 21 M-19 21 L-15 9 L-27 4 M19 -21 L15 -9 L27 -4"/>
+  </g>
+  <g stroke="#4a4442" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <!-- body -->
+    <path fill="url(#b)" d="M128 384 C110 384 100 370 104 352 C106 340 108 330 108 320
+      C82 296 70 262 72 226 C76 158 128 112 194 112 C262 112 310 160 310 226 C310 264 296 296 270 318
+      C272 336 270 356 262 370 C254 384 236 388 222 380 C214 374 210 366 206 358
+      C196 352 184 352 176 360 C168 376 154 384 128 384 Z"/>
+    <!-- thermometer -->
+    <g transform="rotate(14 262 270)">
+      <path fill="#f7f8fa" d="M246 150 C246 136 278 136 278 150 V292 C296 302 302 322 296 340 C288 362 258 370 240 356 C222 342 222 312 246 292 Z"/>
+      <path d="M262 176 H272 M262 204 H272 M262 232 H272 M262 260 H272" stroke-width="6" fill="none"/>
+    </g>
+    <!-- hand over the thermometer -->
+    <path fill="url(#b)" d="M188 300 C172 300 160 288 166 274 C172 262 196 258 214 264 C230 270 232 288 220 296 C210 302 198 300 188 300 Z"/>
+    <path fill="url(#b)" d="M300 252 C316 248 328 262 322 276 C316 290 298 294 288 286 C280 278 286 256 300 252 Z"/>
+  </g>
+  <!-- mercury -->
+  <g transform="rotate(14 262 270)">
+    <rect x="256" y="196" width="12" height="110" rx="6" fill="#8fb0d6"/>
+    <circle cx="262" cy="326" r="20" fill="#8fb0d6"/>
+  </g>
+  <!-- face: happy closed eyes -->
+  <path d="M138 196 Q150 182 162 196 M208 192 Q220 178 232 192" fill="none" stroke="#4a4442" stroke-width="9" stroke-linecap="round"/>
+  <path d="M170 214 Q185 228 200 213" fill="none" stroke="#4a4442" stroke-width="8.5" stroke-linecap="round"/>
+  <ellipse cx="128" cy="224" rx="17" ry="10.5" fill="#f6c3b2" opacity="0.85"/>
+  <ellipse cx="238" cy="220" rx="17" ry="10.5" fill="#f6c3b2" opacity="0.85"/>
+</svg>
