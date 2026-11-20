@@ -62,10 +62,11 @@ export function CardHeader({
 /** Page title + the page's one-sentence answer + at most one action group. */
 export function PageHeader({ title, desc, right, className }: { title: string; desc?: ReactNode; right?: ReactNode; className?: string }) {
   return (
-    <div className={cx('mb-9 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
+    <div className={cx('mb-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
       <div className="min-w-0 flex-[1_1_20rem]">
-        <h1 className="balance text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">{title}</h1>
-        {desc && <p className="pretty mt-2 max-w-[60ch] text-[17px] leading-[1.55] text-ink-2">{desc}</p>}
+        {/* SEED screen-title scale (t9 bold); the breadcrumb above already says where we are */}
+        <h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
+        {desc && <p className="pretty mt-1.5 max-w-[72ch] text-[14px] leading-[1.6] text-ink-2">{desc}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -199,7 +200,7 @@ type Tone = 'neutral' | 'brand' | 'ai' | 'good' | 'warn' | 'crit' | 'info' | 'ev
 
 export function Badge({ children, tone = 'neutral', className, title }: { children: ReactNode; tone?: Tone; className?: string; title?: string }) {
   const tones: Record<Tone, string> = {
-    neutral: 'bg-well text-ink-2 ring-1 ring-inset ring-line',
+    neutral: 'bg-well text-ink-2',
     brand: 'bg-[#e6f5ee] text-s-ai-ink',
     ai: 'bg-[#e6f5ee] text-s-ai-ink',
     good: 'bg-good-bg text-good-ink',
@@ -211,7 +212,7 @@ export function Badge({ children, tone = 'neutral', className, title }: { childr
     heat: 'bg-[#fdeee6] text-heat-ink',
   }
   return (
-    <span title={title} className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-[1px] text-[13px] leading-[20px] font-medium whitespace-nowrap', tones[tone], className)}>
+    <span title={title} className={cx('inline-flex min-h-6 items-center gap-1 rounded-[6px] px-2 text-[12px] leading-[16px] font-semibold whitespace-nowrap', tones[tone], className)}>
       {children}
     </span>
   )
@@ -260,15 +261,17 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 
 export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md', className?: string) {
   const v: Record<Variant, string> = {
-    primary: 'bg-ink text-white border border-ink hover:bg-[#2a2e37] hover:border-[#2a2e37] active:bg-black',
-    secondary: 'bg-surface text-ink border border-[rgb(12_14_19/0.18)] hover:border-[rgb(12_14_19/0.5)]',
-    ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
-    danger: 'bg-surface text-crit-ink border border-[#efc6c6] hover:bg-crit-bg hover:border-[#e3a9a9]',
+    // SEED ActionButton variants: neutralSolid / neutralOutline / ghost / criticalWeak
+    primary: 'bg-bg-neutral-solid text-fg-on-neutral-solid border border-transparent hover:bg-bg-neutral-solid-pressed',
+    secondary: 'bg-surface text-ink border border-stroke-neutral-weak hover:bg-bg-layer-default-pressed',
+    ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-bg-transparent-pressed hover:text-ink',
+    danger: 'bg-bg-critical-weak text-fg-critical-contrast border border-transparent hover:bg-bg-critical-weak-pressed',
     link: 'bg-transparent text-brand-ink border border-transparent underline-offset-4 hover:underline !px-0',
   }
-  const s = size === 'sm' ? 'h-8 px-3.5 text-[13px] gap-1.5' : 'h-10 px-5 text-[14px] gap-2'
+  // SEED sizes: xsmall 32px (pill) and medium 40px (r2)
+  const s = size === 'sm' ? 'h-8 px-3.5 text-[13px] gap-1 rounded-full' : 'h-10 px-4 text-[14px] gap-1.5 rounded-[8px]'
   return cx(
-    'inline-flex shrink-0 items-center justify-center rounded-full leading-none font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-200 disabled:cursor-not-allowed disabled:opacity-40',
+    'ond-press inline-flex shrink-0 items-center justify-center leading-none font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:bg-bg-disabled disabled:text-fg-disabled disabled:border-transparent',
     v[variant],
     s,
     className,
@@ -426,7 +429,7 @@ export function Field({ label, hint, children, className }: { label: string; hin
 }
 
 export const inputBase =
-  'h-11 rounded-[12px] border border-line-strong bg-surface px-3.5 text-[14.5px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-4 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_4px_rgb(47_111_222/0.14)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
+  'h-11 rounded-[12px] border border-line-strong bg-surface px-3.5 text-[14.5px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-3 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_4px_rgb(47_111_222/0.14)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
 
 export const inputCls = `${inputBase} w-full`
 

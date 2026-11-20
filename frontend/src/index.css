@@ -1,27 +1,36 @@
+/* SEED Design (당근) foundations: tokens from @seed-design/css, Tailwind utilities from
+   @seed-design/tailwind4-theme (text-fg-*, bg-bg-*, t4-medium, rounded-r3 …). Layer order per the SEED docs. */
+@layer theme, base, seed-base, components, seed-components, utilities;
+@import "@seed-design/css/base.layered.css";
 @import "tailwindcss";
+@import "@seed-design/tailwind4-theme";
 
 /* ON:D tokens: the app speaks the landing's language (/welcome): white ground, near-black ink,
    one blue for "this is on / selected", heavy tight Korean display type, pill controls. */
 @theme {
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
-  /* chrome: white ground, hairlines instead of shadows, ink from the landing (#0c0e13) */
-  --color-paper: #ffffff;
-  --color-surface: #ffffff;
-  --color-well: #f4f5f7;
-  --color-line: #e7e8eb;
-  --color-line-strong: #d3d5da;
-  --color-ink: #0c0e13;
-  --color-ink-2: #454a54;
-  --color-ink-3: #6a707b;
-  --color-ink-4: #a3a8b1;
-  --color-focus: #2f6fde;
-  --color-hover: #f2f3f5;
+  /* chrome = SEED color roles. The app's short names stay (hundreds of call sites); their values are SEED tokens.
+     canvas: layer-basement (the gray ground of the app shell) · surface: layer-default (cards) */
+  --color-paper: var(--seed-color-bg-layer-default);
+  --color-canvas: var(--seed-color-bg-layer-basement);
+  --color-surface: var(--seed-color-bg-layer-default);
+  --color-well: var(--seed-color-bg-neutral-weak);
+  --color-line: var(--seed-color-palette-gray-300);
+  --color-line-strong: var(--seed-color-palette-gray-400);
+  --color-ink: var(--seed-color-fg-neutral);
+  --color-ink-2: var(--seed-color-fg-neutral-muted);
+  /* captions: between fg.neutral-muted and fg.neutral-subtle so 12–13px text keeps 4.5:1 on white (projector) */
+  --color-ink-3: color-mix(in oklab, var(--seed-color-palette-gray-800) 62%, var(--seed-color-palette-gray-700));
+  --color-ink-4: var(--seed-color-palette-gray-700);
+  --color-focus: var(--seed-color-stroke-focus-ring);
+  --color-hover: var(--seed-color-bg-layer-default-pressed);
 
-  /* v5 brand accent (mock: blue logo, active nav, selected time column) */
-  --color-brand: #2f6fde;
-  --color-brand-ink: #1f56b8;
-  --color-brand-bg: #e8f0fd;
+  /* ON:D brand accent on SEED's blue scale (SEED's carrot would read as "heating" in an HVAC product) */
+  /* between blue-700 and blue-800: white text on it reaches 4.5:1 */
+  --color-brand: color-mix(in oklab, var(--seed-color-palette-blue-700) 45%, var(--seed-color-palette-blue-800));
+  --color-brand-ink: var(--seed-color-palette-blue-800);
+  --color-brand-bg: var(--seed-color-palette-blue-100);
   /* agent characters */
   --color-occupant: #e8894f; /* 사용자 온디 (주황) */
   --color-occupant-bg: #fdf0e7;
@@ -52,27 +61,28 @@
   --color-s-ai-ink: #0d7f5a;
 
   /* status (fixed, always icon + label) */
-  --color-good: #0ca30c;
-  --color-good-ink: #0a6b0a;
-  --color-good-bg: #eaf6ea;
-  --color-warn: #fab219;
-  --color-warn-ink: #8a5a00;
-  --color-warn-bg: #fff4dc;
-  --color-crit: #d03b3b;
-  --color-crit-ink: #a12a2a;
-  --color-crit-bg: #fdeeee;
-  --color-event: #6250d6;
-  --color-event-ink: #4a3aa7;
-  --color-event-bg: #efedfb;
-  --color-info-ink: #1c5cab;
-  --color-info-bg: #eaf2fc;
+  /* SEED semantic roles: positive / warning / critical / informative (+ purple for events) */
+  --color-good: var(--seed-color-palette-green-600);
+  --color-good-ink: var(--seed-color-palette-green-800);
+  --color-good-bg: var(--seed-color-bg-positive-weak);
+  --color-warn: var(--seed-color-palette-yellow-400);
+  --color-warn-ink: var(--seed-color-palette-yellow-800);
+  --color-warn-bg: var(--seed-color-bg-warning-weak);
+  --color-crit: var(--seed-color-palette-red-700);
+  --color-crit-ink: var(--seed-color-palette-red-800);
+  --color-crit-bg: var(--seed-color-bg-critical-weak);
+  --color-event: var(--seed-color-palette-purple-800);
+  --color-event-ink: var(--seed-color-palette-purple-900);
+  --color-event-bg: var(--seed-color-palette-purple-100);
+  --color-info-ink: var(--seed-color-palette-blue-800);
+  --color-info-bg: var(--seed-color-bg-informative-weak);
 
   --radius-panel: 22px;
   --radius-inner: 14px;
   --radius-control: 12px;
   --radius-chip: 6px;
 
-  --shadow-float: 0 18px 48px rgb(12 14 19 / 0.12), 0 0 0 1px rgb(12 14 19 / 0.05);
+  --shadow-float: var(--seed-shadow-s3), 0 0 0 1px rgb(12 14 19 / 0.05);
   --shadow-cover: 0 32px 80px rgb(12 14 19 / 0.2);
 
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -102,7 +112,7 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--seed-font-size-t4);
   line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
@@ -127,6 +137,20 @@ body {
 
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+/* SEED feedback: a pressable element gets a little smaller while it is pressed (distance, not ratio) */
+.ond-press {
+  transition-property: scale, background-color, color, border-color;
+  transition-duration: var(--seed-duration-d3);
+  transition-timing-function: var(--seed-timing-function-easing);
+}
+.ond-press:active {
+  scale: 0.97;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ond-press:active {
+    scale: 1;
+  }
 }
 .balance {
   text-wrap: balance;

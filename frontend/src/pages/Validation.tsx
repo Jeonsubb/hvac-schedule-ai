@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Info, BarChart3 } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
 import type { Day, Summary } from '../lib/types'
-import { CHART, GROUP_META, ROOM_ORDER, STATUS_COLOR, splitCounts, statusInfo } from '../lib/constants'
+import { CHART, ROOM_ORDER, STATUS_COLOR, splitCounts, statusInfo } from '../lib/constants'
 import { cx, fmtDateK, fmtDateShort, fmtNum, fmtPct } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
 import { Badge, Card, ChartCard, Disclosure, DisclosureList, Empty, ErrorBox, IconButton, LegendItem, Loading, PageHeader, PageSkeleton, Popover, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
@@ -357,7 +357,6 @@ function SessionTable({ rows, lo, hi, onOpen }: { rows: ValidationSession[]; lo:
                 tabIndex={0}
                 aria-label={`${v.room}호 ${v.title} ${info.label}, 상세 보기`}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(v.room))}
-                style={{ boxShadow: info.group !== 'normal' ? `inset 3px 0 0 ${GROUP_META[info.group].color}` : undefined }}
               >
                 <td className="px-3.5 py-3 font-semibold text-ink">{v.room}</td>
                 <td className="px-3.5 py-3">

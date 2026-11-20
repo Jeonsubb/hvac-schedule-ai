@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, Settings as SettingsIcon } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
 import { useMeta, useCopilot, useDay } from '../lib/context'
 import { useAuth } from '../lib/auth'
@@ -67,31 +67,133 @@ export function Logo() {
   return <Wordmark size={24} />
 }
 
-/** The two sections as words, the way /welcome names its scenes; the live one carries the blue dot. */
-function MainNav() {
+const SIDE_KEY = 'ond.sidebar.collapsed'
+
+function tabOn(pathname: string, to: string) {
+  return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+}
+
+/**
+ * The whole service in one column: every screen is one click away, and the section names say what the
+ * product does (see the day, manage the timetable, let the AI review it). Collapses to an icon rail.
+ * SEED side-navigation anatomy: 40px rows, r2 corners, neutral-weak fill for the current screen.
+ */
+function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const loc = useLocation()
   const active = groupOf(loc.pathname)
+  const { meta } = useMeta()
+  const building = meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'
+  const row = (on: boolean) =>
+    cx(
+      'ond-press flex h-9 items-center gap-2.5 rounded-[8px] px-3 text-[14px] leading-none transition-colors duration-150',
+      on ? 'bg-well font-semibold text-ink' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
+    )
   return (
-    <nav className="hidden items-center gap-1 lg:flex" aria-label="주 메뉴">
-      {NAV_GROUPS.map((n) => {
-        const on = active === n
-        return (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            title={n.desc}
-            aria-current={on ? 'page' : undefined}
-            className={cx(
-              'inline-flex h-10 items-center gap-2 rounded-full px-4 text-[15px] leading-none transition-colors duration-200',
-              on ? 'font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
-            )}
-          >
-            <span className={cx('inline-block h-[7px] w-[7px] rounded-full transition-colors duration-200', on ? 'bg-brand' : 'bg-transparent')} aria-hidden />
-            {n.label}
-          </NavLink>
-        )
-      })}
+    <aside
+      className={cx('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[76px]' : 'w-[244px]')}
+    >
+      <div className={cx('flex h-16 shrink-0 items-center', collapsed ? 'justify-center' : 'justify-between pr-3 pl-5')}>
+        <NavLink to="/" className="rounded-[10px]" aria-label="ON:D 홈으로">
+          <Wordmark size={collapsed ? 15 : 22} />
+        </NavLink>
+        {!collapsed && (
+          <button type="button" onClick={onToggle} aria-expanded className="ond-press inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-3 hover:bg-hover hover:text-ink" title="메뉴 접기">
+            <ChevronsLeft size={17} aria-hidden />
+            <span className="sr-only">메뉴 접기</span>
+          </button>
+        )}
+      </div>
+      {!collapsed && (
+        <div className="mx-3 mb-2 rounded-[10px] bg-well px-3 py-2.5 text-[12px] leading-[1.5]">
+          <div className="font-semibold text-ink">{building}</div>
+          <div className="tnum text-ink-3">
+            {meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'} · 강의실 {meta ? Object.keys(meta.rooms).length : 10}곳
+          </div>
+        </div>
+      )}
+      <nav className="thin-scroll min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-4" aria-label="주 메뉴">
+        {collapsed ? (
+          <ul className="space-y-1">
+            {NAV_GROUPS.map((g) => {
+              const on = active === g
+              return (
+                <li key={g.to}>
+                  <NavLink
+                    to={g.to}
+                    end={g.to === '/'}
+                    title={`${g.label}: ${g.desc}`}
+                    aria-current={on ? 'page' : undefined}
+                    className={cx(
+                      'ond-press flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2.5 text-[11px] leading-none whitespace-nowrap transition-colors duration-150',
+                      on ? 'bg-well font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-hover hover:text-ink',
+                    )}
+                  >
+                    <g.icon size={20} strokeWidth={on ? 2.2 : 1.8} className={on ? 'text-brand' : undefined} aria-hidden />
+                    {g.label}
+                  </NavLink>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          NAV_GROUPS.map((g) =>
+            g.tabs.length === 1 ? (
+              <NavLink key={g.to} to={g.to} end={g.to === '/'} title={g.desc} className={cx(row(active === g), 'mt-1')}>
+                <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-brand' : 'text-ink-3'} aria-hidden />
+                {g.label}
+              </NavLink>
+            ) : (
+              <div key={g.to} className="mt-5 first:mt-1" role="group" aria-label={g.label}>
+                <div className="mb-1 flex items-center gap-2.5 px-3 text-[12px] font-semibold tracking-[0.01em] text-ink-3" title={g.desc}>
+                  <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-brand' : 'text-ink-4'} aria-hidden />
+                  {g.label}
+                </div>
+                <ul className="space-y-0.5">
+                  {g.tabs.map((t) => {
+                    const on = tabOn(loc.pathname, t.to)
+                    return (
+                      <li key={t.to}>
+                        <NavLink to={t.to} end={t.to === '/'} aria-current={on ? 'page' : undefined} className={cx(row(on), 'pl-[40px]')}>
+                          {t.label}
+                        </NavLink>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ),
+          )
+        )}
+      </nav>
+      {collapsed && (
+        <div className="shrink-0 px-2 pb-2">
+          <button type="button" onClick={onToggle} aria-expanded={false} className="ond-press inline-flex h-9 w-full items-center justify-center rounded-[8px] text-ink-3 hover:bg-hover hover:text-ink" title="메뉴 펼치기">
+            <ChevronsRight size={17} aria-hidden />
+            <span className="sr-only">메뉴 펼치기</span>
+          </button>
+        </div>
+      )}
+    </aside>
+  )
+}
+
+/** Where this screen sits in the service: section › screen. */
+function Crumbs() {
+  const loc = useLocation()
+  const g = groupOf(loc.pathname)
+  const t = g.tabs.find((x) => tabOn(loc.pathname, x.to))
+  const leaf = t && (g.tabs.length > 1 || t.label !== g.label) ? t.label : null
+  return (
+    <nav className="hidden min-w-0 items-center gap-1.5 text-[14px] sm:flex" aria-label="현재 위치">
+      <span className="font-medium whitespace-nowrap text-ink-3">ON:D</span>
+      <ChevronRight size={14} className="shrink-0 text-ink-4" aria-hidden />
+      <span className={cx('whitespace-nowrap', leaf ? 'font-medium text-ink-3' : 'font-semibold text-ink')}>{g.label}</span>
+      {leaf && (
+        <>
+          <ChevronRight size={14} className="shrink-0 text-ink-4" aria-hidden />
+          <span className="truncate font-semibold text-ink">{leaf}</span>
+        </>
+      )}
     </nav>
   )
 }
@@ -214,7 +316,7 @@ function DayPicker() {
       <input
         id="ond-date"
         type="date"
-        className="tnum h-10 max-w-[150px] rounded-full border border-line bg-surface px-3 text-[14px] font-medium text-ink sm:max-w-none sm:px-3.5"
+        className="tnum h-10 max-w-[150px] rounded-[8px] border border-stroke-neutral-weak bg-surface px-3 text-[14px] font-medium text-ink sm:max-w-none sm:px-3.5"
         value={date ?? ''}
         min={meta?.semester.start}
         max={meta?.semester.end}
@@ -222,7 +324,7 @@ function DayPicker() {
         title="모든 화면의 기준 날짜입니다. 수업이 있는 평일을 고르세요."
       />
       <span
-        className="hidden h-7 items-center rounded-full border border-line px-2.5 text-[12.5px] font-semibold whitespace-nowrap text-ink-2 md:inline-flex"
+        className="hidden min-h-6 items-center rounded-[6px] bg-well px-2 text-[12px] leading-[16px] font-semibold whitespace-nowrap text-ink-2 md:inline-flex"
         title="실내온도·CO₂·PMV·전력·냉난방 운전은 모두 시뮬레이션 또는 추정값입니다. 실제 건물 센서나 냉난방 설비와 연결되어 있지 않습니다."
       >
         시뮬레이션
@@ -234,13 +336,13 @@ function DayPicker() {
 function TopBar() {
   const { open, setOpen } = useCopilot()
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-md">
-      <div className="flex h-[72px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
-        <div className="flex min-w-0 items-center gap-6">
-          <NavLink to="/" className="rounded-[10px]" aria-label="ON:D 운전 현황으로">
+    <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
+      <div className="flex h-16 items-center justify-between gap-4 px-[clamp(16px,2.4vw,32px)]">
+        <div className="flex min-w-0 items-center gap-4">
+          <NavLink to="/" className="rounded-[10px] lg:hidden" aria-label="ON:D 홈으로">
             <Logo />
           </NavLink>
-          <MainNav />
+          <Crumbs />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <DayPicker />
@@ -249,8 +351,8 @@ function TopBar() {
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             className={cx(
-              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-[14px] font-semibold transition-colors duration-200 sm:px-4',
-              open ? 'border border-[rgb(12_14_19/0.18)] bg-surface text-ink hover:border-[rgb(12_14_19/0.5)]' : 'bg-ink text-white hover:bg-[#2a2e37]',
+              'ond-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] px-3 text-[14px] font-bold sm:px-4',
+              open ? 'border border-stroke-neutral-weak bg-surface text-ink hover:bg-bg-layer-default-pressed' : 'bg-bg-neutral-solid text-fg-on-neutral-solid hover:bg-bg-neutral-solid-pressed',
             )}
           >
             {open ? <X size={16} aria-hidden /> : <Sparkles size={16} className="text-[#8fb3f0]" aria-hidden />}
@@ -353,7 +455,7 @@ function MobileNav() {
   const loc = useLocation()
   const active = groupOf(loc.pathname)
   return (
-    <nav className="thin-scroll sticky top-[72px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-white/90 px-4 py-2 backdrop-blur-md lg:hidden" aria-label="주 메뉴">
+    <nav className="thin-scroll sticky top-16 z-20 flex gap-1 overflow-x-auto border-b border-line bg-white/90 px-4 py-2 backdrop-blur-md lg:hidden" aria-label="주 메뉴">
       {NAV_GROUPS.flatMap((g) =>
         g.tabs.map((t) => (
           <NavLink
@@ -379,33 +481,45 @@ function MobileNav() {
 export default function Layout() {
   const tour = useTour()
   const { user } = useAuth()
+  const loc = useLocation()
   // the demo account sees the chapter tour once, on its first visit (the full screens are dense)
   useEffect(() => {
     if (user?.id === '부산대학교' && !tour.seen()) tour.start(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
   const { open } = useCopilot()
-  const loc = useLocation()
   // load the copilot (markdown renderer, cards) the first time it is opened, then keep it mounted
   const [loaded, setLoaded] = useState(open)
   useEffect(() => {
     if (open) setLoaded(true)
   }, [open])
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleSide = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDE_KEY, c ? '0' : '1')
+      } catch {
+        /* private mode: the choice lasts for this visit only */
+      }
+      return !c
+    })
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-canvas lg:flex">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>
-      <div className={cx('min-h-full', open && '2xl:pr-[440px]')}>
+      <Sidebar collapsed={collapsed} onToggle={toggleSide} />
+      <div className={cx('min-h-dvh min-w-0 flex-1', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        {/* the dashboard draws its own tabs in its header; one-tab sections need none */}
-        {loc.pathname !== '/' && groupOf(loc.pathname).tabs.length > 1 && (
-          <div className="mx-auto hidden max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-6 lg:block">
-            <SectionTabs />
-          </div>
-        )}
-        <main id="main" className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-8 pb-24">
+        {/* the sidebar lists every screen of every section, so the pages need no tab strip of their own */}
+        <main id="main" className="mx-auto max-w-[1320px] px-[clamp(16px,2.4vw,32px)] pt-7 pb-24">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />

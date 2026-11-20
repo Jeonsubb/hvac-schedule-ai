@@ -317,7 +317,7 @@ function MonthCalendar({
               {hol ? (
                 <span className="mt-auto truncate text-[13px] font-medium text-crit-ink">{hol}</span>
               ) : sv != null ? (
-                <span className={cx('tnum mt-auto text-[14px] font-semibold', future ? 'text-ink-3' : 'text-ink')}>−{sv.toFixed(0)}%</span>
+                <span className={cx('tnum mt-auto text-[14px] font-semibold', future ? 'font-medium text-ink-2' : 'text-ink')}>−{sv.toFixed(0)}%</span>
               ) : null}
             </button>
           )

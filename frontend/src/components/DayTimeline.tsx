@@ -128,7 +128,7 @@ export default function DayTimeline({
                     title={`${room}호 상세 보기`}
                   >
                     <span className={cx('tnum text-[14px] font-semibold', on ? 'text-brand-ink' : 'text-ink')}>{room}호</span>
-                    <span className={cx('text-[11.5px] font-semibold', cur ? 'text-brand-ink' : 'text-ink-4')}>{stateTxt}</span>
+                    <span className={cx('text-[11.5px] font-semibold', cur ? 'text-brand-ink' : 'text-ink-3')}>{stateTxt}</span>
                   </button>
                   <div className="relative flex-1 cursor-col-resize touch-none" onPointerDown={(e) => startDrag(e, room)}>
                     {ss.map((s) => {
@@ -139,7 +139,7 @@ export default function DayTimeline({
                         <span
                           key={s.id}
                           className={cx(
-                            'absolute overflow-hidden rounded-[4px] border bg-[#f1f3f5] px-1 text-[10.5px] leading-[12px] whitespace-nowrap text-ink-2',
+                            'absolute overflow-hidden rounded-[4px] border bg-[#f1f3f5] px-1 text-[11px] leading-[12px] whitespace-nowrap text-ink-2',
                             s.kind === 'event' ? 'border-dashed border-ink-3' : 'border-line-strong',
                           )}
                           style={{ left: `${x(a)}%`, width: `${x(b) - x(a)}%`, top: 6, height: 14 }}

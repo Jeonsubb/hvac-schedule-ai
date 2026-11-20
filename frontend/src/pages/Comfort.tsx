@@ -78,12 +78,12 @@ function RoomTiles({ s, sel, onSel }: { s: FeedbackSummary; sel: string | null; 
           >
             <div className="flex items-baseline justify-between">
               <span className="tnum text-[17px] font-[650] text-ink">{r}호</span>
-              <span className="tnum text-[13px] text-ink-3">{v?.n ?? 0}건</span>
+              <span className="tnum text-[13px] text-ink-2">{v?.n ?? 0}건</span>
             </div>
             <div className="mt-1 text-[13.5px] font-medium text-ink-2">{v?.n ? `${meanWord(v.mean)} ${signed(v.mean)}` : '의견 없음'}</div>
             <VoteScale mean={v?.n ? v.mean : null} />
             {v?.n ? (
-              <div className="tnum mt-2.5 flex gap-3 text-[12.5px] text-ink-3">
+              <div className="tnum mt-2.5 flex gap-3 text-[12.5px] text-ink-2">
                 <span>추움 {v.cold}</span>
                 <span>더움 {v.hot}</span>
                 <span>답답 {v.stuffy}</span>
