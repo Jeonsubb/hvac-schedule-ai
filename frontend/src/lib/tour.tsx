@@ -43,7 +43,7 @@ export const CHAPTERS: TourChapter[] = [
         body: '회색 칸은 수업 일정, 파란 막대는 냉난방을 켜는 구간입니다. 세로선을 끌면 선택 시각이 바뀌고, 공간 보기로 바꾸면 배치 개념도로 볼 수 있습니다.',
       },
       {
-        path: '/overview',
+        path: '/overview?room=306',
         target: 'ov-time',
         title: '선택한 강의실 상세',
         body: '타임라인에서 강의실을 누르면 선택 시각의 예측 실내온도, 설정온도, 운전 상태, 추정 CO₂를 보여 줍니다. 실제 센서 값이 아닙니다.',

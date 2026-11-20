@@ -107,7 +107,6 @@ export default function Overview() {
       ),
     [setParams],
   )
-  const [sheet, setSheet] = useState(false)
 
   if (metaError && !meta) return <ErrorBox title="기본 정보를 불러오지 못했습니다" error={metaError} onRetry={reloadMeta} />
   if (day.error && !D) return <ErrorBox title="이 날짜의 운전계획을 불러오지 못했습니다" error={day.error} onRetry={day.reload} />
@@ -127,7 +126,9 @@ export default function Overview() {
   const m = Math.max(range[0], Math.min(range[1], minute ?? Math.min(range[1], Math.round((firstClass + 30) / 5) * 5)))
 
   const withClass = rooms.find((r) => D.sessions.some((s) => s.room === r))
-  const room = roomParam && meta.rooms[roomParam] ? roomParam : (withClass ?? rooms[0])
+  // the room detail opens only when a room is picked (click, or a link with ?room=); otherwise the timeline has the full width
+  const openRoom = roomParam && meta.rooms[roomParam] ? roomParam : null
+  const room = openRoom ?? withClass ?? rooms[0]
   const noClass = D.sessions.length === 0
 
   // comparison partner: the plan the selected one is naturally measured against
@@ -223,7 +224,7 @@ export default function Overview() {
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+      <div className={cx('mt-2 grid grid-cols-1 gap-5 xl:items-start', openRoom && 'xl:grid-cols-[minmax(0,1fr)_340px]')}>
         <section data-tour="ov-building" className="min-w-0 rounded-[16px] border border-line bg-surface p-5" aria-labelledby="tl-title">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -272,11 +273,8 @@ export default function Overview() {
               range={range}
               minute={m}
               onMinute={setMinute}
-              selected={room}
-              onSelect={(r) => {
-                setRoom(r)
-                setSheet(true)
-              }}
+              selected={openRoom}
+              onSelect={(r) => setRoom(r === openRoom ? null : r)}
             />
           ) : (
             <div>
@@ -287,11 +285,8 @@ export default function Overview() {
                 <BuildingView
                   meta={meta}
                   state={stateAt(sel, D, meta, m)}
-                  onRoomClick={(r) => {
-                    setRoom(r)
-                    setSheet(true)
-                  }}
-                  selected={room}
+                  onRoomClick={(r) => setRoom(r === openRoom ? null : r)}
+                  selected={openRoom}
                   minWidth={640}
                 />
               </div>
@@ -325,18 +320,15 @@ export default function Overview() {
           </div>
         </section>
 
-        {/* selected room: beside the timeline on wide screens, a bottom sheet on narrow ones */}
-        <aside data-tour="ov-time" className="hidden xl:block" aria-label="선택 강의실 상세">
-          <RoomPanel room={room} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} />
-        </aside>
-        {sheet && (
-          <div className="fixed inset-x-0 bottom-0 z-30 max-h-[78vh] overflow-y-auto rounded-t-[20px] border-t border-line bg-surface p-4 shadow-[0_-12px_32px_rgb(12_14_19/0.14)] xl:hidden" role="dialog" aria-label={`${room}호 상세`}>
-            <div className="mb-1 flex justify-end">
-              <button type="button" onClick={() => setSheet(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ink-3 hover:bg-well" aria-label="상세 닫기">
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-            <RoomPanel room={room} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} bare />
+        {/* picked room: beside the timeline on wide screens, a bottom sheet on narrow ones; closed until a room is picked */}
+        {openRoom && (
+          <aside data-tour="ov-time" className="fade-in hidden xl:block" aria-label="선택 강의실 상세">
+            <RoomPanel room={openRoom} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} onClose={() => setRoom(null)} />
+          </aside>
+        )}
+        {openRoom && (
+          <div className="fixed inset-x-0 bottom-0 z-30 max-h-[78vh] overflow-y-auto rounded-t-[20px] border-t border-line bg-surface p-4 shadow-[0_-12px_32px_rgb(12_14_19/0.14)] xl:hidden" role="dialog" aria-label={`${openRoom}호 상세`}>
+            <RoomPanel room={openRoom} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} bare onClose={() => setRoom(null)} />
           </div>
         )}
       </div>
@@ -541,6 +533,7 @@ function RoomPanel({
   spKey,
   planKey,
   bare = false,
+  onClose,
 }: {
   room: string
   minute: number
@@ -551,6 +544,7 @@ function RoomPanel({
   spKey: SpKey
   planKey: PlanKey
   bare?: boolean
+  onClose?: () => void
 }) {
   const r = plan.rooms[room]
   const idx = Math.max(0, Math.min(287, Math.floor(minute / 5)))
@@ -571,7 +565,14 @@ function RoomPanel({
         <h2 className="tnum text-[16px] font-bold tracking-[-0.015em] text-ink">
           {room}호 · 선택 시각 {fmtMin(minute)}
         </h2>
-        <Badge tone="outline">예측</Badge>
+        <span className="flex shrink-0 items-center gap-1 self-center">
+          <Badge tone="outline">예측</Badge>
+          {onClose && (
+            <button type="button" onClick={onClose} className="ond-press inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-3 hover:bg-hover hover:text-ink" aria-label={`${room}호 상세 닫기`}>
+              <X size={15} aria-hidden />
+            </button>
+          )}
+        </span>
       </div>
       <p className="mt-0.5 text-[12.5px] text-ink-3">
         {info?.type_label ?? '강의실'} · 정원 {info?.capacity ?? '—'}명 · {plan.label}
