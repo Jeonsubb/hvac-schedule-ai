@@ -125,13 +125,18 @@ export default function Orb({
       const [cr, cg, cb] = cur.color
 
       // soft halo that swells with the voice
-      const halo = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.75)
+      // the halo ends inside the canvas (never cut into a square by its edge) and fades to the same hue
+      // at zero alpha (fading to transparent black would leave a gray veil on a light surface)
+      const haloR = Math.min(R * 1.75, Math.min(w, h) / 2 - 1)
+      const halo = ctx.createRadialGradient(cx, cy, Math.min(R * 0.2, haloR * 0.2), cx, cy, haloR)
       const ga = cur.glow * (0.7 + level * 1.4)
       halo.addColorStop(0, `rgba(${cr | 0},${cg | 0},${cb | 0},${Math.min(0.5, ga)})`)
       halo.addColorStop(0.55, `rgba(${cr | 0},${cg | 0},${cb | 0},${Math.min(0.5, ga) * 0.25})`)
-      halo.addColorStop(1, 'rgba(0,0,0,0)')
+      halo.addColorStop(1, `rgba(${cr | 0},${cg | 0},${cb | 0},0)`)
       ctx.fillStyle = halo
-      ctx.fillRect(0, 0, w, h)
+      ctx.beginPath()
+      ctx.arc(cx, cy, haloR, 0, 6.2832)
+      ctx.fill()
 
       ctx.globalCompositeOperation = 'source-over'
       const cosA = Math.cos(angle)

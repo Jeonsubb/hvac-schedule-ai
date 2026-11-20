@@ -702,7 +702,8 @@ export function Skeleton({ className, style }: { className?: string; style?: Rea
 /** First-load placeholder shaped like the page: header, answer line, one large panel. */
 export function PageSkeleton({ label }: { label: string }) {
   return (
-    <div className="space-y-6" role="status" aria-label={label}>
+    // shown only when loading really takes a while: a quick move between screens must not flash gray blocks
+    <div className="late-in space-y-6" role="status" aria-label={label}>
       <div className="space-y-3">
         <Skeleton className="h-10 w-[260px] rounded-[12px]" />
         <Skeleton className="h-5 w-[min(560px,80%)] rounded-[8px]" />

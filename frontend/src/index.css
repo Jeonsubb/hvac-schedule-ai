@@ -437,6 +437,16 @@ body {
 .fade-in {
   animation: fade-in 0.18s ease-out;
 }
+/* placeholders appear only after a wait worth showing (0.45s) */
+.late-in {
+  opacity: 0;
+  animation: fade-in 0.2s ease-out 0.45s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .late-in {
+    animation-duration: 0.01s;
+  }
+}
 
 @keyframes spin-slow {
   to {

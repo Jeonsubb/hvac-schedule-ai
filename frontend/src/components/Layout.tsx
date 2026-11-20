@@ -495,6 +495,22 @@ export default function Layout() {
     if (user?.id === '부산대학교' && loc.pathname !== '/' && !tour.seen()) tour.start(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, loc.pathname === '/'])
+  // fetch the other screens' code while the browser is idle, so moving between them never waits on a download
+  useEffect(() => {
+    const load = () => {
+      void import('../pages/Home')
+      void import('../pages/Overview')
+      void import('../pages/Energy')
+      void import('../pages/Comfort')
+      void import('../pages/Data')
+      void import('../pages/Schedule')
+      void import('../pages/Validation')
+      void import('../pages/Plan')
+      void import('../pages/Settings')
+    }
+    const t = window.setTimeout(load, 1200)
+    return () => window.clearTimeout(t)
+  }, [])
   const { open } = useCopilot()
   // load the copilot (markdown renderer, cards) the first time it is opened, then keep it mounted
   const [loaded, setLoaded] = useState(open)
