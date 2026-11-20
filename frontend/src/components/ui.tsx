@@ -6,7 +6,7 @@ import type { StrategyKey } from '../lib/types'
 
 // ---------------------------------------------------------------- surfaces
 
-/** Card: white surface + one hairline + 22px radius (ON:D). No shadow (only floating layers get one). */
+/** Card: white surface with a fine border (ON:D). No shadow (only floating layers get one). */
 export function Card({
   children,
   className,
@@ -24,7 +24,7 @@ export function Card({
   'data-tour'?: string
 }) {
   return (
-    <As className={cx('rounded-[22px] border border-line bg-surface', pad === true && 'p-7', pad === 'dense' && 'p-5', pad === 'lg' && 'p-9', className)} {...rest}>
+    <As className={cx('rounded-2xl border border-line bg-surface', pad === true && 'p-4 sm:p-6', pad === 'dense' && 'p-4 sm:p-5', pad === 'lg' && 'p-5 sm:p-8', className)} {...rest}>
       {children}
     </As>
   )
@@ -62,10 +62,10 @@ export function CardHeader({
 /** Page title + the page's one-sentence answer + at most one action group. */
 export function PageHeader({ title, desc, right, className }: { title: string; desc?: ReactNode; right?: ReactNode; className?: string }) {
   return (
-    <div className={cx('mb-9 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
+    <div className={cx('mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
       <div className="min-w-0 flex-[1_1_20rem]">
-        <h1 className="balance text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">{title}</h1>
-        {desc && <p className="pretty mt-2 max-w-[60ch] text-[17px] leading-[1.55] text-ink-2">{desc}</p>}
+        <h1 className="balance text-[clamp(28px,2.7vw,40px)] leading-[1.18] font-bold tracking-[-0.045em] text-ink">{title}</h1>
+        {desc && <p className="pretty mt-2 max-w-[60ch] text-[15px] leading-[1.55] text-ink-2">{desc}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -260,7 +260,7 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 
 export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md', className?: string) {
   const v: Record<Variant, string> = {
-    primary: 'bg-ink text-white border border-ink hover:bg-[#2a2e37] hover:border-[#2a2e37] active:bg-black',
+    primary: 'border border-brand-ink bg-brand-ink text-white hover:border-[#184691] hover:bg-[#184691] active:bg-[#143a7b]',
     secondary: 'bg-surface text-ink border border-[rgb(12_14_19/0.18)] hover:border-[rgb(12_14_19/0.5)]',
     ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
     danger: 'bg-surface text-crit-ink border border-[#efc6c6] hover:bg-crit-bg hover:border-[#e3a9a9]',
@@ -268,7 +268,7 @@ export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md',
   }
   const s = size === 'sm' ? 'h-8 px-3.5 text-[13px] gap-1.5' : 'h-10 px-5 text-[14px] gap-2'
   return cx(
-    'inline-flex shrink-0 items-center justify-center rounded-full leading-none font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-200 disabled:cursor-not-allowed disabled:opacity-40',
+    'inline-flex shrink-0 items-center justify-center rounded-[9px] leading-none font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-200 disabled:cursor-not-allowed disabled:opacity-40',
     v[variant],
     s,
     className,

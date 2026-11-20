@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
 import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
@@ -23,7 +23,6 @@ export const NAV_GROUPS = [
     desc: '선택한 날짜의 전체 운전계획과 예상 효과',
     tabs: [
       { to: '/', label: '현황' },
-      { to: '/energy', label: '절감 효과' },
       { to: '/comfort', label: '쾌적 의견' },
     ],
   },
@@ -67,59 +66,26 @@ export function Logo() {
   return <Wordmark size={24} />
 }
 
-/** The two sections as words, the way /welcome names its scenes; the live one carries the blue dot. */
-function MainNav() {
-  const loc = useLocation()
-  const active = groupOf(loc.pathname)
+/** Keep every destination visible on desktop. Use the same groups in the mobile menu. */
+function WorkspaceNav() {
   return (
-    <nav className="hidden items-center gap-1 lg:flex" aria-label="주 메뉴">
-      {NAV_GROUPS.map((n) => {
-        const on = active === n
-        return (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            title={n.desc}
-            aria-current={on ? 'page' : undefined}
-            className={cx(
-              'inline-flex h-10 items-center gap-2 rounded-full px-4 text-[15px] leading-none transition-colors duration-200',
-              on ? 'font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
-            )}
-          >
-            <span className={cx('inline-block h-[7px] w-[7px] rounded-full transition-colors duration-200', on ? 'bg-brand' : 'bg-transparent')} aria-hidden />
-            {n.label}
-          </NavLink>
-        )
-      })}
-    </nav>
-  )
-}
-
-/** Tabs of the current section (the screens that used to be separate menu items). */
-export function SectionTabs() {
-  const loc = useLocation()
-  const g = groupOf(loc.pathname)
-  return (
-    <nav className="thin-scroll flex min-w-0 overflow-x-auto" aria-label={`${g.label} 하위 화면`}>
-      <div className="inline-flex shrink-0 gap-1">
-        {g.tabs.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.to === '/'}
-            className={({ isActive }) =>
-              cx(
-                'inline-flex h-9 shrink-0 items-center rounded-full px-4 text-[14px] whitespace-nowrap transition-[background-color,color] duration-200',
-                isActive ? 'bg-ink font-semibold text-white' : 'font-medium text-ink-3 hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
-              )
-            }
-          >
-            {t.label}
-          </NavLink>
+    <aside className="hidden lg:block">
+      <nav aria-label="주 메뉴" className="sticky top-20 max-h-[calc(100dvh-6rem)] space-y-5 overflow-y-auto p-3">
+        {NAV_GROUPS.map(({ to, label, icon: Icon, tabs }) => (
+          <div key={to}>
+            {tabs.length > 1 && <p className="mb-1 px-3 text-xs font-semibold text-ink-3">{label}</p>}
+            {tabs.map((tab) => (
+              <NavLink
+                key={tab.to} to={tab.to} end
+                className={({ isActive }) => cx('flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-[14px]', isActive ? 'bg-brand-bg font-bold text-brand-ink' : 'font-medium text-ink-2 hover:bg-well')}
+              >
+                <Icon size={16} aria-hidden />{tab.to === '/' ? '운영 현황' : tab.label}
+              </NavLink>
+            ))}
+          </div>
         ))}
-      </div>
-    </nav>
+      </nav>
+    </aside>
   )
 }
 
@@ -214,7 +180,7 @@ function DayPicker() {
       <input
         id="ond-date"
         type="date"
-        className="tnum h-10 max-w-[150px] rounded-full border border-line bg-surface px-3 text-[14px] font-medium text-ink sm:max-w-none sm:px-3.5"
+        className="tnum h-10 w-[130px] min-w-0 rounded-lg border border-line bg-surface px-3 text-[14px] font-medium text-ink sm:w-auto sm:px-3.5"
         value={date ?? ''}
         min={meta?.semester.start}
         max={meta?.semester.end}
@@ -233,14 +199,15 @@ function DayPicker() {
 
 function TopBar() {
   const { open, setOpen } = useCopilot()
+  const { meta } = useMeta()
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-md">
-      <div className="flex h-[72px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
+      <div className="flex h-16 items-center justify-between gap-2 px-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-6">
           <NavLink to="/" className="rounded-[10px]" aria-label="ON:D 운전 현황으로">
             <Logo />
           </NavLink>
-          <MainNav />
+          {meta && <span className="hidden truncate border-l border-line pl-5 text-sm font-semibold text-ink-2 sm:block">{meta.building.name}</span>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <DayPicker />
@@ -351,27 +318,15 @@ function SystemStatus() {
 
 function MobileNav() {
   const loc = useLocation()
-  const active = groupOf(loc.pathname)
+  const navigate = useNavigate()
+  const known = NAV_GROUPS.some((g) => g.tabs.some((t) => t.to === loc.pathname))
   return (
-    <nav className="thin-scroll sticky top-[72px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-white/90 px-4 py-2 backdrop-blur-md lg:hidden" aria-label="주 메뉴">
-      {NAV_GROUPS.flatMap((g) =>
-        g.tabs.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.to === '/'}
-            className={({ isActive }) =>
-              cx(
-                'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap',
-                isActive ? 'bg-ink font-semibold text-white' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
-              )
-            }
-          >
-            {t.to === g.to && <g.icon size={15} aria-hidden />}
-            {t.label}
-          </NavLink>
-        )),
-      )}
+    <nav className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2 lg:hidden" aria-label="주 메뉴">
+      <label htmlFor="work-screen" className="text-xs font-semibold text-ink-3">운영 메뉴</label>
+      <select id="work-screen" value={loc.pathname} onChange={(e) => navigate(e.target.value)} className="min-h-9 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink">
+        {!known && <option value={loc.pathname}>화면 선택</option>}
+        {NAV_GROUPS.map((g) => <optgroup key={g.to} label={g.label}>{g.tabs.map((t) => <option key={t.to} value={t.to}>{t.to === '/' ? '운영 현황' : t.label}</option>)}</optgroup>)}
+      </select>
     </nav>
   )
 }
@@ -392,25 +347,21 @@ export default function Layout() {
     if (open) setLoaded(true)
   }, [open])
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-[#f7f8fa]">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>
       <div className={cx('min-h-full', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        {/* the dashboard draws its own tabs in its header; one-tab sections need none */}
-        {loc.pathname !== '/' && groupOf(loc.pathname).tabs.length > 1 && (
-          <div className="mx-auto hidden max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-6 lg:block">
-            <SectionTabs />
-          </div>
-        )}
-        <main id="main" className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-8 pb-24">
-          {/* keyed by route: moving to another screen clears a crashed page */}
-          <ErrorBoundary key={loc.pathname} area="이 화면">
-            <Outlet />
-          </ErrorBoundary>
-        </main>
+        <div className="mx-auto grid max-w-[1760px] lg:grid-cols-[170px_minmax(0,1fr)] xl:grid-cols-[190px_minmax(0,1fr)]">
+          <WorkspaceNav />
+          <main id="main" tabIndex={-1} className="min-w-0 px-4 pt-6 pb-24 sm:px-6 lg:border-l lg:border-line lg:px-[clamp(20px,2.3vw,42px)] lg:pt-8">
+            <ErrorBoundary key={loc.pathname} area="이 화면">
+              <Outlet />
+            </ErrorBoundary>
+          </main>
+        </div>
       </div>
       {loaded && (
         <Suspense

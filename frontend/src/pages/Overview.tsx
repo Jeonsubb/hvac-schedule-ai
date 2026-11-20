@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CircleCheck, Download, FileUp, Inbox, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, Download, FileUp, Sparkles, X } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useDay, useMeta } from '../lib/context'
-import { statusInfo } from '../lib/constants'
-import { PendingList } from '../components/ModeSwitch'
 import { useAuth } from '../lib/auth'
-import type { Day, Iaq, Interval, Meta, NegCompare, OpMode } from '../lib/types'
+import type { Day, Iaq, Interval, Meta, NegCompare } from '../lib/types'
 import { ROOM_ORDER } from '../lib/constants'
-import { cx, fmtDateK, fmtKwh, fmtMin, fmtNum, hm } from '../lib/format'
+import { cx, fmtDateK, fmtKwh, fmtMin, hm } from '../lib/format'
 import { MODE, condMode, type BuildingState, type Mode, type RoomState } from '../lib/thermal'
 import {
   NEG_STATE,
@@ -30,8 +28,7 @@ import {
 import BuildingView, { MapLegend } from '../components/BuildingView'
 import DayTimeline from '../components/DayTimeline'
 import TimetableApply from '../components/TimetableApply'
-import { SectionTabs } from '../components/Layout'
-import { Badge, Button, ErrorBox, PageSkeleton, Popover, Segmented, Skeleton, btnCls } from '../components/ui'
+import { Badge, Button, ErrorBox, PageSkeleton, Segmented, Skeleton, btnCls } from '../components/ui'
 
 /**
  * 운영 현황: the whole day's operating plan first. Three numbers, the ten-room ON/OFF timeline, one
@@ -146,22 +143,17 @@ export default function Overview() {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-[20px] leading-[1.3] font-bold tracking-[-0.02em] text-ink">운영 현황</h1>
-          <p className="tnum mt-0.5 text-[13.5px] text-ink-3">
+          <h1 className="text-[clamp(28px,2.7vw,40px)] leading-[1.18] font-bold tracking-[-0.045em] text-ink">운영 현황</h1>
+          <p className="tnum mt-2 text-[13.5px] text-ink-3">
             {meta.building.campus.replace('부산캠퍼스', '').trim()} {meta.building.name} · 강의실 {rooms.length}곳 · {fmtDateK(date)} 기준
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="hidden lg:block">
-            <SectionTabs />
-          </div>
           <Link to={`/plan?date=${date}&room=${room}`} className={btnCls('primary', 'md')}>
             <Sparkles size={15} aria-hidden /> AI 협의로 운전계획 검토
           </Link>
         </div>
       </div>
-
-      {applied && <Brief day={D} meta={meta} op={plans[operating] ?? sel} fixed={fixed} date={date} />}
 
       {!applied && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-line bg-well px-5 py-3.5">
@@ -174,39 +166,34 @@ export default function Overview() {
       <TimetableApply open={ttOpen} onClose={() => setTtOpen(false)} onApplied={() => setPicked('base')} />
 
       {/* three numbers, all of the selected plan */}
-      <section data-tour="ov-summary" className="grid grid-cols-1 divide-y divide-line rounded-[16px] border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="핵심 지표">
+      <section data-tour="ov-summary" className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="핵심 지표">
+        <Kpi primary label="예상 소비량" value={fmtKwh(sel.kwh)} unit="kWh" sub={`${sel.label}${sel.badge ? ` (${sel.badge})` : ''} · 하루 전체 · 시뮬레이션`} />
         <Kpi
-          label="하루 예상 전기 사용"
-          value={fmtKwh(sel.kwh)}
-          unit="kWh"
-          sub={`${sel.costKrw != null ? `전기요금 약 ${fmtNum(sel.costKrw)}원 · ` : ''}${sel.label}${sel.badge ? ` (${sel.badge})` : ''} · 시뮬레이션`}
-        />
-        <Kpi
-          label="종일 켜 둘 때(고정 운전)보다"
-          value={saving != null ? `${saving >= 0 ? '−' : '+'}${Math.abs(saving).toFixed(1)}` : '—'}
+          label="고정 운전 대비 예상 절감률"
+          value={saving != null ? `${saving >= 0 ? '' : '+'}${Math.abs(saving).toFixed(1)}` : '—'}
           unit={saving != null ? '%' : undefined}
           sub={
             key === 'fixed'
               ? '고정 운전이 비교 기준입니다'
               : fixed
-                ? `${saving != null && saving < 0 ? '고정 운전보다 많이 씀 · ' : ''}${meta.settings.fixed_on}~${meta.settings.fixed_off} 전 강의실 가동 시 ${fmtKwh(fixed.kwh)} kWh${fixed.costKrw != null && sel.costKrw != null && fixed.costKrw > sel.costKrw ? ` · 하루 약 ${fmtNum(fixed.costKrw - sel.costKrw)}원 절약` : ''}`
+                ? `${saving != null && saving < 0 ? '고정 운전보다 많이 씀 · ' : ''}같은 시간표·날씨에서 고정 운전 ${fmtKwh(fixed.kwh)} kWh`
                 : '고정 운전 계산 결과가 없습니다'
           }
         />
         <Kpi
-          label="수업 시간 중 쾌적했던 비율"
+          label="수업 중 쾌적 범위 충족"
           value={noClass ? '—' : sel.comfortPct != null ? sel.comfortPct.toFixed(0) : '—'}
           unit={!noClass && sel.comfortPct != null ? '%' : undefined}
           sub={
             noClass
               ? '이 날짜에는 수업이 없습니다'
-              : `수업 중 실내가 ${band} 안이었던 시간${sel.outBandMin != null && sel.classMin ? (sel.outBandMin > 0 ? ` · 벗어난 시간 ${sel.outBandMin}분(전체 ${fmtNum(sel.classMin)}분)` : ` · 수업 ${fmtNum(sel.classMin)}분 모두 범위 안`) : ''}`
+              : `예측 실내온도 ${band} 기준${sel.outBandMin != null && sel.classMin ? ` · 범위 밖 ${sel.outBandMin}분/${sel.classMin}분` : ''}${sel.pmvMean != null ? ` · 평균 PMV ${signed(sel.pmvMean, 2)}` : ''}`
           }
         />
       </section>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section data-tour="ov-building" className="min-w-0 rounded-[16px] border border-line bg-surface p-5" aria-labelledby="tl-title">
+      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <section data-tour="ov-building" className="min-w-0 rounded-xl border border-line bg-surface p-3 sm:p-5" aria-labelledby="tl-title">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 id="tl-title" className="text-[16px] font-bold tracking-[-0.015em] text-ink">
@@ -307,8 +294,13 @@ export default function Overview() {
         </section>
 
         {/* selected room: beside the timeline on wide screens, a bottom sheet on narrow ones */}
-        <aside data-tour="ov-time" className="hidden xl:block" aria-label="선택 강의실 상세">
-          <RoomPanel room={room} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} />
+        <aside data-tour="ov-time" className="min-w-0" aria-label="선택 강의실 상세">
+          <button type="button" className="flex w-full items-center justify-between rounded-xl border border-line bg-surface p-4 text-sm font-semibold xl:hidden" onClick={() => setSheet(true)} aria-haspopup="dialog">
+            {room}호 · {fmtMin(m)} 상세 보기 <ArrowRight size={16} aria-hidden />
+          </button>
+          <div className="hidden xl:block">
+            <RoomPanel room={room} minute={m} plan={sel} day={D} meta={meta} iaq={iaq} spKey={spKey} planKey={key} />
+          </div>
         </aside>
         {sheet && (
           <div className="fixed inset-x-0 bottom-0 z-30 max-h-[78vh] overflow-y-auto rounded-t-[20px] border-t border-line bg-surface p-4 shadow-[0_-12px_32px_rgb(12_14_19/0.14)] xl:hidden" role="dialog" aria-label={`${room}호 상세`}>
@@ -327,85 +319,12 @@ export default function Overview() {
   )
 }
 
-/** One plain sentence about the day and the things the operator has to act on, before any number. */
-function Brief({ day, meta, op, fixed, date }: { day: Day; meta: Meta; op: PlanModel; fixed: PlanModel | undefined; date: string }) {
-  const modeQ = useApi<OpMode>('/api/mode', { maxAgeMs: 20_000, refreshMs: 60_000 })
-  const pending = Number(modeQ.data?.pending) || 0
-  const auto = modeQ.data?.mode === 'auto'
-  const review = (day.validation?.sessions ?? []).filter((v) => statusInfo(String(v.status)).group === 'review')
-  const used = new Set(day.sessions.map((s) => s.room))
-  const nRooms = Object.keys(meta.rooms).length
-  const wxErr = Object.keys(meta.weather?.errors ?? {}).length > 0
-  const aiDown = meta.ai?.ok === false
-  const saving = fixed && fixed.kwh > 0 ? Math.round(((fixed.kwh - op.kwh) / fixed.kwh) * 100) : null
-  const sentence =
-    day.sessions.length === 0
-      ? '이 날은 수업이 없어 냉난방을 켜지 않습니다.'
-      : `강의실 ${nRooms}곳 중 수업이 있는 ${used.size}곳만, 수업 전에 미리 켜고 수업이 끝나면 끕니다.${saving != null && saving > 0 ? ` 모든 강의실을 종일 켜 둘 때보다 전기를 약 ${saving}% 덜 씁니다.` : ''}`
-  const clear = pending === 0 && review.length === 0 && !wxErr && !aiDown
+function Kpi({ label, value, unit, sub, primary = false }: { label: string; value: string; unit?: string; sub: string; primary?: boolean }) {
   return (
-    <section data-tour="ov-brief" className="mb-5 rounded-[16px] border border-line bg-surface" aria-label="오늘 요약과 확인할 일">
-      <p className="px-5 pt-4 pb-3.5 text-[15.5px] leading-[1.55] text-ink">{sentence}</p>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-t border-line px-5 py-3">
-        <span className="mr-1 text-[13px] font-semibold text-ink-2">지금 확인할 일</span>
-        {clear && (
-          <span className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-2">
-            <CircleCheck size={15} className="text-good" aria-hidden /> 없습니다. 계획대로 운전하고 있습니다.
-          </span>
-        )}
-        {pending > 0 && (
-          <Popover
-            label="승인 대기 조정안"
-            align="start"
-            width={400}
-            buttonClassName="inline-flex h-8 items-center gap-1.5 rounded-full bg-warn-bg px-3 text-[13px] font-semibold whitespace-nowrap text-warn-ink transition-colors hover:bg-[#ffeec4]"
-            button={
-              <>
-                <Inbox size={14} aria-hidden /> AI 조정안 승인 대기 <span className="tnum">{pending}</span>건
-              </>
-            }
-          >
-            <div className="mb-3 text-[14.5px] font-semibold text-ink">승인을 기다리는 AI 조정안</div>
-            <PendingList onDone={modeQ.reload} />
-            <p className="mt-3 text-[13px] leading-[1.5] text-ink-3">승인한 것만 운전계획에 반영됩니다. 거절하면 지금 계획을 그대로 둡니다.</p>
-          </Popover>
-        )}
-        {review.length > 0 && (
-          <Link
-            to={`/validation?date=${date}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-crit-bg px-3 text-[13px] font-semibold whitespace-nowrap text-crit-ink transition-colors hover:brightness-[0.97]"
-          >
-            <TriangleAlert size={14} aria-hidden /> 확인이 필요한 수업 <span className="tnum">{review.length}</span>건 ({[...new Set(review.map((v) => v.room))].join('·')}호)
-          </Link>
-        )}
-        {wxErr && <span className="inline-flex h-8 items-center rounded-full bg-warn-bg px-3 text-[13px] font-medium text-warn-ink">날씨 자료를 일부 받지 못했습니다</span>}
-        {aiDown && <span className="inline-flex h-8 items-center rounded-full bg-warn-bg px-3 text-[13px] font-medium text-warn-ink">AI 연결이 불안정합니다</span>}
-        <span className="ml-auto text-[12.5px] text-ink-3">
-          {modeQ.data ? (auto ? '자동 운전: 작은 조정(0.5℃ 이내)은 AI가 바로 반영합니다' : '추천 모드: AI 조정안은 승인한 것만 반영합니다') : ''}
-        </span>
-      </div>
-    </section>
-  )
-}
-
-/** In words: what the room is doing at the chosen time and why. */
-function roomStatus(iv: Interval | undefined, cur: { title: string; end: string } | undefined, next: { title: string; start: string } | undefined, runs: Interval[], minute: number): string {
-  if (iv && cur) return `수업 중이라 켜 둡니다. ${cur.end}에 수업이 끝나면 꺼집니다.`
-  if (iv && next) return `${next.start} 수업에 맞춰 미리 켜 둔 상태입니다.`
-  if (iv) return '계획에 따라 켜 둔 상태입니다.'
-  if (cur) return '수업 중이지만 실내가 쾌적 범위라 꺼 둔 상태입니다.'
-  const run = runs.find((x) => x.s > minute)
-  if (next && run) return `지금은 수업이 없어 꺼 둡니다. ${next.start} 수업에 맞춰 ${fmtMin(run.s)}에 켭니다.`
-  if (next) return `지금은 수업이 없어 꺼 둡니다. 다음 수업은 ${next.start}입니다.`
-  return '오늘 남은 수업이 없어 꺼 둡니다.'
-}
-
-function Kpi({ label, value, unit, sub }: { label: string; value: string; unit?: string; sub: string }) {
-  return (
-    <div className="min-w-0 px-5 py-4">
+    <div className={cx('min-w-0 rounded-xl border px-5 py-5', primary ? 'border-[#c8d8ef] bg-[#eaf1fc]' : 'border-line bg-surface')}>
       <div className="text-[13px] font-medium text-ink-3">{label}</div>
       <div className="mt-1 flex items-baseline gap-1">
-        <span className="tnum text-[28px] leading-[1.15] font-[650] tracking-[-0.02em] text-ink">{value}</span>
+        <span className="tnum text-[clamp(28px,2.6vw,40px)] leading-[1.15] font-bold tracking-[-0.02em] text-ink">{value}</span>
         {unit && <span className="text-[14px] font-medium text-ink-3">{unit}</span>}
       </div>
       <div className="tnum mt-1 text-[12.5px] leading-snug text-ink-3">{sub}</div>
@@ -474,10 +393,13 @@ function RoomPanel({
   const co2 = iaq?.rooms[room]?.co2?.[Math.max(0, Math.min(95, Math.floor(minute / 15)))]
   const people = iaq?.rooms[room]?.people?.[Math.max(0, Math.min(95, Math.floor(minute / 15)))]
   const mode = iv ? (iv.kind === 'fan' ? 'air' : condMode(day, room, ta ?? 20, meta, planKey === 'fixed' ? 'fixed' : 'ai')) : 'off'
+  // PMV of the class in progress exists per class only in the day's own strategies
+  const sd = planKey === 'fixed' ? day.strategies.fixed : planKey === 'base' && !plan.badge?.includes('협의 전') ? day.strategies.ai : undefined
+  const curPmv = cur ? sd?.rooms[room]?.sessions.find((c) => c.id === cur.id)?.pmv : undefined
   const runs = mergeIntervals(r?.plan)
   const info = meta.rooms[room]
   return (
-    <div className={cx(!bare && 'rounded-[16px] border border-line bg-surface p-5')}>
+    <div className={cx(!bare && 'rounded-xl border border-line bg-surface p-3 sm:p-5')}>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="tnum text-[16px] font-bold tracking-[-0.015em] text-ink">
           {room}호 · 선택 시각 {fmtMin(minute)}
@@ -498,7 +420,7 @@ function RoomPanel({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[12.5px] font-medium text-ink-3">냉난방 (계획)</div>
+          <div className="text-[12.5px] font-medium text-ink-3">시뮬레이션 ON/OFF</div>
           <div className="mt-1 inline-flex items-center gap-1.5 text-[16px] font-bold text-ink">
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: iv ? 'var(--color-brand)' : 'var(--color-ink-4)' }} aria-hidden />
             {iv ? `ON · ${MODE[mode as Mode].label}` : 'OFF'}
@@ -506,21 +428,20 @@ function RoomPanel({
         </div>
       </div>
 
-      <p className="mt-3 rounded-[10px] bg-well px-3 py-2 text-[13px] leading-snug text-ink-2">{roomStatus(iv, cur, next, runs, minute)}</p>
-
       {r?.ta && <TempSpark ta={r.ta} minute={minute} lo={meta.settings.comfort_low} hi={meta.settings.comfort_high} runs={runs} />}
 
       <dl className="mt-4 divide-y divide-line border-y border-line text-[13.5px]">
-        <Row k={`${spKey === 'sp_heat' ? '난방' : '냉방'} 설정온도`} v={r?.sp != null ? `${r.sp.toFixed(1)} ℃` : '—'} />
-        <Row k="켜 두는 시간" v={runs.length ? runs.map((x) => `${fmtMin(x.s)}–${fmtMin(x.e)}`).join(', ') : '운전 없음'} />
+        <Row k={`정책 설정온도 (${spKey === 'sp_heat' ? '난방' : '냉방'})`} v={r?.sp != null ? `${r.sp.toFixed(1)} ℃` : '—'} />
+        <Row k="계획 운전 구간" v={runs.length ? runs.map((x) => `${fmtMin(x.s)}–${fmtMin(x.e)}`).join(', ') : '운전 없음'} />
         <Row k="진행 중인 수업" v={cur ? `${cur.title} ${cur.start}–${cur.end}` : '없음'} />
         <Row k="다음 수업" v={next ? `${next.title} ${next.start}–${next.end}` : '없음'} />
         {co2 != null && <Row k="추정 CO₂" v={`${Math.round(co2).toLocaleString('ko-KR')} ppm${iaq ? ` (기준 ${iaq.co2_max})` : ''}`} />}
         {people != null && people > 0 && <Row k="추정 재실 인원" v={`${Math.round(people)}명`} />}
-        {r?.kwh != null && <Row k="하루 예상 전기 사용" v={`${r.kwh.toFixed(1)} kWh`} />}
+        {curPmv != null ? <Row k="이 수업의 예측 PMV" v={signed(curPmv, 2)} /> : r?.pmv != null ? <Row k="수업 중 평균 예측 PMV" v={signed(r.pmv, 2)} /> : null}
+        {r?.kwh != null && <Row k="하루 예상 소비량" v={`${r.kwh.toFixed(1)} kWh`} />}
       </dl>
       <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
-        실내온도·켜고 끄는 시각·전력은 열모델 시뮬레이션, CO₂·인원은 정원×출석률 가정으로 계산한 추정값입니다. 실제 센서 값이 아닙니다.
+        실내온도·ON/OFF·PMV·전력은 열모델 시뮬레이션, CO₂·인원은 정원×출석률 가정으로 계산한 추정값입니다. 실제 센서 값이 아닙니다.
       </p>
     </div>
   )
@@ -595,7 +516,7 @@ function AiSummary({
   onPreview?: () => void
 }) {
   const to = `/plan?date=${date}&room=${room}`
-  const shell = 'mt-5 rounded-[16px] border border-line bg-surface p-5'
+  const shell = 'mt-5 rounded-xl border border-line bg-surface p-3 sm:p-5'
   if (loading) return <Skeleton className="mt-5 h-[88px]" />
   if (error && !cmp)
     return (
@@ -665,18 +586,12 @@ function AiSummary({
           <dd className="mt-0.5 font-medium text-ink">{b && f ? `${b.kwh.toFixed(1)} → ${f.kwh.toFixed(1)} kWh (${signed(dk as number, 2)} kWh)` : '—'}</dd>
         </div>
         <div>
-          <dt className="text-ink-3">{cmp.before && cmp.after ? '수업 중 쾌적 범위를 벗어난 시간 (협의 전 → 후)' : '체감 지표 PMV (협의 전 → 후, 0이 적당)'}</dt>
-          <dd className="mt-0.5 font-medium text-ink">
-            {cmp.before && cmp.after
-              ? `${cmp.before.out_band_min}분 → ${cmp.after.out_band_min}분`
-              : b?.pmv_mean != null && f?.pmv_mean != null
-                ? `${signed(b.pmv_mean, 2)} → ${signed(f.pmv_mean, 2)}`
-                : '—'}
-          </dd>
+          <dt className="text-ink-3">수업 중 평균 예측 PMV (협의 전 → 후)</dt>
+          <dd className="mt-0.5 font-medium text-ink">{b?.pmv_mean != null && f?.pmv_mean != null ? `${signed(b.pmv_mean, 2)} → ${signed(f.pmv_mean, 2)}` : '—'}</dd>
         </div>
       </dl>
       <p className="mt-3 text-[12.5px] text-ink-3">
-        비용을 줄이려는 AI와 쾌적을 지키려는 AI가 강의실별 설정온도를 조율한 결과입니다. 켜고 끄는 시각은 그 온도로 다시 계산합니다. {cmp.created_at ? `협의 시각 ${cmp.created_at.slice(5, 16).replace('T', ' ')} · ` : ''}
+        두 Agent가 협의하는 것은 설정온도이고, 켜고 끄는 시각은 물리 계산 엔진이 다시 계산합니다. {cmp.created_at ? `협의 시각 ${cmp.created_at.slice(5, 16).replace('T', ' ')} · ` : ''}
         {cmp.state === 'pending' ? '승인 전이므로 현재 운영계획은 바뀌지 않았습니다.' : cmp.state === 'applied' ? '승인되어 현재 운영계획에 반영되어 있습니다.' : ''}
       </p>
     </section>

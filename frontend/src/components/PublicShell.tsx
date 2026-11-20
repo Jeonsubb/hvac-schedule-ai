@@ -74,7 +74,7 @@ export function AiAvatar({ size = 32 }: { size?: number }) {
 export function AuthLayout({ title, desc, children, aside }: { title: string; desc?: ReactNode; children: ReactNode; aside?: ReactNode }) {
   return (
     <div className="grid min-h-full bg-surface lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-[#fafafb] px-12 py-10 lg:flex">
+      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-[#eaf1fc] px-12 py-10 lg:flex">
         <div className="ground-grid pointer-events-none absolute inset-0" aria-hidden />
         <Link to="/welcome" className="relative z-10 self-start rounded-[10px]" aria-label="ON:D 소개로 가기">
           <Wordmark size={24} />
@@ -84,14 +84,14 @@ export function AuthLayout({ title, desc, children, aside }: { title: string; de
             <>
               <p className="display text-[clamp(38px,3.8vw,56px)]">
                 <span className="rise-mask">
-                  <span className="rise-line">필요한 시간에,</span>
+                  <span className="rise-line">첫 수업 전에,</span>
                 </span>
                 <span className="rise-mask">
-                  <span className="rise-line d1">필요한 공간만.</span>
+                  <span className="rise-line d1">강의실은 준비 중.</span>
                 </span>
               </p>
               <p className="mt-6 max-w-[28em] text-[17px] leading-[1.6] text-ink-2">
-                일정·날씨·재실·CO₂·쾌적 의견을 보고 냉난방 운전 계획을 매월·매주·매일 다시 만듭니다. 비용은 줄이고, 수업 중 쾌적은 그대로 지킵니다.
+                시설 담당자는 하루 운전 계획을 확인하고, 시간표 변경이나 쾌적 의견에 맞춰 강의실별 냉난방을 조정할 수 있습니다.
               </p>
             </>
           )}

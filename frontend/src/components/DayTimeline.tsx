@@ -75,7 +75,7 @@ export default function DayTimeline({
         <div className="min-w-[660px]">
           {/* hour axis */}
           <div className="flex h-11 items-end">
-            <div style={{ width: LABEL_W }} className="shrink-0 pb-1 text-[12px] font-medium text-ink-3">
+            <div style={{ width: LABEL_W }} className="sticky left-0 z-[3] shrink-0 border-r border-line bg-surface pb-1 pl-2 text-[12px] font-medium text-ink-3">
               강의실
             </div>
             <div className="relative h-full flex-1">
@@ -123,7 +123,7 @@ export default function DayTimeline({
                     type="button"
                     onClick={() => onSelect(room)}
                     aria-pressed={on}
-                    className="flex shrink-0 items-center justify-between gap-1 pr-3 pl-2 text-left"
+                    className={cx('sticky left-0 z-[3] flex shrink-0 items-center justify-between gap-1 border-r border-line pr-3 pl-2 text-left', on ? 'bg-brand-bg' : 'bg-surface hover:bg-well')}
                     style={{ width: LABEL_W }}
                     title={`${room}호 상세 보기`}
                   >
