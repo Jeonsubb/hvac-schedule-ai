@@ -44,6 +44,12 @@ Conditions:
   UseLambda: !Equals [!Ref ApiMode, lambda]
 
 Resources:
+  OperatorNotifications:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: hvac-ai-operator-notifications
+      Tags: [{ Key: project, Value: hvac-ai }]
+
   DataBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -107,6 +113,7 @@ Resources:
           MODEL_SONNET: global.anthropic.claude-sonnet-5-5
           MODEL_HAIKU: global.anthropic.claude-haiku-5-5
           LLM_DAILY_CAP: "600"
+          NOTIFICATION_TOPIC_ARN: !Ref OperatorNotifications
       Tags: [{ Key: project, Value: hvac-ai }]
 
   ApiAsyncConfig:
@@ -244,6 +251,8 @@ Resources:
                 AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}
 
 Outputs:
+  NotificationTopicArn:
+    Value: !Ref OperatorNotifications
   SiteUrl:
     Value: !Sub https://${Distribution.DomainName}
   DistributionId:

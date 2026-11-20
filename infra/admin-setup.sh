@@ -25,6 +25,8 @@ cat > /tmp/api-policy.json <<EOF
  {"Effect":"Allow","Action":"ssm:GetParameter","Resource":"arn:aws:ssm:${REGION}:${ACC}:parameter/hvac-ai/kma-key"},
  {"Effect":"Allow","Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],"Resource":["arn:aws:bedrock:*::foundation-model/anthropic.*","arn:aws:bedrock:*:${ACC}:inference-profile/*"]},
  {"Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:${REGION}:${ACC}:function:hvac-ai-api"},
+ {"Effect":"Allow","Action":["sns:Publish","sns:Subscribe"],"Resource":"arn:aws:sns:${REGION}:${ACC}:hvac-ai-operator-notifications"},
+ {"Effect":"Allow","Action":"sns:GetSubscriptionAttributes","Resource":"*"},
  {"Effect":"Allow","Action":["polly:SynthesizeSpeech","transcribe:StartStreamTranscriptionWebSocket"],"Resource":"*"}
 ]}
 EOF

@@ -164,6 +164,11 @@ def run(job_id: str) -> dict:
     try:
         _save(job)
     except Exception as e:  # last resort: never leave the job "running"
+        job["status"] = "error"
         get_store().put_item("job", job["id"], {"id": job["id"], "kind": job["kind"], "status": "error",
                                                 "error": f"결과 저장 실패: {e}"[:300], "updated": time.time()})
+    from . import notifications
+
+    notifications.job_finished(job)
+    notifications.pending_approvals()
     return job

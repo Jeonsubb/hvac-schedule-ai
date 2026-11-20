@@ -8,6 +8,7 @@ import type { BmsCommand, BuildingProfile, GatewayStatus, Policy, Settings, Stra
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
 import ModeSwitch from '../components/ModeSwitch'
+import OperatorNotifications from '../components/OperatorNotifications'
 import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast, More} from '../components/ui'
 
 type NumKey =
@@ -247,6 +248,7 @@ export default function SettingsPage() {
         </div>
       )}
       <BuildingAndPolicy />
+      <OperatorNotifications />
 
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">

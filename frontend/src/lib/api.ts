@@ -46,10 +46,10 @@ export async function apiGet<T>(url: string, signal?: AbortSignal): Promise<T> {
   return (await res.json()) as T
 }
 
-export async function apiSend<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown): Promise<T> {
+export async function apiSend<T>(method: 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   const res = await request(url, {
     method,
-    headers: body instanceof FormData ? undefined : { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: body instanceof FormData ? headers : { 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
     body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   })
   if (!res.ok) throw await parseError(res)

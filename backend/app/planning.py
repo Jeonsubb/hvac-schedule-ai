@@ -1499,6 +1499,10 @@ def run_tier(tier: int, d: date | None = None, actor: str = "운영자", progres
            "actor": actor, "elapsed_ms": round((time.perf_counter() - t_all) * 1000), "steps": steps, "outcome": out.get("outcome"),
            "scenarios": out.get("scenarios")}
     get_store().put_item("tier_run", rec["id"], rec)
+    from . import notifications
+
+    notifications.pending_approvals()
+    notifications.inspection_checks(out["plan"].get("checks", []), f"{tier}:{d.isoformat()}")
     return {"run": rec, "plan": out["plan"]}
 
 
@@ -1509,7 +1513,13 @@ def run_daily(log=print) -> dict:
         try:
             p = tier_plan(t)
             out[t] = {"checks": len(p["checks"]), "adjustments": len(p["adjustments"])}
+            from . import notifications
+
+            notifications.inspection_checks(p["checks"], f"{t}:{service.now_kst().date().isoformat()}")
         except Exception as e:  # never break the weather refresh
             out[t] = {"error": str(e)[:200]}
     log(f"tier re-check: {json.dumps(out, ensure_ascii=False)}")
+    from . import notifications
+
+    notifications.pending_approvals()
     return out
