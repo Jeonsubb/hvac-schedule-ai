@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { AudioLines, LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react'
+import { AudioLines, LayoutDashboard, CalendarRange, MessageCircle, Sparkles, X, CloudSun, LogOut, BookOpenText, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
 import { useMeta, useCopilot, useDay } from '../lib/context'
 import { useAuth } from '../lib/auth'
@@ -91,11 +91,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const row = (on: boolean) =>
     cx(
       'ond-press flex h-9 items-center gap-2.5 rounded-[8px] px-3 text-[14px] leading-none transition-colors duration-150',
-      on ? 'bg-well font-semibold text-ink' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
+      on ? 'bg-brand-bg/70 font-semibold text-brand-ink' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
     )
   return (
     <aside
-      className={cx('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[76px]' : 'w-[244px]')}
+      className={cx('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-[#fafbfc] transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[76px]' : 'w-[224px]')}
     >
       <div className={cx('flex h-16 shrink-0 items-center', collapsed ? 'justify-center' : 'justify-between pr-3 pl-5')}>
         <NavLink to="/" className="rounded-[10px]" aria-label="온디에게 말로 묻기" title="온디에게 말로 묻기">
@@ -109,9 +109,9 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         )}
       </div>
       {!collapsed && (
-        <div className="mx-3 mb-2 rounded-[10px] bg-well px-3 py-2.5 text-[12px] leading-[1.5]">
-          <div className="font-semibold text-ink">{building}</div>
-          <div className="tnum text-ink-3">
+        <div className="mx-5 mt-2 mb-5 border-b border-line pb-5 text-[12px] leading-[1.5]">
+          <div className="text-[13px] font-semibold text-ink">{building}</div>
+          <div className="tnum mt-1 text-ink-3">
             {meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'} · 강의실 {meta ? Object.keys(meta.rooms).length : 10}곳
           </div>
         </div>
@@ -130,7 +130,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                     aria-current={on ? 'page' : undefined}
                     className={cx(
                       'ond-press flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2.5 text-[11px] leading-none whitespace-nowrap transition-colors duration-150',
-                      on ? 'bg-well font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-hover hover:text-ink',
+                      on ? 'bg-brand-bg/70 font-semibold text-brand-ink' : 'font-medium text-ink-3 hover:bg-hover hover:text-ink',
                     )}
                   >
                     <g.icon size={20} strokeWidth={on ? 2.2 : 1.8} className={on ? 'text-brand' : undefined} aria-hidden />
@@ -179,7 +179,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         </div>
       )}
       {/* the voice orb (헤이 온디) docks in this corner on every screen */}
-      <div className="h-[104px] shrink-0" aria-hidden />
+      <div className="h-[76px] shrink-0" aria-hidden />
     </aside>
   )
 }
@@ -187,9 +187,19 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 /** Where this screen sits in the service: section › screen. */
 function Crumbs() {
   const loc = useLocation()
+  const { meta } = useMeta()
   const g = groupOf(loc.pathname)
   const t = g.tabs.find((x) => tabOn(loc.pathname, x.to))
   const leaf = t && (g.tabs.length > 1 || t.label !== g.label) ? t.label : null
+  if (loc.pathname === '/overview') {
+    return (
+      <nav className="hidden min-w-0 items-center gap-2 text-[13px] sm:flex" aria-label="현재 위치">
+        <span className="shrink-0 text-ink-3">워크스페이스</span>
+        <span className="text-ink-4" aria-hidden>/</span>
+        <span className="truncate font-medium text-ink-2">{meta?.building.name ?? 'IT관'}</span>
+      </nav>
+    )
+  }
   return (
     <nav className="hidden min-w-0 items-center gap-1.5 text-[14px] sm:flex" aria-label="현재 위치">
       <span className="font-medium whitespace-nowrap text-ink-3">ON:D</span>
@@ -343,8 +353,8 @@ function DayPicker() {
 function TopBar() {
   const { open, setOpen } = useCopilot()
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
-      <div className="flex h-16 items-center justify-between gap-4 px-[clamp(16px,2.4vw,32px)]">
+    <header className="sticky top-0 z-20 border-b border-line bg-surface">
+      <div className="flex h-16 items-center justify-between gap-3 px-4 lg:px-7">
         <div className="flex min-w-0 items-center gap-4">
           <NavLink to="/" className="rounded-[10px] lg:hidden" aria-label="온디에게 말로 묻기" title="온디에게 말로 묻기">
             <Logo />
@@ -358,11 +368,11 @@ function TopBar() {
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             className={cx(
-              'ond-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] px-3 text-[14px] font-bold sm:px-4',
-              open ? 'border border-stroke-neutral-weak bg-surface text-ink hover:bg-bg-layer-default-pressed' : 'bg-bg-neutral-solid text-fg-on-neutral-solid hover:bg-bg-neutral-solid-pressed',
+              'ond-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] border px-3 text-[13px] font-medium',
+              open ? 'border-line-strong bg-well text-ink hover:bg-hover' : 'border-transparent text-ink-2 hover:border-line hover:bg-hover hover:text-ink',
             )}
           >
-            {open ? <X size={16} aria-hidden /> : <Sparkles size={16} className="text-[#8fb3f0]" aria-hidden />}
+            {open ? <X size={16} aria-hidden /> : <MessageCircle size={16} aria-hidden />}
             <span className="max-sm:sr-only">{open ? '도우미 닫기' : 'AI 도우미'}</span>
           </button>
           <AccountMenu />
@@ -462,7 +472,7 @@ function MobileNav() {
   const loc = useLocation()
   const active = groupOf(loc.pathname)
   return (
-    <nav className="thin-scroll sticky top-16 z-20 flex gap-1 overflow-x-auto border-b border-line bg-white/90 px-4 py-2 backdrop-blur-md lg:hidden" aria-label="주 메뉴">
+    <nav className="thin-scroll sticky top-16 z-20 flex gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2 lg:hidden" aria-label="주 메뉴">
       {NAV_GROUPS.flatMap((g) =>
         g.tabs.map((t) => (
           <NavLink
@@ -471,8 +481,8 @@ function MobileNav() {
             end={t.to === '/'}
             className={({ isActive }) =>
               cx(
-                'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap',
-                isActive ? 'bg-ink font-semibold text-white' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
+                'flex shrink-0 items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
+                isActive ? 'bg-brand-bg/70 font-semibold text-brand-ink' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
               )
             }
           >
@@ -534,7 +544,7 @@ export default function Layout() {
       return !c
     })
   return (
-    <div className="min-h-full bg-canvas lg:flex">
+    <div className={cx('min-h-full lg:flex', loc.pathname === '/overview' ? 'bg-surface' : 'bg-canvas')}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>
@@ -544,7 +554,7 @@ export default function Layout() {
         <MobileNav />
         {/* the sidebar lists every screen of every section, so the pages need no tab strip of their own */}
         {/* 온디 (voice) fills the whole area under the top bar; the other screens keep a readable width */}
-        <main id="main" className={loc.pathname === '/' ? 'min-w-0' : 'mx-auto max-w-[1320px] px-[clamp(16px,2.4vw,32px)] pt-7 pb-24'}>
+        <main id="main" className={loc.pathname === '/' ? 'min-w-0' : loc.pathname === '/overview' ? 'mx-auto max-w-[1440px] px-4 pt-6 pb-24 lg:px-7' : 'mx-auto max-w-[1320px] px-[clamp(16px,2.4vw,32px)] pt-7 pb-24'}>
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />

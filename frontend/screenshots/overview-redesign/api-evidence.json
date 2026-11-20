@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-20",
+  "state": "applied",
+  "ai": true,
+  "same_conditions": true,
+  "fullDayBeforeKwh": 44.61,
+  "fullDayAfterKwh": 44.05,
+  "evaluationBeforeKwh": 44.61,
+  "evaluationAfterKwh": 44.05,
+  "fullDayBeforeOutBand": 0,
+  "fullDayAfterOutBand": 0
+}

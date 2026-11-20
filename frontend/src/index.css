@@ -5,6 +5,70 @@
 @import "tailwindcss";
 @import "@seed-design/tailwind4-theme";
 
+/* The operations view is a working surface: hierarchy comes from type and rules. */
+.overview-page { --overview-line: #e8ebef; }
+.overview-heading { margin-bottom: 8px; }
+.overview-page .overview-primary {
+  background: var(--color-brand); color: white; font-weight: 600;
+}
+.overview-page .overview-primary:hover { background: var(--color-brand-ink); }
+.overview-brief {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px;
+  min-height: 20px; margin-bottom: 12px; font-size: 13px;
+}
+.overview-kpis { border-block: 1px solid var(--overview-line); }
+.overview-kpi { padding: 12px 24px; }
+.overview-kpi > div:nth-child(2), .overview-kpi > div:nth-child(3) { margin-top: 4px; }
+.overview-kpi > div:nth-child(2) > span:first-child { font-size: 32px; }
+.overview-kpi:first-child { padding-left: 0; }
+.overview-kpi:last-child { padding-right: 0; }
+.overview-basis { min-height: 28px; margin-bottom: 4px; }
+.overview-strategies { border-bottom: 1px solid var(--overview-line); padding-bottom: 4px; }
+.overview-page [role='radiogroup'] { border-radius: 7px; background: #f5f6f8; padding: 3px; }
+.overview-page [role='radio'] { border-radius: 5px; height: 28px; font-size: 12px; padding-inline: 10px; transition-duration: 150ms; }
+.overview-strategies [role='radiogroup'] { background: transparent; padding: 0; gap: 4px; }
+.overview-strategies [role='radio'] { box-shadow: none; height: 28px; padding-inline: 10px; }
+.overview-strategies [role='radio'][aria-checked='true'] { background: #eef2f8; color: var(--color-brand-ink); }
+.overview-strategies [role='radio'][aria-checked='false'] { background: transparent; }
+.overview-page .overview-compare { height: 30px; border-radius: 6px; padding-inline: 10px; font-weight: 500; }
+.overview-schedule > div:last-child { margin-top: 10px; padding-top: 8px; }
+.overview-inspector { position: relative; border-left: 1px solid var(--overview-line); padding-left: 24px; }
+.overview-inspector-close {
+  position: absolute; right: -4px; top: 0; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: 6px; color: var(--color-ink-3);
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.overview-inspector-close:hover { background: var(--color-well); color: var(--color-ink); }
+.overview-ai { border-top: 1px solid var(--overview-line); padding-top: 16px; margin-top: 20px; }
+.overview-shortcuts { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-top: 28px; font-size: 12px; }
+.overview-shortcuts a { display: inline-flex; align-items: center; gap: 4px; color: var(--color-ink-2); }
+.overview-shortcuts a:hover { color: var(--color-brand-ink); }
+.overview-room-sheet { overscroll-behavior: contain; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.overview-page input[type='range'] { min-height: 20px; cursor: pointer; accent-color: var(--color-brand); }
+.overview-page button:disabled { cursor: not-allowed; opacity: .5; }
+.overview-page button:active:not(:disabled), .overview-page a:active { filter: brightness(.95); }
+@media (max-width: 639px) {
+  .overview-heading h1 { font-size: 22px; }
+  .overview-heading .overview-primary { height: 36px; font-size: 13px; }
+  .overview-brief { gap: 6px 12px; margin-bottom: 16px; }
+  .overview-brief > span:last-child { margin-left: 0; }
+  .overview-kpi, .overview-kpi:first-child, .overview-kpi:last-child { padding: 14px 0; }
+  .overview-kpi { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
+  .overview-kpi > div:nth-child(2) { grid-row: span 2; margin: 0; }
+  .overview-kpi > div:nth-child(2) > span:first-child { font-size: 30px; }
+  .overview-kpi > div:nth-child(3) { grid-column: 1; margin-top: 3px; }
+  .overview-kpi > div:nth-child(4) { grid-column: 1 / -1; }
+  .overview-basis { margin-bottom: 12px; }
+  .overview-basis > span { flex: 1; font-size: 11px; }
+  .overview-shortcuts { gap: 10px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-page *, .overview-page *::before, .overview-page *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}
+
 /* ON:D tokens: the app speaks the landing's language (/welcome): white ground, near-black ink,
    one blue for "this is on / selected", heavy tight Korean display type, pill controls. */
 @theme {

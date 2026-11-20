@@ -432,7 +432,7 @@ export function Segmented<T extends string>({
 }) {
   return (
     <div className="inline-flex rounded-full bg-well p-1" role="radiogroup" aria-label={label}>
-      {options.map((o) => {
+      {options.map((o, index) => {
         const on = o.value === value
         return (
           <button
@@ -441,6 +441,17 @@ export function Segmented<T extends string>({
             role="radio"
             title={o.title}
             aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            onKeyDown={(e) => {
+              const next = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? (index + 1) % options.length
+                : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? (index - 1 + options.length) % options.length
+                : e.key === 'Home' ? 0 : e.key === 'End' ? options.length - 1 : null
+              if (next == null) return
+              e.preventDefault()
+              const group = e.currentTarget.parentElement
+              onChange(options[next].value)
+              group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
+            }}
             onClick={() => onChange(o.value)}
             className={cx(
               'inline-flex items-center gap-1.5 rounded-full whitespace-nowrap transition-[background-color,color,box-shadow] duration-200',
