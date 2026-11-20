@@ -789,7 +789,34 @@ export interface BmsCommand {
   value: string
   window: string
   adjustment_id: string
-  status: 'sent' | 'acked'
+  /** queued → sent (to the edge gateway) → acked (written and read back) | failed | refused | blocked (read-only gateway) */
+  status: 'queued' | 'sent' | 'acked' | 'failed' | 'refused' | 'blocked'
+  gateway_id?: string | null
+  readback?: number | string | null
+  error?: string | null
+  /** no gateway online: the simulator stood in for the controller */
+  simulated?: boolean
+}
+
+export interface GatewayInfo {
+  id: string
+  code: string
+  online: boolean
+  seen_s_ago: number | null
+  version: string
+  allow_write: boolean
+  n_points: number
+  rooms_mapped?: number
+  unmapped?: number
+  controller: { protocol?: string; host?: string; port?: number; device_instance?: number; device_name?: string; vendor?: string }
+  device?: { instance?: number; name?: string; address?: string }
+  sample?: { point: string; room: string | null; kind: string; unit: string; value: number | string | null }[]
+  snapshot_ts?: string | null
+}
+
+export interface GatewayStatus {
+  gateways: GatewayInfo[]
+  live: boolean
 }
 
 export type BuildingType = 'school' | 'mall' | 'hotel' | 'office' | 'hospital' | 'etc'
@@ -851,6 +878,9 @@ export interface ConnectResult {
   summary: { rooms: number; idus: number; odus: number; sensors: number; points: number }
   gateway: { id: string; version: string; latency_ms: number }
   error?: string
+  /** 'gateway' = read by a live edge gateway over BACnet, 'simulated' = the simulator answered */
+  source?: 'gateway' | 'simulated'
+  note?: string
 }
 
 export interface OnboardQuestion {

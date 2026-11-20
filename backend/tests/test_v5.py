@@ -149,3 +149,37 @@ def test_evaluation_helpers(client):
     assert g["checked"] > 0 and g["direct_rate"] >= 80  # rule-based agents quote the dossier
     c = evaluation.consistency([neg, neg])
     assert c["identical_rooms_pct"] == 100.0 and c["max_setpoint_spread_c"] == 0.0
+
+
+def test_gateway_pair_telemetry_commands(client):
+    from app import gateway
+
+    p = client.post("/api/gateway/pair", json={"pair_code": "TP-TEST-0001", "version": "1.0.0", "allow_write": True,
+                                               "controller": {"protocol": "bacnet", "host": "127.0.0.1", "port": 47808}}).json()
+    gid, tok = p["gateway_id"], p["token"]
+    pts = [{"name": "IDU-306-1/RoomTemp", "objid": "analog-input,1", "value": 18.2, "writable": False},
+           {"name": "IDU-306-1/HeatSetpoint", "objid": "analog-value,1", "value": 20.0, "writable": True},
+           {"name": "ODU-3F/Power", "objid": "analog-input,2", "value": 3.1, "writable": False}]
+    body = {"gateway_id": gid, "device": {"instance": 3001, "name": "test", "address": "127.0.0.1:47808"}, "allow_write": True, "points": pts}
+    assert client.post("/api/gateway/telemetry", json=body, headers={"x-gateway-token": "wrong"}).status_code == 400
+    assert client.post("/api/gateway/telemetry", json=body, headers={"x-gateway-token": tok}).json()["commands"] == []
+    st = client.get("/api/gateway/status").json()
+    assert st["live"] and st["gateways"][0]["rooms_mapped"] == 1
+    # onboarding connection test now reports what the gateway read
+    res = client.post("/api/onboarding/connect", json={"method": "gateway", "protocol": "bacnet", "host": "127.0.0.1",
+                                                        "port": 47808, "pair_code": "TP-TEST-0001"}).json()
+    assert res["source"] == "gateway" and res["summary"]["points"] == 3
+    # an applied adjustment is queued for the gateway, delivered with the next telemetry, then acknowledged
+    from app import planning
+
+    adj = planning.upsert_proposal({"id": "T3-test-gw", "tier": 3, "origin": "feedback", "kind": "setpoint", "title": "t", "reason": "t",
+                                    "rooms": ["306"], "date_from": "2026-11-18", "date_to": "2026-11-18", "change": {"sp_heat": 20.5},
+                                    "impact": {"kwh": 0, "cost_krw": 0}, "evidence": []})
+    planning.apply_adjustment(adj["id"])
+    cmds = client.post("/api/gateway/telemetry", json=body, headers={"x-gateway-token": tok}).json()["commands"]
+    assert {c["name"] for c in cmds} == {"IDU-306-1/HeatSetpoint", "IDU-306-2/HeatSetpoint"} and all(c["value"] == 20.5 for c in cmds)
+    for c in cmds:
+        client.post("/api/gateway/ack", json={"gateway_id": gid, "id": c["id"], "ok": True, "readback": 20.5}, headers={"x-gateway-token": tok})
+    done = [c for c in client.get("/api/commands?limit=50").json() if c.get("adjustment_id") == "T3-test-gw"]
+    assert len(done) == 2 and all(c["status"] == "acked" and c["readback"] == 20.5 for c in done)
+    assert gateway.map_point("SENS-405/CO2")["kind"] == "co2" and gateway.map_point("weird")["room"] is None

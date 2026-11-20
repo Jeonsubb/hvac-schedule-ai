@@ -203,15 +203,22 @@ def dispatch_commands(a: dict) -> list[dict]:
         writes = []
         for idu in room["idus"]:
             if "sp_heat" in ch:
-                writes.append((idu["id"], f"AV:{idu['id']}/HeatSetpoint", f"{float(ch['sp_heat']):.1f}℃"))
+                writes.append((idu["id"], f"AV:{idu['id']}/HeatSetpoint", f"{idu['id']}/HeatSetpoint", float(ch["sp_heat"]), f"{float(ch['sp_heat']):.1f}℃"))
             if "sp_cool" in ch:
-                writes.append((idu["id"], f"AV:{idu['id']}/CoolSetpoint", f"{float(ch['sp_cool']):.1f}℃"))
+                writes.append((idu["id"], f"AV:{idu['id']}/CoolSetpoint", f"{idu['id']}/CoolSetpoint", float(ch["sp_cool"]), f"{float(ch['sp_cool']):.1f}℃"))
         if "vent" in ch:
-            writes.append((f"ERV-{r}", f"MV:ERV-{r}/FanLevel", VENT_LABEL.get(ch["vent"], ch["vent"])))
-        for dev, point, value in writes:
+            lv = {"low": 1, "mid": 2, "high": 3}.get(ch["vent"], 2)
+            writes.append((f"ERV-{r}", f"AV:ERV-{r}/FanLevel", f"ERV-{r}/FanLevel", lv, VENT_LABEL.get(ch["vent"], ch["vent"])))
+        from . import gateway
+
+        real = gateway.queue_writes(a, writes, f"{window} 수업 시간")
+        if real is not None:  # a live edge gateway will write these over BACnet and acknowledge
+            out += real
+            continue
+        for dev, point, _name, _num, value in writes:  # no gateway online: simulated controller
             cid = f"{now}-{uuid.uuid4().hex[:6]}"
             rec = {"id": cid, "ts": now, "device": dev, "room": r, "point": point, "value": value,
-                   "window": f"{window} 수업 시간", "adjustment_id": a["id"], "status": "acked"}
+                   "window": f"{window} 수업 시간", "adjustment_id": a["id"], "status": "acked", "simulated": True}
             st.put_item("command", cid, rec)
             out.append(rec)
     return out

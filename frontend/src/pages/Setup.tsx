@@ -561,6 +561,8 @@ function ConnectStep({ s, patch, onBack, onNext }: { s: WizardState; patch: (p: 
         summary: r?.summary ?? { rooms: 0, idus: 0, odus: 0, sensors: 0, points: 0 },
         gateway: r?.gateway ?? { id: '-', version: '-', latency_ms: 0 },
         error: r?.error,
+        source: r?.source,
+        note: r?.note,
       }
       setRunId((v) => v + 1)
       patch({
@@ -585,7 +587,8 @@ function ConnectStep({ s, patch, onBack, onNext }: { s: WizardState; patch: (p: 
     }
   }
 
-  const cmd = `docker run -d --restart=always --network host \\\n  -e PAIR_CODE=${f.pairCode} \\\n  -e BMS_PROTOCOL=${f.protocol} -e BMS_HOST=${f.host || '<중앙제어 PC 주소>'} -e BMS_PORT=${f.port} \\\n  thermoplan/edge-gateway:1.4`
+  const target = `${f.host || '<중앙제어 PC 주소>'}:${f.port}`
+  const cmd = `# ThermoPlan 저장소의 gateway 폴더 (읽기 전용으로 시작, 명령 적용은 --allow-write)\ndocker build -t thermoplan-gateway . && docker run -d --restart=always --network host \\\n  thermoplan-gateway --pair ${f.pairCode} --controller ${target}\n# Docker 없이: pip install -r requirements.txt && python edge_gateway.py --pair ${f.pairCode} --controller ${target}`
 
   return (
     <div>
@@ -755,6 +758,16 @@ function ConnectStep({ s, patch, onBack, onNext }: { s: WizardState; patch: (p: 
                   게이트웨이 {res.gateway.id}, 버전 {res.gateway.version}, 지연 {res.gateway.latency_ms}ms
                 </span>
               </div>
+              {res.source && (
+                <div
+                  className={cx(
+                    'mt-3 rounded-[10px] px-3 py-2 text-[13.5px] leading-relaxed',
+                    res.source === 'gateway' ? 'bg-good-bg text-good-ink' : 'bg-warn-bg text-warn-ink',
+                  )}
+                >
+                  <b className="font-semibold">{res.source === 'gateway' ? '실제 게이트웨이에서 BACnet으로 읽은 값입니다.' : '시뮬레이터로 시험했습니다.'}</b> {res.note}
+                </div>
+              )}
               <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
                 <Figure size="sm" label="강의실" value={fmtNum(res.summary.rooms)} unit="개" />
                 <Figure size="sm" label="실내기" value={fmtNum(res.summary.idus)} unit="대" />

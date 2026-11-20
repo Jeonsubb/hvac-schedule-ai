@@ -170,6 +170,16 @@ def connect(body: dict) -> dict:
         if not 1 <= port <= 65535:
             raise InvalidInput("포트는 1~65535 사이여야 합니다.")
     vendor = str(body.get("vendor") or "중앙제어기")[:40]
+    from . import gateway
+
+    code = re.sub(r"[^A-Z0-9-]", "", str(body.get("pair_code") or "").upper())
+    live = gateway.online(code or None) if method == "gateway" else None
+    if live:  # a real edge gateway is reporting: show what it discovered over BACnet
+        res = gateway.connect_result(live, method, protocol, host, port)
+        save_building({"connection": {"method": method, "vendor": vendor, "protocol": protocol, "host": host, "port": port,
+                                      "gateway_id": live["id"], "connected_at": service.now_kst().isoformat(timespec="seconds"),
+                                      "points": res["summary"]["points"]}}, "온보딩")
+        return res
     seed = hashlib.sha1(f"{host}|{port}|{protocol}".encode()).hexdigest()
     gw = f"GW-{seed[:6].upper()}"
     pts = _points()
@@ -201,10 +211,11 @@ def connect(body: dict) -> dict:
         {"key": "write", "label": "쓰기 권한 확인 (시험 모드)", "ok": True,
          "detail": "설정온도·운전 명령 쓰기 가능 · 실제 값은 바꾸지 않았습니다", "ms": 520},
     ]
-    res = {"ok": True, "steps": steps, "points": pts,
+    res = {"ok": True, "source": "simulated", "steps": steps, "points": pts,
            "summary": {"rooms": len(config.ROOMS), "idus": n_idu, "odus": len(config.ODUS), "sensors": len(config.ROOMS) * 2, "points": len(pts)},
            "gateway": {"id": gw, "version": "1.4.2", "latency_ms": 12 + int(seed[6:8], 16) % 30},
-           "note": "데모 환경에서는 IT관 열모델 시뮬레이터가 중앙제어기 역할을 합니다."}
+           "note": ("연결 코드로 접속한 게이트웨이가 없어 시뮬레이터로 시험했습니다. 설치 명령으로 게이트웨이를 실행한 뒤 다시 시험하면 실제 값을 읽습니다."
+                    if method == "gateway" else "데모 환경에서는 IT관 열모델 시뮬레이터가 중앙제어기 역할을 합니다.")}
     save_building({"connection": {"method": method, "vendor": vendor, "protocol": protocol, "host": host, "port": port,
                                   "gateway_id": gw if method == "gateway" else None,
                                   "connected_at": service.now_kst().isoformat(timespec="seconds"), "points": len(pts)}}, "온보딩")

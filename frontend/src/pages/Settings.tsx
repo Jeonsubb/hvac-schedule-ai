@@ -4,7 +4,7 @@ import { FlaskConical, RotateCcw, Save, Info, AlertTriangle, CheckCircle2, Spark
 import { apiSend, invalidate, invalidateAll, useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
 import { useAuth } from '../lib/auth'
-import type { BmsCommand, BuildingProfile, Policy, Settings, StrategyKey, WhatIf } from '../lib/types'
+import type { BmsCommand, BuildingProfile, GatewayStatus, Policy, Settings, StrategyKey, WhatIf } from '../lib/types'
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
 import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast } from '../components/ui'
@@ -660,6 +660,82 @@ function attendancePct(v: number) {
   return v <= 1 ? Math.round(v * 100) : Math.round(v)
 }
 
+const CMD_STATUS: Record<BmsCommand['status'], { label: string; tone: 'good' | 'info' | 'warn' | 'crit' | 'neutral' }> = {
+  queued: { label: '대기', tone: 'neutral' },
+  sent: { label: '게이트웨이로 전송', tone: 'info' },
+  acked: { label: '쓰기·되읽기 확인', tone: 'good' },
+  failed: { label: '실패', tone: 'crit' },
+  refused: { label: '게이트웨이 거절', tone: 'warn' },
+  blocked: { label: '읽기 전용', tone: 'warn' },
+}
+
+function CommandStatus({ c }: { c: BmsCommand }) {
+  const s = CMD_STATUS[c.status] ?? { label: c.status, tone: 'neutral' as const }
+  const label = c.simulated ? '시뮬레이터 확인' : s.label
+  const title = [c.gateway_id && `게이트웨이 ${c.gateway_id}`, c.readback != null && `되읽은 값 ${c.readback}`, c.error].filter(Boolean).join(' · ')
+  return (
+    <span title={title || undefined}>
+      <Badge tone={c.simulated ? 'neutral' : s.tone}>{label}</Badge>
+    </span>
+  )
+}
+
+/** Live edge gateway: is it reporting, what controller did it find, what does it read right now. */
+function GatewayLive() {
+  const q = useApi<GatewayStatus>('/api/gateway/status', { maxAgeMs: 10_000, refreshMs: 15_000 })
+  const gs = Array.isArray(q.data?.gateways) ? q.data!.gateways : []
+  if (q.error) return <ErrorBox title="게이트웨이 상태를 불러오지 못했습니다" error={q.error} onRetry={q.reload} />
+  if (!q.data)
+    return (
+      <div className="flex items-center gap-2 text-[13.5px] text-ink-3">
+        <Spinner size={14} /> 불러오는 중…
+      </div>
+    )
+  if (!gs.length)
+    return (
+      <p className="text-[13.5px] leading-relaxed text-ink-2">
+        아직 연결된 게이트웨이가 없습니다. 지금은 시뮬레이터가 중앙제어기 역할을 합니다. 저장소의 <code>gateway/</code> 폴더에서 <code>python edge_gateway.py --pair 연결코드 --controller 주소:47808</code>을 실행하면 이곳에
+        실시간으로 나타납니다.
+      </p>
+    )
+  const g = gs[0]
+  const temps = (g.sample ?? []).filter((p) => p.kind === 'room_temp').slice(0, 6)
+  const sps = (g.sample ?? []).filter((p) => p.kind === 'setpoint' && p.point.endsWith('HeatSetpoint')).slice(0, 6)
+  return (
+    <div className="space-y-3 text-[13.5px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cx('inline-block h-2.5 w-2.5 rounded-full', g.online ? 'bg-good' : 'bg-ink-4')} aria-hidden />
+        <b className="text-[14.5px] text-ink">{g.id}</b>
+        <Badge tone={g.online ? 'good' : 'neutral'}>{g.online ? `온라인 · ${g.seen_s_ago ?? 0}초 전 보고` : `오프라인 · 마지막 보고 ${g.seen_s_ago != null ? `${Math.round(g.seen_s_ago / 60)}분 전` : '없음'}`}</Badge>
+        <Badge tone={g.allow_write ? 'info' : 'warn'}>{g.allow_write ? '쓰기 허용' : '읽기 전용'}</Badge>
+        <span className="text-ink-3">버전 {g.version || '-'} · 연결 코드 {g.code}</span>
+      </div>
+      <div className="text-ink-2">
+        중앙제어기 {g.controller?.protocol === 'bacnet' ? 'BACnet/IP' : g.controller?.protocol} {g.device?.address ?? `${g.controller?.host}:${g.controller?.port}`} · 장치 {g.device?.instance ?? g.controller?.device_instance} '
+        {g.device?.name ?? g.controller?.device_name}' · 포인트 {g.n_points}개 · 강의실 {g.rooms_mapped ?? 0}곳 매핑
+        {g.unmapped ? ` · 매핑 안 됨 ${g.unmapped}개` : ''}
+      </div>
+      {(temps.length > 0 || sps.length > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {temps.map((p) => (
+            <span key={p.point} className="rounded-full bg-well px-2.5 py-1 font-mono text-[12.5px] text-ink-2" translate="no">
+              {p.point} = {String(p.value)}
+              {p.unit}
+            </span>
+          ))}
+          {sps.map((p) => (
+            <span key={p.point} className="rounded-full bg-info-bg px-2.5 py-1 font-mono text-[12.5px] text-info-ink" translate="no">
+              {p.point} = {String(p.value)}
+              {p.unit}
+            </span>
+          ))}
+        </div>
+      )}
+      {g.snapshot_ts && <div className="text-[12.5px] text-ink-3">마지막 읽기 {fmtTs(g.snapshot_ts)} (BACnet ReadProperty)</div>}
+    </div>
+  )
+}
+
 function PolicyCommands() {
   const q = useApi<BmsCommand[]>('/api/commands?limit=20', { maxAgeMs: 15_000 })
   const rows = Array.isArray(q.data) ? q.data : []
@@ -694,7 +770,9 @@ function PolicyCommands() {
               </td>
               <td className="px-3.5 py-2 text-right text-ink">{c.value}</td>
               <td className="px-3.5 py-2 text-ink-2">{c.window}</td>
-              <td className="px-3.5 py-2">{c.status === 'acked' ? <Badge tone="good">확인됨</Badge> : <Badge tone="info">전송</Badge>}</td>
+              <td className="px-3.5 py-2">
+                <CommandStatus c={c} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -921,8 +999,11 @@ function BuildingAndPolicy() {
               })}
             </div>
           </Disclosure>
+          <Disclosure title="현장 게이트웨이" icon={<PlugZap size={16} aria-hidden />} summary="BACnet/IP로 중앙제어기와 통신">
+            <GatewayLive />
+          </Disclosure>
           <Disclosure title="최근 제어 명령" icon={<Send size={16} aria-hidden />} summary="중앙 제어기로 보낸 기록">
-            <p className="mb-3 text-[13.5px] text-ink-3">자동 운전 모드이거나 담당자가 승인한 조정안만 중앙 제어기에 보냅니다.</p>
+            <p className="mb-3 text-[13.5px] text-ink-3">자동 운전 모드이거나 담당자가 승인한 조정안만 중앙 제어기에 보냅니다. 게이트웨이가 연결되어 있으면 BACnet으로 쓰고 되읽어 확인하며, 없으면 시뮬레이터가 대신 받습니다.</p>
             <PolicyCommands />
           </Disclosure>
         </DisclosureList>

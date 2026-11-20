@@ -654,6 +654,38 @@ def lab_measured_clear():
     return {"cleared": True}
 
 
+# ---------------------------------------------------------------- edge gateway (outbound HTTPS from the building)
+
+@app.post("/api/gateway/pair")
+def gateway_pair(request: Request, body: dict = Body(...)):
+    from . import gateway
+
+    _rate_limit(request, "gwpair", 10)
+    addr = request.headers.get("cloudfront-viewer-address") or (request.client.host if request.client else "")
+    return gateway.pair(body, addr.split(",")[0][:60])
+
+
+@app.post("/api/gateway/telemetry")
+def gateway_telemetry(request: Request, body: dict = Body(...)):
+    from . import gateway
+
+    return gateway.telemetry(body, request.headers.get("x-gateway-token"))
+
+
+@app.post("/api/gateway/ack")
+def gateway_ack(request: Request, body: dict = Body(...)):
+    from . import gateway
+
+    return gateway.ack(body, request.headers.get("x-gateway-token"))
+
+
+@app.get("/api/gateway/status")
+def gateway_status():
+    from . import gateway
+
+    return gateway.status()
+
+
 @app.post("/api/precompute")
 def precompute():
     service._queue_precompute()
