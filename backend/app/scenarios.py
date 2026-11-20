@@ -132,7 +132,15 @@ class Planner:
     """Three steps the run can report one by one: propose → simulate → choose."""
 
     def __init__(self, tier: int, d: date, ctx: service.Ctx, use_ai: bool = True):
-        self.tier, self.d, self.ctx, self.use_ai = tier, d, ctx, use_ai
+        self.tier, self.d, self.use_ai = tier, d, use_ai
+        # like the negotiation: plan from the day without the AI setpoint decisions already made for this same
+        # period, so running the tier again reaches the same scenario instead of moving setpoints another step
+        import copy
+
+        first = agents._dates_for(tier, d, ctx)[0].isoformat()
+        self.ctx = copy.copy(ctx)
+        self.ctx.adjustments = [a for a in getattr(ctx, "adjustments", [])
+                                if not (a.get("origin") == "agents" and a.get("tier") == tier and a.get("date_from") == first)]
         self.ds: dict = {}
         self.dates: list[date] = []
         self.cands: list[dict] = []
