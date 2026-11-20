@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FlaskConical, RotateCcw, Save, Info, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react'
-import { apiSend, invalidateAll, useApi } from '../lib/api'
+import { useNavigate } from 'react-router-dom'
+import { FlaskConical, RotateCcw, Save, Info, AlertTriangle, CheckCircle2, Sparkles, PlugZap, Building2, Scale, Compass, Send } from 'lucide-react'
+import { apiSend, invalidate, invalidateAll, useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
-import type { Settings, StrategyKey, WhatIf } from '../lib/types'
+import { useAuth } from '../lib/auth'
+import type { BmsCommand, BuildingProfile, Policy, Settings, StrategyKey, WhatIf } from '../lib/types'
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
-import { addDays, cx, fmtDateK, fmtKwh, fmtPct, weekdayOf } from '../lib/format'
+import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
 import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast } from '../components/ui'
 
 type NumKey =
@@ -242,6 +244,8 @@ export default function SettingsPage() {
           <ErrorBox title="저장하지 못했습니다" error={saveErr} />
         </div>
       )}
+      <BuildingAndPolicy />
+
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           {SECTIONS.map((sec) => (
@@ -628,5 +632,301 @@ function Tariff({ s }: { s: Settings }) {
         <div>경부하는 23~09시입니다. 최대부하는 겨울 10~12시, 17~20시, 22~23시, 그 외 계절 10~12시, 13~17시이고 나머지는 중간부하입니다.</div>
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- 건물 연결과 정책 (v5)
+
+const TYPE_LABEL: Record<string, string> = { school: '학교', mall: '쇼핑몰', hotel: '호텔', office: '오피스', hospital: '병원', etc: '기타' }
+const METHOD_LABEL: Record<string, string> = { gateway: '현장 게이트웨이', direct: '직접 연결', file: '파일 업로드' }
+const PROTOCOL_LABEL: Record<string, string> = { bacnet: 'BACnet/IP', modbus: 'Modbus TCP', vendor_api: '제조사 API', opcua: 'OPC UA' }
+const ORIENTS = ['남', '북', '동', '서']
+
+type PolicyNum = 'heat_min' | 'heat_max' | 'cool_min' | 'cool_max' | 'co2_max' | 'weather_jump_c' | 'attendance' | 'comfort_won'
+
+const POLICY_FIELDS: { k: PolicyNum; label: string; unit: string; step: number; min: number; max: number; hint: string }[] = [
+  { k: 'heat_min', label: '난방 하한', unit: '℃', step: 0.5, min: 14, max: 24, hint: '학교보건법 교실 기준 18℃ 이상' },
+  { k: 'heat_max', label: '난방 상한', unit: '℃', step: 0.5, min: 16, max: 26, hint: '에너지이용 합리화법 난방 20℃ 이하(학교는 자체 기준 가능)' },
+  { k: 'cool_min', label: '냉방 하한', unit: '℃', step: 0.5, min: 22, max: 30, hint: '정부 권장 냉방 26℃ 이상' },
+  { k: 'cool_max', label: '냉방 상한', unit: '℃', step: 0.5, min: 24, max: 30, hint: '학교보건법 교실 기준 28℃ 이하' },
+  { k: 'co2_max', label: 'CO₂ 상한', unit: 'ppm', step: 50, min: 600, max: 2000, hint: '학교보건법 교실 기준 1,000ppm' },
+  { k: 'weather_jump_c', label: '날씨 급변 기준', unit: '℃', step: 0.5, min: 0.5, max: 8, hint: '예보와 실황 차이가 이보다 크면 다시 계산' },
+  { k: 'attendance', label: '예상 출석률', unit: '%', step: 5, min: 20, max: 100, hint: '수강 인원이 없는 강의의 재실 인원 추정' },
+  { k: 'comfort_won', label: '쾌적 가중치(판정)', unit: '원', step: 50, min: 0, max: 5000, hint: '체감(PMV) 1만큼 나빠지는 것을 강의실·하루당 몇 원으로 볼지. 작으면 절감, 크면 쾌적 쪽으로 판정합니다' },
+]
+
+/** attendance may come back as a ratio (0.75) or a percentage (75); edit it as a percentage, save it back in the same scale. */
+function attendancePct(v: number) {
+  return v <= 1 ? Math.round(v * 100) : Math.round(v)
+}
+
+function PolicyCommands() {
+  const q = useApi<BmsCommand[]>('/api/commands?limit=20', { maxAgeMs: 15_000 })
+  const rows = Array.isArray(q.data) ? q.data : []
+  if (q.error) return <ErrorBox title="제어 명령 기록을 불러오지 못했습니다" error={q.error} onRetry={q.reload} />
+  if (!q.data)
+    return (
+      <div className="flex items-center gap-2 text-[13.5px] text-ink-3">
+        <Spinner size={14} /> 불러오는 중…
+      </div>
+    )
+  if (!rows.length) return <p className="text-[13.5px] text-ink-3">아직 보낸 제어 명령이 없습니다. 조정안이 적용되면 여기에 기록됩니다.</p>
+  return (
+    <div className={cx(tbl.frame, 'thin-scroll max-h-[360px] overflow-auto')}>
+      <table className={tbl.table}>
+        <thead className={cx(tbl.thead, 'sticky top-0')}>
+          <tr>
+            <th className={tbl.th}>시각</th>
+            <th className={tbl.th}>장치</th>
+            <th className={tbl.th}>포인트</th>
+            <th className={tbl.thR}>값</th>
+            <th className={tbl.th}>적용 구간</th>
+            <th className={tbl.th}>상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((c) => (
+            <tr key={c.id} className={tbl.tr}>
+              <td className="px-3.5 py-2 whitespace-nowrap text-ink-2">{fmtTs(c.ts)}</td>
+              <td className="px-3.5 py-2 text-ink">{c.device}</td>
+              <td className="px-3.5 py-2 font-mono text-[12.5px] text-ink-2" translate="no">
+                {c.point}
+              </td>
+              <td className="px-3.5 py-2 text-right text-ink">{c.value}</td>
+              <td className="px-3.5 py-2 text-ink-2">{c.window}</td>
+              <td className="px-3.5 py-2">{c.status === 'acked' ? <Badge tone="good">확인됨</Badge> : <Badge tone="info">전송</Badge>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function BuildingAndPolicy() {
+  const nav = useNavigate()
+  const { restartOnboarding } = useAuth()
+  const b = useApi<BuildingProfile>('/api/building')
+  const pol = useApi<Policy>('/api/policy')
+  const [form, setForm] = useState<Policy | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (pol.data) setForm({ ...pol.data, orient: { ...(pol.data.orient ?? {}) } })
+  }, [pol.data])
+
+  const P = pol.data
+  const ratio = P ? P.attendance <= 1 : true
+  const diff = useMemo(() => {
+    if (!P || !form) return {} as Partial<Policy>
+    const out: Partial<Policy> = {}
+    for (const f of POLICY_FIELDS) if (form[f.k] !== P[f.k]) (out as Record<string, unknown>)[f.k] = form[f.k]
+    const o = form.orient ?? {}
+    const po = P.orient ?? {}
+    if (Object.keys(o).some((r) => o[r] !== po[r])) out.orient = o
+    return out
+  }, [P, form])
+  const nDiff = Object.keys(diff).length
+  const problems: string[] = []
+  if (form) {
+    if (form.heat_min >= form.heat_max) problems.push('난방 하한은 상한보다 낮아야 합니다.')
+    if (form.cool_min >= form.cool_max) problems.push('냉방 하한은 상한보다 낮아야 합니다.')
+    if (form.heat_max >= form.cool_min) problems.push('난방 상한은 냉방 하한보다 낮아야 합니다.')
+  }
+
+  const save = async () => {
+    if (!nDiff) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await apiSend<Policy>('PUT', '/api/policy', diff)
+      invalidate('/api/policy')
+      invalidate('/api/plan')
+      toast('운전 정책을 저장했습니다. 다음 스케줄 검증부터 반영됩니다.')
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const restart = () => {
+    restartOnboarding()
+    nav('/setup')
+  }
+
+  const B = b.data
+  const c = B?.connection ?? null
+  const fact = (label: string, value: React.ReactNode) => (
+    <div className="flex items-baseline justify-between gap-3 py-1.5 text-[14px]">
+      <span className="shrink-0 text-ink-3">{label}</span>
+      <span className="tnum min-w-0 truncate text-right font-medium text-ink">{value}</span>
+    </div>
+  )
+
+  return (
+    <section className="mb-6 space-y-4" aria-label="건물 연결과 정책">
+      <Card>
+        <CardHeader
+          title="건물 연결과 정책"
+          sub="온보딩에서 연결한 중앙 제어 시스템과, AI가 스케줄을 바꿀 때 넘지 않는 운전 정책입니다."
+          right={
+            <Button size="sm" onClick={restart}>
+              온보딩 다시 보기
+            </Button>
+          }
+        />
+        <div className="grid gap-x-10 gap-y-6 lg:grid-cols-3">
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-ink">
+              <Building2 size={15} className="text-ink-3" aria-hidden /> 건물
+            </div>
+            {b.error ? (
+              <p className="text-[13.5px] text-crit-ink">건물 정보를 불러오지 못했습니다.</p>
+            ) : !B ? (
+              <Spinner size={14} />
+            ) : (
+              <div className="divide-y divide-line">
+                {fact('이름', `${B.org ? `${B.org} ` : ''}${B.name}`)}
+                {fact('유형', TYPE_LABEL[B.type] ?? B.type)}
+                {fact('주소', B.address || '–')}
+                {fact('온보딩', B.onboarded_at ? fmtTs(B.onboarded_at) : '진행 전')}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-ink">
+              <PlugZap size={15} className="text-ink-3" aria-hidden /> 중앙 제어 연결
+              {c?.connected_at ? (
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium text-good-ink">
+                  <span className="inline-block h-2 w-2 rounded-full bg-good" aria-hidden /> 연결됨
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium text-ink-3">
+                  <span className="inline-block h-2 w-2 rounded-full bg-ink-4" aria-hidden /> 미연결
+                </span>
+              )}
+            </div>
+            {!B ? null : c ? (
+              <div className="divide-y divide-line">
+                {fact('방식', `${METHOD_LABEL[c.method] ?? c.method}, ${c.vendor}`)}
+                {fact('통신', `${PROTOCOL_LABEL[c.protocol] ?? c.protocol} ${c.method === 'file' ? '' : `${c.host}:${c.port}`}`)}
+                {fact('게이트웨이', c.gateway_id ?? '–')}
+                {fact('제어 포인트', c.points != null ? `${c.points}개` : '–')}
+              </div>
+            ) : (
+              <p className="text-[13.5px] text-ink-3">연결 정보가 없습니다. 온보딩을 다시 진행해 중앙 제어 PC를 연결하세요.</p>
+            )}
+          </div>
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[14px] font-semibold text-ink">
+              <Scale size={15} className="text-ink-3" aria-hidden /> 운전 정책
+            </div>
+            {pol.error ? (
+              <p className="text-[13.5px] text-crit-ink">정책을 불러오지 못했습니다.</p>
+            ) : !P ? (
+              <Spinner size={14} />
+            ) : (
+              <div className="divide-y divide-line">
+                {fact('난방 허용', `${P.heat_min}~${P.heat_max}℃`)}
+                {fact('냉방 허용', `${P.cool_min}~${P.cool_max}℃`)}
+                {fact('CO₂ 상한', `${P.co2_max.toLocaleString('ko-KR')} ppm`)}
+                {fact('날씨 급변', `±${P.weather_jump_c}℃`)}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {form && P && (
+        <DisclosureList>
+          <Disclosure title="운전 정책 바꾸기" icon={<Scale size={16} aria-hidden />} summary={nDiff ? `변경 ${nDiff}개` : `출석률 ${attendancePct(P.attendance)}% 가정`}>
+            <p className="mb-4 text-[13.5px] text-ink-3">AI와 두 에이전트는 이 범위 밖으로 설정온도를 바꾸지 않습니다. 근거는 정부 지침과 학교보건법이며, 학교는 자체 기준을 정할 수 있습니다.</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+              {POLICY_FIELDS.map((f) => {
+                const raw = form[f.k] as number
+                const shown = f.k === 'attendance' ? attendancePct(raw) : raw
+                const changed = form[f.k] !== P[f.k]
+                return (
+                  <Field key={f.k} label={f.label} hint={f.hint}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        name={f.k}
+                        className={cx(inputCls, 'tnum', changed && 'border-s-rule bg-info-bg')}
+                        step={f.step}
+                        min={f.min}
+                        max={f.max}
+                        value={Number.isFinite(shown) ? shown : ''}
+                        onChange={(e) => {
+                          const v = Number(e.target.value)
+                          setForm((x) => (x ? { ...x, [f.k]: f.k === 'attendance' && ratio ? v / 100 : v } : x))
+                        }}
+                      />
+                      <span className="shrink-0 text-[13.5px] text-ink-3">{f.unit}</span>
+                    </div>
+                  </Field>
+                )
+              })}
+            </div>
+            {problems.length > 0 && (
+              <div className="mt-4 space-y-1">
+                {problems.map((p) => (
+                  <Note key={p} tone="crit">
+                    {p}
+                  </Note>
+                ))}
+              </div>
+            )}
+            {err && (
+              <div className="mt-4">
+                <ErrorBox title="정책을 저장하지 못했습니다" error={err} />
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" disabled={!nDiff || busy} onClick={() => setForm({ ...P, orient: { ...(P.orient ?? {}) } })}>
+                되돌리기
+              </Button>
+              <Button variant="primary" disabled={!nDiff || busy || problems.length > 0} onClick={save}>
+                {busy ? <Spinner size={15} className="text-white" /> : <Save size={15} aria-hidden />} 정책 저장
+              </Button>
+            </div>
+          </Disclosure>
+          <Disclosure title="강의실 방향(일사 반영)" icon={<Compass size={16} aria-hidden />} summary="가정값">
+            <p className="mb-4 text-[13.5px] text-ink-3">
+              <Badge tone="warn">가정값</Badge> 도면 확인 전 가정한 방향입니다. 2차·3차 스케줄은 이 방향으로 오후 일사 부하를 추정합니다. 바꾼 뒤 위의 &lsquo;정책 저장&rsquo;을 누르세요.
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {ROOM_ORDER.map((r) => {
+                const v = form.orient?.[r] ?? ''
+                const changed = v !== (P.orient?.[r] ?? '')
+                return (
+                  <Field key={r} label={`${r}호`}>
+                    <select
+                      name={`orient-${r}`}
+                      className={cx(inputCls, changed && 'border-s-rule bg-info-bg')}
+                      value={v}
+                      onChange={(e) => setForm((x) => (x ? { ...x, orient: { ...(x.orient ?? {}), [r]: e.target.value } } : x))}
+                    >
+                      {!v && <option value="">미정</option>}
+                      {ORIENTS.map((o) => (
+                        <option key={o} value={o}>
+                          {o}향
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )
+              })}
+            </div>
+          </Disclosure>
+          <Disclosure title="최근 제어 명령" icon={<Send size={16} aria-hidden />} summary="중앙 제어기로 보낸 기록">
+            <p className="mb-3 text-[13.5px] text-ink-3">자동 운전 모드이거나 담당자가 승인한 조정안만 중앙 제어기에 보냅니다.</p>
+            <PolicyCommands />
+          </Disclosure>
+        </DisclosureList>
+      )}
+    </section>
   )
 }

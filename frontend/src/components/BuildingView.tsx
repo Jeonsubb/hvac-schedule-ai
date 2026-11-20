@@ -29,7 +29,7 @@ export function ModeIcon({ mode, size = 13, className }: { mode: Mode; size?: nu
   return <span className={cx('inline-block rounded-full border-[1.5px] border-ink-4', className)} style={{ width: size - 3, height: size - 3 }} aria-hidden />
 }
 
-// ---------------------------------------------------------------- schematic plan (not to scale)
+// ---------------------------------------------------------------- floor plates (v5, not to scale)
 
 interface Slot {
   room?: string
@@ -37,28 +37,56 @@ interface Slot {
   w: number
 }
 
-const SLOTS: Record<number, Slot[]> = {
-  4: [{ room: '405', w: 1 }, { room: '406', w: 1 }, { room: '407', w: 1 }, { room: '408', w: 1 }, { room: '409', w: 1 }, { room: '410', w: 0.92 }, { label: '계단·EV', w: 0.74 }],
-  3: [{ room: '306', w: 1 }, { room: '307', w: 1 }, { label: '교수연구실', w: 1 }, { room: '309', w: 1 }, { room: '310', w: 1 }, { label: '세미나실', w: 0.92 }, { label: '계단·EV', w: 0.74 }],
+/** Back row: the HVAC rooms (data tiles). Front row: other spaces, drawn low and neutral for orientation. */
+const BACK: Record<number, Slot[]> = {
+  4: [{ room: '405', w: 1 }, { room: '406', w: 1 }, { room: '407', w: 1 }, { room: '408', w: 1 }, { room: '409', w: 1 }, { room: '410', w: 1 }],
+  3: [{ room: '306', w: 1 }, { room: '307', w: 1 }, { label: '교수연구실', w: 0.8 }, { room: '309', w: 1 }, { room: '310', w: 1 }, { label: '세미나실', w: 0.8 }],
+}
+const FRONT: Record<number, Slot[]> = {
+  4: [{ label: '자율실습실', w: 1.5 }, { label: 'EV', w: 0.45 }, { label: '계단', w: 0.75 }, { label: '남자화장실', w: 1 }, { label: '여자화장실', w: 1 }, { label: 'EV', w: 0.45 }, { label: '교수연구실', w: 1.5 }],
+  3: [{ label: '학과 사무실', w: 1.5 }, { label: 'EV', w: 0.45 }, { label: '계단', w: 0.75 }, { label: '남자화장실', w: 1 }, { label: '여자화장실', w: 1 }, { label: 'EV', w: 0.45 }, { label: '대학원 연구실', w: 1.5 }],
 }
 
-// projection (px): plan laid back, height stood up. P(x, d, z) = (X0 + x + d·K, Yb − d − z)
-const GUT = 56 // floor label gutter
-const K = 0.58 // horizontal shift per px of projected depth
-const HR = 84 // room depth
-const HC = 34 // corridor depth (behind rooms)
-const H = 16 // room height (facade)
-const SLAB = 7
+// oblique projection (px): plan depth recedes up-right. P(x, d, z) = (GUT + x + d·K, Yb − d·S − z)
+const GUT = 64 // floor label gutter
+const K = 0.42 // horizontal shift per px of depth
+const S = 0.55 // vertical foreshortening of depth
+const M_FRONT = 12
+const D_FRONT = 78 // front row depth (other spaces)
+const D_CORR = 34 // corridor
+const D_BACK = 134 // back row depth (HVAC rooms)
+const M_BACK = 18 // strip behind the rooms (refrigerant lines)
+const D = M_FRONT + D_FRONT + D_CORR + D_BACK + M_BACK
+const H_ROOM = 14 // extrusion of a room tile
+const H_SPACE = 7 // extrusion of other spaces
+const SLAB = 12 // plate thickness
+const GAP = 8 // gap between tiles
 const CHIP = 26
-const CHIP_GAP = 12
-const GAP = 8 // wall gap between rooms
-const FLOOR_GAP = 22
-const DP = HR + H + (HC - H) / 2 // pipe depth, on the visible corridor strip
+const CHIP_GAP = 14
+const FLOOR_GAP = 30
 
 type Pt = [number, number]
 const poly = (pts: Pt[]) => pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
 
-// ---------------------------------------------------------------- building section
+/** Tile colours: a running room wears its mode (heat orange, cool blue, fan teal); an idle room shows its temperature. */
+const MODE_TILE: Record<Exclude<Mode, 'off'>, [string, string]> = {
+  heat: ['#ffd3b8', '#f39462'],
+  cool: ['#cfe0fb', '#86aef0'],
+  air: ['#cdeeed', '#84d0cc'],
+}
+
+function place(slots: Slot[], L: number) {
+  const unit = (L - GAP * (slots.length - 1)) / slots.reduce((a, s) => a + s.w, 0)
+  let acc = 0
+  return slots.map((s) => {
+    const x0 = acc
+    const x1 = acc + s.w * unit
+    acc = x1 + GAP
+    return { ...s, x0, x1 }
+  })
+}
+
+// ---------------------------------------------------------------- building floor plates
 
 export default function BuildingView({
   meta,
@@ -84,108 +112,112 @@ export default function BuildingView({
   const hi = meta.settings.comfort_high
   const byRoom = useMemo(() => Object.fromEntries(state.rooms.map((r) => [r.room, r])) as Record<string, RoomState>, [state])
 
-  const L = W - GUT - (HR + HC) * K - 10
+  const L = W - GUT - D * K - 8
   const floors = [4, 3].filter((f) => Object.values(meta.rooms).some((r) => r.floor === f))
-  const TOP = showOdus ? CHIP + CHIP_GAP : 0
-  const BLOCK = TOP + HC + HR + SLAB
-  const totalH = floors.length * BLOCK + (floors.length - 1) * FLOOR_GAP + 8
+  const TOP = showOdus ? CHIP + CHIP_GAP : 4
+  const BLOCK = TOP + D * S + H_ROOM + SLAB
+  const totalH = floors.length * BLOCK + (floors.length - 1) * FLOOR_GAP + 6
 
   const tipRoom = hover ?? focus
   const tipData = tipRoom ? byRoom[tipRoom] : undefined
 
+  // depth bands (d measured from the front edge)
+  const dF0 = M_FRONT
+  const dF1 = M_FRONT + D_FRONT
+  const dB0 = dF1 + D_CORR
+  const dB1 = dB0 + D_BACK
+  const dPipe = dB1 + M_BACK / 2
+
   return (
     <div ref={wrapRef} className="relative w-full overflow-x-auto">
-      <svg width={W} height={totalH} role="group" aria-label="IT관 3층·4층 단면도: 방 바닥색은 실내온도, 앞면 색과 아이콘은 운전 모드" className="block select-none">
+      <svg width={W} height={totalH} role="group" aria-label="IT관 3층·4층 평면: 강의실 타일 색은 실내온도(가동 중이면 운전 모드), 아이콘은 운전 모드" className="block select-none">
         <defs>
-          <pattern id="bv-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#e1e5ea" strokeWidth="1.2" />
-          </pattern>
-          {(['heat', 'cool', 'air'] as Mode[]).map((m) => (
-            <linearGradient key={m} id={`bv-rise-${m}`} x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stopColor={MODE[m].color} stopOpacity="0.34" />
-              <stop offset="0.75" stopColor={MODE[m].color} stopOpacity="0" />
+          {(Object.keys(MODE_TILE) as Exclude<Mode, 'off'>[]).map((m) => (
+            <linearGradient key={m} id={`bv-tile-${m}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor={MODE_TILE[m][0]} />
+              <stop offset="1" stopColor={MODE_TILE[m][1]} />
             </linearGradient>
           ))}
+          <linearGradient id="bv-plate" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#f3f6fa" />
+            <stop offset="1" stopColor="#e7ecf3" />
+          </linearGradient>
         </defs>
         {floors.map((floor, fi) => {
-          const T = 4 + fi * (BLOCK + FLOOR_GAP)
-          const Yb = T + TOP + HC + HR
-          const P = (x: number, d: number, z: number): Pt => [GUT + x + d * K, Yb - d - z]
-          const slots = SLOTS[floor] ?? []
-          const unit = (L - GAP * (slots.length - 1)) / slots.reduce((a, s) => a + s.w, 0)
-          let acc = 0
-          const placed = slots.map((s) => {
-            const x0 = acc
-            const x1 = acc + s.w * unit
-            acc = x1 + GAP
-            return { ...s, x0, x1 }
-          })
+          const T = fi * (BLOCK + FLOOR_GAP)
+          const Yb = T + TOP + D * S + H_ROOM
+          const P = (x: number, d: number, z: number): Pt => [GUT + x + d * K, Yb - d * S - z]
+          const back = place(BACK[floor] ?? [], L)
+          const front = place(FRONT[floor] ?? [], L)
           const odus = Object.values(meta.odus).filter((o) => o.floor === floor)
+          const box = (x0: number, x1: number, d0: number, d1: number, h: number) => ({
+            top: poly([P(x0, d0, h), P(x1, d0, h), P(x1, d1, h), P(x0, d1, h)]),
+            front: poly([P(x0, d0, 0), P(x1, d0, 0), P(x1, d0, h), P(x0, d0, h)]),
+            side: poly([P(x1, d0, 0), P(x1, d1, 0), P(x1, d1, h), P(x1, d0, h)]),
+          })
           return (
             <g key={floor}>
-              {/* floor marker */}
-              <text x={4} y={Yb - H - HR / 2 + 6} fontSize="24" fontWeight="400" fill="#8a94a3" style={{ letterSpacing: '-0.02em' }}>
+              {/* floor label in the gutter */}
+              <text x={6} y={P(0, D * 0.62, 0)[1] + 12} fontSize="34" fontWeight="750" fill="#2b3447" style={{ letterSpacing: '-0.03em' }}>
                 {floor}F
               </text>
-              {/* slab: top (corridor surface), front lip, right side */}
-              <polygon points={poly([P(-6, -6, 0), P(L + 6, -6, 0), P(L + 6, HR + HC, 0), P(-6, HR + HC, 0)])} fill="#eceff3" />
-              <polygon points={poly([P(-6, -6, -SLAB), P(L + 6, -6, -SLAB), P(L + 6, -6, 0), P(-6, -6, 0)])} fill="#d6dbe2" />
-              <polygon points={poly([P(L + 6, -6, -SLAB), P(L + 6, HR + HC, -SLAB), P(L + 6, HR + HC, 0), P(L + 6, -6, 0)])} fill="#c3cad4" />
+              {/* plate: top and front lip (rounded by a same-colour stroke) */}
+              <polygon points={poly([P(-8, 0, -SLAB), P(L + 8, 0, -SLAB), P(L + 8, 0, 0), P(-8, 0, 0)])} fill="#d7dee8" stroke="#d7dee8" strokeWidth="6" strokeLinejoin="round" />
+              <polygon points={poly([P(L + 8, 0, -SLAB), P(L + 8, D, -SLAB), P(L + 8, D, 0), P(L + 8, 0, 0)])} fill="#c9d2de" stroke="#c9d2de" strokeWidth="6" strokeLinejoin="round" />
+              <polygon points={poly([P(-8, 0, 0), P(L + 8, 0, 0), P(L + 8, D, 0), P(-8, D, 0)])} fill="url(#bv-plate)" stroke="#e7ecf3" strokeWidth="6" strokeLinejoin="round" />
 
-              {/* refrigerant lines along the corridor, one per outdoor unit (opt-in layer) */}
-              {showOdus && odus.map((o) => {
-                const rs = placed.filter((s) => s.room && meta.rooms[s.room]?.odu === o.id)
-                if (!rs.length) return null
-                const st = state.odus[o.id]
-                const on = !!st?.on
-                const col = on ? MODE[st.mode].color : '#b9c2cd'
-                const xa = (rs[0].x0 + rs[0].x1) / 2
-                const xb = (rs[rs.length - 1].x0 + rs[rs.length - 1].x1) / 2
-                const [ax, ay] = P(xa, DP, 0)
-                const [bx, by] = P(xb, DP, 0)
-                const mid = (ax + bx) / 2
-                const chipW = 168
-                return (
-                  <g key={o.id}>
-                    <line x1={ax} y1={ay} x2={bx} y2={by} stroke={col} strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" />
-                    {rs.map((s) => {
-                      const r = byRoom[s.room!]
-                      const [cx_, cy_] = P((s.x0 + s.x1) / 2, DP, 0)
-                      const run = r && r.mode !== 'off'
-                      return <circle key={s.room} cx={cx_} cy={cy_} r={3.2} fill={run ? MODE[r.mode].color : '#ffffff'} stroke={run ? '#ffffff' : '#b9c2cd'} strokeWidth={1.5} />
-                    })}
-                    <line x1={mid} y1={T + CHIP} x2={mid} y2={ay} stroke={col} strokeWidth="1.25" />
-                    <g transform={`translate(${mid - chipW / 2} ${T})`}>
-                      <title>{`실외기 ${o.id} (${o.label}, 용량 ${o.cap_kw} kW): ${on ? `가동 ${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}`}</title>
-                      <rect width={chipW} height={CHIP} rx="8" fill="#ffffff" stroke={on ? col : '#d5dbe3'} strokeWidth={on ? 1.5 : 1} />
-                      <g transform="translate(8 6)" className={on ? 'fan-spin' : undefined}>
-                        <Fan size={14} color={on ? col : '#97a1ae'} strokeWidth={2.2} />
-                      </g>
-                      <text x="28" y="17.5" fontSize="13" fontWeight="600" fill="#142033">
-                        실외기 {o.id.replace('ODU-', '')}
-                      </text>
-                      <text x={chipW - 10} y="17.5" fontSize="13" fontWeight={on ? 650 : 500} textAnchor="end" fill={on ? MODE[st.mode].deep : '#667183'} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {on ? `${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}
-                      </text>
-                    </g>
-                  </g>
-                )
-              })}
-
-              {/* rooms and other spaces, left to right (right neighbours occlude side faces) */}
-              {placed.map((s, si) => {
-                const top = poly([P(s.x0, 0, H), P(s.x1, 0, H), P(s.x1, HR, H), P(s.x0, HR, H)])
-                const front = poly([P(s.x0, 0, 0), P(s.x1, 0, 0), P(s.x1, 0, H), P(s.x0, 0, H)])
-                const side = poly([P(s.x1, 0, 0), P(s.x1, HR, 0), P(s.x1, HR, H), P(s.x1, 0, H)])
-                if (!s.room) {
-                  const [lx, ly] = P((s.x0 + s.x1) / 2, HR / 2, H)
+              {/* refrigerant lines behind the rooms, one per outdoor unit (opt-in layer) */}
+              {showOdus &&
+                odus.map((o) => {
+                  const rs = back.filter((s) => s.room && meta.rooms[s.room]?.odu === o.id)
+                  if (!rs.length) return null
+                  const st = state.odus[o.id]
+                  const on = !!st?.on
+                  const col = on ? MODE[st.mode].color : '#b9c2cd'
+                  const xa = (rs[0].x0 + rs[0].x1) / 2
+                  const xb = (rs[rs.length - 1].x0 + rs[rs.length - 1].x1) / 2
+                  const [ax, ay] = P(xa, dPipe, 0)
+                  const [bx, by] = P(xb, dPipe, 0)
+                  const mid = (ax + bx) / 2
+                  const chipW = 168
                   return (
-                    <g key={si} aria-hidden>
-                      <polygon points={side} fill="#d8dde4" />
-                      <polygon points={top} fill="#f4f6f8" />
-                      <polygon points={top} fill="url(#bv-hatch)" />
-                      <polygon points={front} fill="#e2e6eb" />
-                      <text x={lx} y={ly + 4} textAnchor="middle" fontSize="12" fill="#8a94a3">
+                    <g key={o.id}>
+                      <line x1={ax} y1={ay} x2={bx} y2={by} stroke={col} strokeWidth={on ? 2.5 : 1.5} strokeLinecap="round" />
+                      {rs.map((s) => {
+                        const r = byRoom[s.room!]
+                        const [cx_, cy_] = P((s.x0 + s.x1) / 2, dPipe, 0)
+                        const run = r && r.mode !== 'off'
+                        return <circle key={s.room} cx={cx_} cy={cy_} r={3.2} fill={run ? MODE[r.mode].color : '#ffffff'} stroke={run ? '#ffffff' : '#b9c2cd'} strokeWidth={1.5} />
+                      })}
+                      <line x1={mid} y1={T + CHIP} x2={mid} y2={ay} stroke={col} strokeWidth="1.25" />
+                      <g transform={`translate(${mid - chipW / 2} ${T})`}>
+                        <title>{`실외기 ${o.id} (${o.label}, 용량 ${o.cap_kw} kW): ${on ? `가동 ${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}`}</title>
+                        <rect width={chipW} height={CHIP} rx="13" fill="#ffffff" stroke={on ? col : '#d5dbe3'} strokeWidth={on ? 1.5 : 1} />
+                        <g transform="translate(9 6)" className={on ? 'fan-spin' : undefined}>
+                          <Fan size={14} color={on ? col : '#97a1ae'} strokeWidth={2.2} />
+                        </g>
+                        <text x="29" y="17.5" fontSize="13" fontWeight="600" fill="#142033">
+                          실외기 {o.id.replace('ODU-', '')}
+                        </text>
+                        <text x={chipW - 11} y="17.5" fontSize="13" fontWeight={on ? 650 : 500} textAnchor="end" fill={on ? MODE[st.mode].deep : '#667183'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {on ? `${((st?.power_w ?? 0) / 1000).toFixed(1)} kW` : '정지'}
+                        </text>
+                      </g>
+                    </g>
+                  )
+                })}
+
+              {/* back row: HVAC rooms and other spaces, left to right */}
+              {back.map((s, si) => {
+                const b = box(s.x0, s.x1, dB0, dB1, s.room ? H_ROOM : H_SPACE)
+                if (!s.room) {
+                  const [lx, ly] = P((s.x0 + s.x1) / 2, (dB0 + dB1) / 2, H_SPACE)
+                  return (
+                    <g key={`b${si}`} aria-hidden>
+                      <polygon points={b.side} fill="#dfe4eb" />
+                      <polygon points={b.front} fill="#e3e8ef" />
+                      <polygon points={b.top} fill="#f8fafc" stroke="#e6ebf1" strokeWidth="1" strokeLinejoin="round" />
+                      <text x={lx} y={ly + 4} textAnchor="middle" fontSize="12.5" fontWeight="500" fill="#8a94a3">
                         {s.label}
                       </text>
                     </g>
@@ -194,31 +226,28 @@ export default function BuildingView({
                 const r = byRoom[s.room]
                 const rm = meta.rooms[s.room]
                 if (!r || !rm) return null
-                const fill = Number.isFinite(r.ta) ? thermalFill(r.ta, lo, hi) : '#eef1f4'
                 const run = r.mode !== 'off'
+                const fill = Number.isFinite(r.ta) ? thermalFill(r.ta, lo, hi) : '#eef1f4'
+                const topFill = run ? `url(#bv-tile-${r.mode})` : `url(#bv-idle-${s.room})`
+                const base = run ? MODE_TILE[r.mode as Exclude<Mode, 'off'>][1] : fill
                 const occupied = !!r.session
                 const outBand = occupied && (r.ta < lo || r.ta > hi)
                 const isSel = selected === s.room
                 const isHover = hover === s.room
                 const isFocus = focus === s.room
-                const pad = 12
-                const tx = (d: number) => P(s.x0, d, H)[0] + pad
-                const ty = (d: number) => P(s.x0, d, H)[1]
-                const silhouette = poly([P(s.x0, 0, 0), P(s.x1, 0, 0), P(s.x1, 0, H), P(s.x1, HR, H), P(s.x0, HR, H), P(s.x0, 0, H)])
+                const [cx0, cy0] = P((s.x0 + s.x1) / 2, (dB0 + dB1) / 2, H_ROOM)
+                const [bx, by] = P(s.x1, dB1, H_ROOM)
                 const label = `${s.room}호, 실내 ${Number.isFinite(r.ta) ? r.ta.toFixed(1) : '알 수 없음'}도, ${MODE[r.mode].label}${outBand ? ', 수업 중 쾌적 범위 밖' : ''}${
                   r.session ? `, 강의 중: ${r.session.title}` : r.next ? `, 다음 강의 ${r.next.start}` : ''
                 }. 눌러서 상세 보기`
-                // mode badge: right end of the room-number row, inside the top face
-                const [bx0, by0] = P(s.x1, HR - 27, H)
-                const ix = bx0 - pad - 13
-                const iy = by0
                 return (
                   <g
                     key={s.room}
                     role={onRoomClick ? 'button' : undefined}
                     tabIndex={onRoomClick ? 0 : undefined}
                     aria-label={label}
-                    className={cx('outline-none', onRoomClick && 'cursor-pointer')}
+                    aria-pressed={onRoomClick ? isSel : undefined}
+                    className={cx('iso-room outline-none', onRoomClick && 'cursor-pointer')}
                     onClick={() => onRoomClick?.(s.room!)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -231,35 +260,74 @@ export default function BuildingView({
                     onFocus={(e) => e.currentTarget.matches(':focus-visible') && setFocus(s.room!)}
                     onBlur={() => setFocus(null)}
                   >
-                    <polygon points={side} fill={shade(fill, 0.18)} />
-                    <polygon points={top} fill={isHover && !isSel ? shade(fill, 0.03) : fill} />
-                    {run && <polygon points={top} fill={`url(#bv-rise-${r.mode})`} />}
-                    <polygon points={front} fill={run ? MODE[r.mode].deep : shade(fill, 0.1)} />
-                    {/* top face: number, temperature, mode icon. Nothing else. */}
-                    <text x={tx(HR - 22)} y={ty(HR - 22)} fontSize="15" fontWeight="700" fill="#142033" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {!run && (
+                      <defs>
+                        <linearGradient id={`bv-idle-${s.room}`} x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0" stopColor={shade(fill, -0.42)} />
+                          <stop offset="1" stopColor={fill} />
+                        </linearGradient>
+                      </defs>
+                    )}
+                    <polygon points={b.side} fill={shade(base, 0.22)} />
+                    <polygon points={b.front} fill={shade(base, 0.12)} />
+                    <polygon points={b.top} fill={topFill} />
+                    {isHover && !isSel && <polygon points={b.top} fill="#ffffff" opacity="0.18" />}
+                    {/* number, temperature, mode badge. Nothing else. */}
+                    <text x={cx0} y={cy0 - 9} textAnchor="middle" fontSize="15" fontWeight="700" fill="#142033" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {s.room}
                     </text>
-                    <text x={tx(16)} y={ty(16)} fontSize="27" fontWeight="650" fill={outBand ? '#a12a2a' : '#142033'} style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.025em' }}>
+                    <text x={cx0} y={cy0 + 20} textAnchor="middle" fontSize="26" fontWeight="700" fill={outBand ? '#a12a2a' : '#142033'} style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.025em' }}>
                       {Number.isFinite(r.ta) ? r.ta.toFixed(1) : '–'}
-                      <tspan fontSize="14" fontWeight="500" fill={outBand ? '#a12a2a' : '#667183'} dx="2">
+                      <tspan fontSize="14" fontWeight="500" fill={outBand ? '#a12a2a' : '#4a5668'} dx="1">
                         ℃
                       </tspan>
                     </text>
                     {outBand && (
-                      <g transform={`translate(${tx(16) + 86} ${ty(16) - 15})`}>
+                      <g transform={`translate(${cx0 + 46} ${cy0 + 4})`}>
                         <AlertTriangle size={15} color="#d03b3b" strokeWidth={2.4} />
                       </g>
                     )}
                     {run && (
-                      <g transform={`translate(${ix - 13} ${iy - 13})`}>
-                        <circle cx="13" cy="13" r="13" fill={MODE[r.mode].deep} />
-                        <g transform="translate(6.5 6.5)">
+                      <g transform={`translate(${bx - 38} ${by + 6})`}>
+                        <circle cx="12" cy="12" r="12" fill={MODE[r.mode].color} stroke="#ffffff" strokeWidth="1.5" />
+                        <g transform="translate(5.5 5.5)">
                           <ModeIcon mode={r.mode} size={13} className="text-white" />
                         </g>
                       </g>
                     )}
-                    {/* hit area, selection, hover and keyboard focus outlines */}
-                    <polygon points={silhouette} fill="transparent" stroke={isFocus ? '#2f6fde' : isSel ? '#142033' : isHover ? '#667183' : 'none'} strokeWidth={isFocus ? 2.5 : isSel ? 2 : 1.25} strokeLinejoin="round" />
+                    {occupied && (
+                      <g transform={`translate(${P(s.x0, dB1, H_ROOM)[0] + 12} ${P(s.x0, dB1, H_ROOM)[1] + 8})`} aria-hidden>
+                        <rect width="22" height="18" rx="9" fill="#ffffff" opacity="0.92" />
+                        <g transform="translate(4 2)">
+                          <Users size={14} color="#142033" strokeWidth={2.2} />
+                        </g>
+                      </g>
+                    )}
+                    {/* selection, hover and keyboard focus outlines on the top face */}
+                    <polygon
+                      points={b.top}
+                      fill="transparent"
+                      stroke={isFocus ? '#2f6fde' : isSel ? '#2f6fde' : isHover ? '#4a5668' : 'none'}
+                      strokeWidth={isFocus ? 3 : isSel ? 2.5 : 1.25}
+                      strokeLinejoin="round"
+                    />
+                  </g>
+                )
+              })}
+
+              {/* front row: other spaces (low, neutral) */}
+              {front.map((s, si) => {
+                const b = box(s.x0, s.x1, dF0, dF1, H_SPACE)
+                const [lx, ly] = P((s.x0 + s.x1) / 2, (dF0 + dF1) / 2, H_SPACE)
+                const small = s.x1 - s.x0 < 54
+                return (
+                  <g key={`f${si}`} aria-hidden>
+                    <polygon points={b.side} fill="#dfe4eb" />
+                    <polygon points={b.front} fill="#e3e8ef" />
+                    <polygon points={b.top} fill="#fbfcfd" stroke="#e6ebf1" strokeWidth="1" strokeLinejoin="round" />
+                    <text x={lx} y={ly + 4} textAnchor="middle" fontSize={small ? 11.5 : 12.5} fontWeight="500" fill="#8a94a3">
+                      {s.label}
+                    </text>
                   </g>
                 )
               })}
@@ -274,7 +342,7 @@ export default function BuildingView({
 
 /** Which side of the drawing a room sits on, so its detail card opens on the other side. */
 function roomSide(room: string): 'left' | 'right' {
-  for (const slots of Object.values(SLOTS)) {
+  for (const slots of Object.values(BACK)) {
     const i = slots.findIndex((s) => s.room === room)
     if (i >= 0) return i < slots.length / 2 ? 'left' : 'right'
   }
@@ -286,19 +354,21 @@ function RoomTip({ r, meta, side }: { r: RoomState; meta: Meta; side: 'left' | '
   return (
     <div
       className={cx(
-        'fade-in pointer-events-none absolute top-1 z-10 w-[260px] rounded-[14px] border border-line bg-surface px-4 py-3 text-[13.5px] shadow-[var(--shadow-float)]',
-        side === 'left' ? 'right-1' : 'left-14',
+        'fade-in pointer-events-none absolute bottom-2 z-10 w-[260px] rounded-[14px] border border-line bg-surface px-4 py-3 text-[13.5px] shadow-[var(--shadow-float)]',
+        side === 'left' ? 'right-2' : 'left-16',
       )}
       aria-hidden
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[15px] font-bold text-ink">{r.room}호</span>
+        <span className="text-[15px] font-bold text-ink">
+          {rm?.floor}F - {r.room}
+        </span>
         <span className="text-[13px] text-ink-3">
           {rm?.type_label}, {rm?.capacity}석
         </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2.5">
-        <span className="tnum text-[22px] font-[650] tracking-[-0.02em] text-ink">{r.ta.toFixed(1)}℃</span>
+        <span className="tnum text-[22px] font-[650] tracking-[-0.02em] text-ink">{Number.isFinite(r.ta) ? r.ta.toFixed(1) : '–'}℃</span>
         <span className="inline-flex items-center gap-1 text-[13px] font-semibold" style={{ color: MODE[r.mode].deep }}>
           <ModeIcon mode={r.mode} size={13} />
           {MODE[r.mode].label}
@@ -448,8 +518,8 @@ export function ModeLegend({ state }: { state: BuildingState }) {
 }
 
 /**
- * The one legend the building view needs: indoor-temperature colour (neutral inside the comfort band)
- * and the mode icons. Counts are not repeated here (the page sentence carries them).
+ * The one legend the building view needs: an idle room shows its indoor temperature (neutral inside the
+ * comfort band), a running room wears its mode colour and icon, and the people icon marks a class in progress.
  */
 export function MapLegend({ meta }: { meta: Meta }) {
   const lo = meta.settings.comfort_low
@@ -460,9 +530,9 @@ export function MapLegend({ meta }: { meta: Meta }) {
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-2">
       <span className="inline-flex items-center gap-2.5">
-        <span className="text-ink-3">실내온도</span>
+        <span className="text-ink-3">정지 중 실내온도</span>
         <span className="tnum">낮음</span>
-        <span className="relative inline-block h-2 w-[132px] rounded-full" style={{ background: thermalGradient(t0, t1, lo, hi) }} aria-hidden>
+        <span className="relative inline-block h-2 w-[120px] rounded-full" style={{ background: thermalGradient(t0, t1, lo, hi) }} aria-hidden>
           <span className="absolute -inset-y-[3px] rounded-[4px] border-[1.5px] border-ink-3" style={{ left: `${x(lo)}%`, width: `${x(hi) - x(lo)}%` }} />
         </span>
         <span className="tnum">높음</span>
@@ -471,14 +541,19 @@ export function MapLegend({ meta }: { meta: Meta }) {
         </span>
       </span>
       <span className="inline-flex items-center gap-3.5">
+        <span className="text-ink-3">가동 중</span>
         {(['heat', 'cool', 'air'] as Mode[]).map((m) => (
           <span key={m} className="inline-flex items-center gap-1.5">
-            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-white" style={{ background: MODE[m].deep }} aria-hidden>
+            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-white" style={{ background: MODE[m].color }} aria-hidden>
               <ModeIcon mode={m} size={10} />
             </span>
             {m === 'air' ? '송풍(외기 냉방)' : MODE[m].label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5">
+          <Users size={14} className="text-ink" aria-hidden />
+          수업 중
+        </span>
       </span>
     </div>
   )
@@ -570,7 +645,7 @@ export function TimeScrubber({
           if (!playing && minute >= r1) onChange(r0)
           setPlaying((p) => !p)
         }}
-        className="mt-[2px] inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-colors duration-150 hover:bg-[#25344e]"
+        className="mt-[2px] inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white transition-colors duration-150 hover:bg-brand-ink"
         aria-label={playing ? '재생 멈춤' : '하루 운전 재생'}
         title={playing ? '재생 멈춤' : '선택한 시각부터 하루 운전을 재생'}
       >
@@ -628,10 +703,10 @@ export function TimeScrubber({
             </svg>
           )}
           {/* now */}
-          <div className="absolute inset-y-0 w-px bg-ink-3" style={{ left: `${pct(nowMinute)}%` }} aria-hidden />
+          <div className="absolute inset-y-0 w-0 border-l border-dashed border-brand/60" style={{ left: `${pct(nowMinute)}%` }} aria-hidden />
           {/* handle */}
-          <div className="pointer-events-none absolute -inset-y-1 z-10 -ml-[1.5px] w-[3px] rounded-full bg-ink" style={{ left: `${pct(minute)}%` }} aria-hidden>
-            <div className="tnum absolute -top-[26px] left-1/2 -translate-x-1/2 rounded-[6px] bg-ink px-2 py-[2px] text-[13px] font-semibold whitespace-nowrap text-white">
+          <div className="pointer-events-none absolute -inset-y-1 z-10 -ml-[1.5px] w-[3px] rounded-full bg-brand" style={{ left: `${pct(minute)}%` }} aria-hidden>
+            <div className="tnum absolute -top-[26px] left-1/2 -translate-x-1/2 rounded-[6px] bg-brand px-2 py-[2px] text-[13px] font-semibold whitespace-nowrap text-white">
               {fmtMin(minute)}
               {future ? ' 예정' : ''}
             </div>

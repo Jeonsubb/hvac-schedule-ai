@@ -286,7 +286,8 @@ def compute_day(
                                                         vacancy=settings.get("ai_use_vacancy", True))
         sim = simulate_day(rooms, odus, plan, by_room, to_a, rh_a, ghi_a, init_states[st], settings,
                            anomalies=anomalies, clo=clo, detail=detail, occupancy=occ_actual,
-                           guard=(st == "ai"), t_adj=adjacent_temp(sum(wa["t"]) / 24.0))
+                           guard=(st == "ai"), t_adj=adjacent_temp(sum(wa["t"]) / 24.0),
+                           room_sp=settings.get("room_sp") if st == "ai" else None)
         guard_events = sim.pop("guard_events", {})
         sim.pop("end_state")
         cmds = sim.pop("_cmds")

@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
-/* ThermoPlan tokens — see DESIGN.md */
+/* ThermoPlan tokens (v5) — see DESIGN.md */
 @theme {
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
-  /* chrome: calm canvas, white surfaces, one navy ink (also the only interaction colour) */
-  --color-paper: #f4f6f9;
+  /* chrome (v5): near-white canvas, white surfaces with hairlines, navy text, blue brand accent for interaction */
+  --color-paper: #f7f9fc;
   --color-surface: #ffffff;
   --color-well: #f7f8fa;
-  --color-line: #e6e9ee;
+  --color-line: #e5e9f0;
   --color-line-strong: #cfd5de;
   --color-ink: #142033;
   --color-ink-2: #4a5668;
@@ -16,6 +16,16 @@
   --color-ink-4: #a3acb8;
   --color-focus: #2f6fde;
   --color-hover: #f0f2f5;
+
+  /* v5 brand accent (mock: blue logo, active nav, selected time column) */
+  --color-brand: #2f6fde;
+  --color-brand-ink: #1f56b8;
+  --color-brand-bg: #eaf1fd;
+  /* agent characters */
+  --color-occupant: #e8894f; /* 사용자 에이전트 (주황 캐릭터) */
+  --color-occupant-bg: #fdf0e7;
+  --color-shark: #3d6fb6; /* 관리자 에이전트 북항이 (상어) */
+  --color-shark-bg: #e9f0fa;
 
   /* thermal (diverging; comfort band is the neutral midpoint) */
   --color-cold-3: #7ea7e0;
@@ -56,7 +66,7 @@
   --color-info-ink: #1c5cab;
   --color-info-bg: #eaf2fc;
 
-  --radius-panel: 16px;
+  --radius-panel: 14px;
   --radius-inner: 12px;
   --radius-control: 10px;
   --radius-chip: 6px;
@@ -125,6 +135,31 @@ body {
 }
 .pnum {
   font-variant-numeric: proportional-nums;
+}
+
+/* v5: status pill dot that breathes only while the system reports healthy (reduced-motion turns it off) */
+@keyframes soft-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgb(12 163 12 / 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgb(12 163 12 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(12 163 12 / 0);
+  }
+}
+.soft-ping {
+  animation: soft-ping 2.4s ease-out infinite;
+}
+
+/* v5: building tiles lift a little on hover/focus (transform only) */
+.iso-room {
+  transition: transform 0.15s var(--ease-out);
+}
+.iso-room:hover,
+.iso-room:focus-visible {
+  transform: translateY(-2px);
 }
 
 /* scrollbars */

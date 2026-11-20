@@ -300,6 +300,8 @@ export interface Day {
   history: HistoryRow[]
   fingerprint?: string
   computed_at?: string
+  /** per-room setpoints of applied schedule adjustments (AI operation only) */
+  room_sp?: Record<string, { sp_heat?: number; sp_cool?: number }>
 }
 
 export interface TotalsRow extends StrategyDayTotals {}
@@ -555,4 +557,343 @@ export interface Job<R = unknown> {
   progress?: { steps?: ChatStep[] }
   result: R | null
   error?: string
+}
+
+// ---------------------------------------------------------------- v5: B2B onboarding, 1·2·3차 스케줄, 쾌적 의견, 에이전트 협의, 운전 모드
+
+export type OpModeKey = 'auto' | 'recommend'
+export type Verdict = 'ok' | 'adjust' | 'review'
+export type SourceOrigin = 'live' | 'simulated' | 'input' | 'assumption'
+
+/** One data feed the planner reads (기상청, CO2 센서, 재실 밀도, 민원 …). */
+export interface DataSource {
+  key: string // 'timetable' | 'calendar' | 'weather' | 'forecast' | 'nowcast' | 'co2' | 'occupancy' | 'density' | 'sensor' | 'events' | 'feedback' | 'bms' | 'tariff' | 'policy' | 'simulator'
+  label: string // '기상청 단기예보'
+  origin: SourceOrigin // 실데이터 / 시뮬레이션 센서 / 운영자 입력 / 가정값
+  status: 'ok' | 'stale' | 'missing'
+  detail: string // '11/20 14:00 발표, 3일치'
+  updated_at?: string | null
+}
+
+/** A consistency check: does the plan still fit the data that just arrived? */
+export interface TierCheck {
+  id: string
+  title: string // '날씨 급변 대응'
+  idea?: number | null // 과제 아이디어 번호(11~15) 또는 요구사항 번호
+  sources: string[] // DataSource keys
+  expected: string // 계획이 가정한 것
+  observed: string // 새로 들어온 데이터
+  verdict: Verdict
+  action: string // AI 판단/조치
+  rooms?: string[]
+}
+
+export interface RoomSetpoint {
+  sp_heat?: number
+  sp_cool?: number
+}
+
+export interface Adjustment {
+  id: string
+  tier: 1 | 2 | 3
+  origin: 'tier' | 'agents' | 'feedback'
+  kind: 'setpoint' | 'vent'
+  title: string
+  reason: string
+  rooms: string[]
+  date_from: string
+  date_to: string
+  change: { sp_heat?: number; sp_cool?: number; vent?: 'low' | 'mid' | 'high' }
+  impact: { kwh: number; cost_krw: number; pmv_before?: number | null; pmv_after?: number | null; note?: string }
+  evidence: { source: string; text: string }[]
+  status: 'pending' | 'applied' | 'rejected'
+  created_at: string
+  decided_at?: string | null
+  decided_by?: string | null
+}
+
+export interface TierDay {
+  date: string
+  weekday: number
+  workday: boolean
+  holiday: string | null
+  sessions: number
+  events: number
+  kwh: number // AI 계획
+  baseline_kwh: number // 현재 운영(고정)
+  on_hours: number
+  t_mean: number
+  t_min: number
+  t_max: number
+  src: 'actual' | 'forecast' | 'climatology'
+  adjusted: boolean // 적용된 조정이 있는 날
+}
+
+export interface TierBlock {
+  s: number // minute of day
+  e: number
+  kind?: string // 'cond' | 'fan' | 'lecture' | 'event'
+  label?: string
+}
+
+export interface TierRoomRow {
+  room: string
+  type: string
+  orient: string // '남' | '북' | '동' | '서'
+  sessions: number
+  people: number // 예상 인원 합(주간) 또는 오늘 최대
+  kwh: number
+  sp_heat: number
+  sp_cool: number
+  co2_peak: number | null
+  vent: 'low' | 'mid' | 'high'
+  feedback: { n: number; mean: number | null }
+  solar_index: number // 오후 일사 부하 kW (방향 반영)
+  ta_now?: number | null
+  windows?: TierBlock[] // 3차: 오늘 AI 운전 구간
+  lectures?: TierBlock[] // 3차: 오늘 수업
+  week?: Record<number, TierBlock[]> // 1차: 요일(0~5) → 수업 블록
+}
+
+export interface TierHourly {
+  step_min: number // 15
+  t_forecast: number[] // 24 (계획에 쓴 예보)
+  t_actual: (number | null)[] // 24 (실황, 미래는 null)
+  ghi: number[] // 24
+  co2: Record<string, number[]> // room → 96 (ppm)
+  people: Record<string, number[]> // room → 96
+}
+
+export interface TierPlan {
+  tier: 1 | 2 | 3
+  label: string // '1차 · 월간 기본 계획'
+  period: { start: string; end: string; label: string }
+  generated_at: string
+  mode: OpModeKey
+  summary: {
+    sentence: string
+    kwh: number
+    baseline_kwh: number
+    cost_krw: number
+    saving_pct: number | null
+    sessions: number
+    comfort_pct: number | null
+  }
+  sources: DataSource[]
+  checks: TierCheck[]
+  adjustments: Adjustment[]
+  days?: TierDay[]
+  rooms?: TierRoomRow[]
+  hourly?: TierHourly
+  now_minute?: number | null
+}
+
+/** 사고 과정: 에이전트가 어떤 데이터를 보고 무엇을 확인했는지 */
+export interface AgentTrace {
+  source: string // DataSource key
+  query: string
+  finding: string
+}
+
+export interface NegotiationEval {
+  kwh: number
+  cost_krw: number
+  pmv_mean: number | null
+  cold_rooms: string[]
+  hot_rooms: string[]
+  discomfort_dm: number
+  cold_starts: number
+  complaints_addressed: number
+  rooms: Record<string, { kwh: number; pmv: number | null; sp_heat?: number; sp_cool?: number }>
+}
+
+export interface AgentTurn {
+  round: number
+  agent: 'building' | 'occupant' | 'arbiter' // building = 관리자(건물) 에이전트 '북항이', occupant = 사용자 에이전트
+  stance: string
+  message: string
+  trace: AgentTrace[]
+  proposal: Record<string, RoomSetpoint>
+  eval?: NegotiationEval
+  accepts?: boolean
+}
+
+export interface Negotiation {
+  tier: 2 | 3
+  date: string
+  dates: string[]
+  season: 'heat' | 'cool'
+  policy: { heat_min: number; heat_max: number; cool_min: number; cool_max: number }
+  baseline: NegotiationEval
+  turns: AgentTurn[]
+  final: { proposal: Record<string, RoomSetpoint>; eval: NegotiationEval; summary: string; agreed: boolean }
+  adjustment_ids: string[]
+  ai: boolean // false: AI 연결 실패로 규칙 기반 협의
+  note?: string
+  created_at: string
+}
+
+export interface NegotiationJob {
+  id: string
+  kind: 'negotiate'
+  status: 'queued' | 'running' | 'done' | 'error'
+  progress?: { phase?: string; turns?: AgentTurn[] }
+  result: Negotiation | null
+  error?: string
+}
+
+export interface Feedback {
+  id: string
+  ts: string
+  date: string
+  minute: number
+  room: string
+  vote: number // ASHRAE 7점: -3 춥다 … 0 적당 … +3 덥다
+  tags: string[] // 'stuffy' 답답함 | 'draft' 바람 | 'humid' 습함 | 'dry' 건조 | 'noise' 소음
+  text: string
+  source: 'occupant' | 'operator' | 'simulated'
+  status: 'new' | 'reflected'
+  reflected_in?: string | null
+}
+
+export interface FeedbackSummary {
+  items: Feedback[]
+  by_room: Record<string, { n: number; mean: number | null; cold: number; hot: number; stuffy: number; last_ts: string | null }>
+  by_hour: Record<string, Record<string, { n: number; mean: number }>> // room → hour → …
+  days: number
+}
+
+export interface FeedbackReply {
+  feedback: Feedback
+  reply: {
+    message: string
+    room: { ta: number | null; state: string; sp_heat: number; sp_cool: number; co2: number | null; session: string | null }
+    policy: string
+    next: string
+  }
+}
+
+export interface OpMode {
+  mode: OpModeKey
+  changed_at: string | null
+  by: string | null
+  pending: number
+}
+
+export interface BmsCommand {
+  id: string
+  ts: string
+  device: string
+  room: string
+  point: string
+  value: string
+  window: string
+  adjustment_id: string
+  status: 'sent' | 'acked'
+}
+
+export type BuildingType = 'school' | 'mall' | 'hotel' | 'office' | 'hospital' | 'etc'
+
+export interface BmsConnection {
+  method: 'gateway' | 'direct' | 'file'
+  vendor: string
+  protocol: 'bacnet' | 'modbus' | 'vendor_api' | 'opcua'
+  host: string
+  port: number
+  gateway_id?: string | null
+  connected_at?: string | null
+  points?: number
+}
+
+export interface BuildingProfile {
+  name: string
+  org: string
+  type: BuildingType
+  address: string
+  onboarded_at: string | null
+  connection: BmsConnection | null
+  demo: boolean
+}
+
+export interface ProfileParse {
+  name: string
+  org: string
+  type: BuildingType
+  address: string
+  floors: number | null
+  note: string
+  clarification: string | null
+  ai: boolean
+}
+
+export interface ConnectStep {
+  key: string
+  label: string
+  ok: boolean
+  detail: string
+  ms: number
+}
+
+export interface BmsPoint {
+  point: string
+  room: string | null
+  device: string
+  kind: 'onoff' | 'mode' | 'setpoint' | 'room_temp' | 'power' | 'co2' | 'occupancy' | 'humidity'
+  unit: string
+  value: string | number
+  writable: boolean
+}
+
+export interface ConnectResult {
+  ok: boolean
+  steps: ConnectStep[]
+  points: BmsPoint[]
+  summary: { rooms: number; idus: number; odus: number; sensors: number; points: number }
+  gateway: { id: string; version: string; latency_ms: number }
+  error?: string
+}
+
+export interface OnboardQuestion {
+  id: string
+  title: string
+  why: string
+  kind: 'number' | 'time_range' | 'temp_range' | 'choice' | 'confirm'
+  unit?: string
+  default: unknown
+  options?: { value: string; label: string }[]
+  min?: number
+  max?: number
+  step?: number
+  source: string
+  affects: string
+}
+
+export interface CollectResult {
+  building: { name: string; campus: string }
+  sources: DataSource[]
+  counts: {
+    courses: number
+    rooms: number
+    idus: number
+    odus: number
+    events: number
+    holidays: number
+    feedback: number
+    weather_days: number
+    estimated_people: number
+  }
+  questions: OnboardQuestion[]
+}
+
+export interface Policy {
+  heat_min: number
+  heat_max: number
+  cool_min: number
+  cool_max: number
+  co2_max: number
+  weather_jump_c: number
+  attendance: number
+  orient: Record<string, string>
+  /** arbiter: won per PMV unit per room per day */
+  comfort_won?: number
 }

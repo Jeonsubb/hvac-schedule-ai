@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Sun, AlertTriangle, Timer } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Download, Sun, AlertTriangle, Timer, CalendarDays, Sparkles } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
 import type { Day, DaySummary, StrategyKey, Summary } from '../lib/types'
 import { STRATEGY, STRATEGY_KEYS, WEEKDAY, decisionLabel, splitCounts } from '../lib/constants'
-import { cx, fmtDateK, fmtKwh, fmtPct, fmtWon, isoDate, josa, pctSaving, weekdayOf } from '../lib/format'
+import { addDays, cx, fmtDateK, fmtKwh, fmtMin, fmtPct, fmtWon, isoDate, josa, pctSaving, weekdayOf } from '../lib/format'
 import Gantt, { GanttLegend } from '../components/Gantt'
 import RoomDrawer from '../components/RoomDrawer'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle } from '../components/EChart'
@@ -61,7 +61,15 @@ export default function Schedule() {
 
   return (
     <div>
-      <PageHeader title="스케줄·타임라인" desc="날짜를 고르면 그날 강의와 냉난방 운전을 강의실별로 맞춰 봅니다." />
+      <PageHeader
+        title="스케줄 타임라인"
+        desc="날짜를 고르면 그날 강의와 냉난방 운전을 강의실별로 맞춰 봅니다."
+        right={
+          <Link to={`/plan?tier=3&date=${date}`} className={btnCls('secondary')}>
+            <Sparkles size={15} className="text-brand" aria-hidden /> 이 날 AI 3차 검증 보기
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <MonthCalendar
@@ -80,14 +88,39 @@ export default function Schedule() {
 
       <Card className="mt-6" pad={false}>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
-          <h2 className="flex items-center gap-2.5 text-[17px] font-[650] tracking-[-0.01em] text-ink">
-            {fmtDateK(date)} 강의실별 운전
-            {ds?.holiday && <Badge tone="crit">{ds.holiday}</Badge>}
-            {ds && !ds.workday && !ds.holiday && <Badge>주말</Badge>}
-          </h2>
-          <a href={`/api/export/plan.csv?date=${date}&strategy=${primary}`} className={btnCls('ghost', 'sm')} download>
-            <Download size={14} aria-hidden /> 운전 계획 CSV
-          </a>
+          <div>
+            <h2 className="flex items-center gap-2.5 text-[20px] font-bold tracking-[-0.02em] text-ink">
+              강의실별 운전 타임라인
+              {ds?.holiday && <Badge tone="crit">{ds.holiday}</Badge>}
+              {ds && !ds.workday && !ds.holiday && <Badge>주말</Badge>}
+            </h2>
+            <p className="mt-1 text-[13.5px] text-ink-3">
+              {ds ? `수업 ${ds.sessions}건${ds.events ? `, 이벤트 ${ds.events}건` : ''}을 기준으로 실제 가동을 맞춰 봅니다.` : '강의와 실제 가동을 강의실별로 맞춰 봅니다.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {isToday && (
+              <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-good-bg px-3 text-[13px] font-semibold text-good-ink">
+                <span className="inline-block h-2 w-2 rounded-full bg-good" aria-hidden /> 오늘
+              </span>
+            )}
+            <div className="inline-flex h-9 items-center rounded-full border border-line bg-surface">
+              <IconButton label="전날" onClick={() => set({ date: addDays(date, -1), m: addDays(date, -1).slice(0, 7), room: null })} className="h-9 w-9 rounded-full">
+                <ChevronLeft size={16} />
+              </IconButton>
+              <span className="tnum inline-flex items-center gap-1.5 px-1 text-[13.5px] font-semibold text-ink">
+                <CalendarDays size={15} className="text-ink-3" aria-hidden />
+                {fmtDateK(date)}
+                {isToday && ` · ${fmtMin(meta.now.minute)}`}
+              </span>
+              <IconButton label="다음 날" onClick={() => set({ date: addDays(date, 1), m: addDays(date, 1).slice(0, 7), room: null })} className="h-9 w-9 rounded-full">
+                <ChevronRight size={16} />
+              </IconButton>
+            </div>
+            <a href={`/api/export/plan.csv?date=${date}&strategy=${primary}`} className={btnCls('ghost', 'sm', 'h-9 rounded-full')} download>
+              <Download size={14} aria-hidden /> 운전 계획 CSV
+            </a>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-3 px-7 pt-4">
           <Segmented
@@ -258,7 +291,7 @@ function MonthCalendar({
               aria-label={`${fmtDateK(d)}${hol ? `, ${hol}` : ''}${sv != null ? `, 고정 대비 AI 절감 ${sv.toFixed(0)}%${future ? ' 예상' : ''}` : ''}${!future && review > 0 ? `, 확인 필요 ${review}건` : ''}`}
               className={cx(
                 'relative flex h-[60px] flex-col rounded-[10px] px-2 py-1.5 text-left transition-[box-shadow,background-color] duration-150',
-                sel ? 'shadow-[0_0_0_2px_var(--color-ink)]' : 'hover:shadow-[0_0_0_1px_var(--color-ink-4)]',
+                sel ? 'shadow-[0_0_0_2px_var(--color-brand)]' : 'hover:shadow-[0_0_0_1px_var(--color-ink-4)]',
                 !inSem && 'cursor-default opacity-35',
                 wd >= 5 && 'bg-well',
               )}
@@ -274,7 +307,7 @@ function MonthCalendar({
                   className={cx(
                     'tnum text-[13.5px] font-semibold',
                     hol || wd === 6 ? 'text-crit-ink' : wd === 5 ? 'text-info-ink' : 'text-ink',
-                    isT && 'rounded-full bg-ink px-1.5 text-white',
+                    isT && 'rounded-full bg-brand px-1.5 text-white',
                   )}
                 >
                   {Number(d.slice(8))}

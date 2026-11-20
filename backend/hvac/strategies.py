@@ -338,7 +338,11 @@ def plan_ai(sessions_by_room: dict, rooms: dict, weather_f: dict, init: dict, se
         if not ss:
             plans[r] = []
             continue
-        p, d = plan_ai_room(rooms[r], ss, weather_f["to"], weather_f["rh"], weather_f["ghi"], init[r], settings,
+        s_r = settings
+        over = (settings.get("room_sp") or {}).get(r)
+        if over:  # per-room setpoint from an applied schedule adjustment
+            s_r = {**settings, **{k: float(v) for k, v in over.items() if k in ("sp_heat", "sp_cool")}}
+        p, d = plan_ai_room(rooms[r], ss, weather_f["to"], weather_f["rh"], weather_f["ghi"], init[r], s_r,
                             odu_share=_odu_share(rooms, r))
         plans[r] = p
         decisions.extend(d)

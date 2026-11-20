@@ -1,16 +1,16 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { RotateCcw, CloudSun, Cloud, CloudRain, CloudSnow, Sun, Droplets, WindIcon, Wrench, History, Info, Fan, Clock3, CalendarRange, Sparkles } from 'lucide-react'
+import { RotateCcw, CloudSun, Cloud, CloudRain, CloudSnow, Sun, Droplets, WindIcon, Wrench, History, Info, Fan, Clock3, CalendarRange, Sparkles, ArrowLeft, Download } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
 import type { Day, Live, Meta, StrategyKey, WeatherNow } from '../lib/types'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
 import { COLD_START, STRATEGY, decisionLabel, statusInfo } from '../lib/constants'
 import { cx, fmtDateK, fmtKwh, fmtMin, fmtPct, hm, josa, pctSaving } from '../lib/format'
-import { buildingAt, buildingFromLive, type BuildingState } from '../lib/thermal'
+import { MODE, buildingAt, buildingFromLive, type BuildingState } from '../lib/thermal'
 import BuildingView, { MapLegend, TimeScrubber } from '../components/BuildingView'
 import Gantt, { DecisionIcon, GanttLegend, decisionMinute } from '../components/Gantt'
-import RoomDrawer from '../components/RoomDrawer'
+import { RoomDetails, RoomHero, type RoomNow } from '../components/RoomDrawer'
 import {
   Badge,
   Button,
@@ -37,7 +37,21 @@ export default function Overview() {
   const date = live.data?.now.date
   const day = useApi<Day>(date ? `/api/day/${date}` : null)
   const weather = useApi<WeatherNow>('/api/weather', { maxAgeMs: 10 * 60_000 })
-  const [drawerRoom, setDrawerRoom] = useState<string | null>(null)
+  // the selected room lives in the URL (?room=407): the page shows that room instead of the whole building
+  const drawerRoom = params.get('room')
+  const setDrawerRoom = useCallback(
+    (r: string | null) =>
+      setParams(
+        (prev) => {
+          const n = new URLSearchParams(prev)
+          if (r) n.set('room', r)
+          else n.delete('room')
+          return n
+        },
+        { replace: false },
+      ),
+    [setParams],
+  )
   const [viewMinute, setViewMinute] = useState<number | null>(null)
   const [viewKey, setViewKey] = useState<string | null>(null)
   const [showOdus, setShowOdus] = useState(false)
@@ -66,12 +80,12 @@ export default function Overview() {
   return (
     <div>
       {/* the page's answer: one sentence from the data + three key numbers */}
-      <header className="mb-7 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+      <header className="mb-6 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">운영 현황</h1>
+            <h1 className="text-[26px] leading-[1.2] font-bold tracking-[-0.025em] text-[#2b3447]">운영 현황</h1>
             {at && (
-              <span className="inline-flex items-center gap-2 rounded-[10px] bg-ink px-3 py-1 text-[13.5px] font-semibold text-white">
+              <span className="inline-flex items-center gap-2 rounded-full bg-brand px-3 py-1 text-[13.5px] font-semibold text-white">
                 <Clock3 size={14} aria-hidden />
                 <span className="tnum">
                   {fmtDateK(now.date)} {fmtMin(now.minute)} 재현 중
@@ -79,58 +93,104 @@ export default function Overview() {
               </span>
             )}
           </div>
-          <p className="pretty mt-2 max-w-[60ch] text-[17px] leading-[1.6] text-ink-2">
+          <p className="pretty mt-2 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-2">
             {now.live || at ? summarize(shown, meta, D, minute, ref) : <span className="text-warn-ink">{now.reason}</span>}
           </p>
         </div>
         <KeyFigures L={L} at={!!at} />
       </header>
 
-      {/* hero: the building */}
-      <section className="rounded-[16px] border border-line bg-surface" aria-labelledby="bv-title">
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <h2 id="bv-title" className="text-[17px] font-[650] tracking-[-0.01em] text-ink">
-              IT관 3·4층
-            </h2>
-            <span
-              className={cx(
-                'tnum rounded-[8px] px-2.5 py-0.5 text-[13.5px] font-semibold',
-                scrubbing ? 'bg-ink text-white' : 'bg-well text-ink-2',
-              )}
-            >
-              {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재'}
-            </span>
-            {scrubbing && (
-              <Button size="sm" variant="ghost" onClick={() => setViewMinute(null)}>
-                <RotateCcw size={13} aria-hidden /> {at ? '기준 시각으로' : '지금으로'}
+      {drawerRoom && meta.rooms[drawerRoom] ? (
+        /* one room in focus (mock 1): the room card, its status and its chart, then the day's detail */
+        <section aria-labelledby="room-focus-title">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <Button size="sm" variant="secondary" onClick={() => setDrawerRoom(null)}>
+                <ArrowLeft size={14} aria-hidden /> 건물 전체
               </Button>
-            )}
+              <h2 id="room-focus-title" className="sr-only">
+                {drawerRoom}호 상세
+              </h2>
+              <RoomPicker meta={meta} state={shown} value={drawerRoom} onChange={setDrawerRoom} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cx('tnum rounded-full px-3 py-1 text-[13.5px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-[#edf1f7] text-ink-2')}>
+                {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재'}
+              </span>
+              {D && (
+                <a href={`/api/export/plan.csv?date=${D.date}&strategy=ai`} className={btnCls('ghost', 'sm')} download>
+                  <Download size={14} aria-hidden /> 운전 계획 CSV
+                </a>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ToggleChip pressed={showOdus} onChange={setShowOdus} title="실외기 3대와 배관, 지금 전력을 단면도에 겹쳐 봅니다">
-              <Fan size={14} aria-hidden /> 실외기
-            </ToggleChip>
-            <ReplayControl now={now} at={at} semester={meta.semester} onSet={(v) => setParams(v ? { at: v } : {})} />
-          </div>
-        </div>
-        <div className="px-7 pt-5 pb-2">
-          <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={showOdus} />
-        </div>
-        <div className="border-t border-line px-7 pt-9 pb-6">
+          <RoomHero day={D} meta={meta} room={drawerRoom} now={drawerNow} layout="page" />
           {D ? (
-            <TimeScrubber day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
+            <div className="mt-6">
+              <RoomDetails day={D} meta={meta} room={drawerRoom} />
+            </div>
           ) : day.error ? (
-            <ErrorBox error={day.error} onRetry={day.reload} />
+            <div className="mt-6">
+              <ErrorBox error={day.error} onRetry={day.reload} />
+            </div>
           ) : (
-            <Skeleton className="h-[40px]" />
+            <Skeleton className="mt-6 h-[120px]" />
           )}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-            <MapLegend meta={meta} />
-            <span className="text-[13px] text-ink-3">강의실을 누르면 온도·전력·설비 이력을 봅니다</span>
+        </section>
+      ) : (
+        /* hero: the building as floor plates */
+        <section className="rounded-[14px] border border-line bg-surface" aria-labelledby="bv-title">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <h2 id="bv-title" className="text-[17px] font-[650] tracking-[-0.01em] text-ink">
+                IT관 3·4층
+              </h2>
+              <span className={cx('tnum rounded-full px-3 py-1 text-[13.5px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-[#edf1f7] text-ink-2')}>
+                {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재'}
+              </span>
+              {scrubbing && (
+                <Button size="sm" variant="ghost" onClick={() => setViewMinute(null)}>
+                  <RotateCcw size={13} aria-hidden /> {at ? '기준 시각으로' : '지금으로'}
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleChip pressed={showOdus} onChange={setShowOdus} title="실외기 3대와 배관, 지금 전력을 평면도에 겹쳐 봅니다">
+                <Fan size={14} aria-hidden /> 실외기
+              </ToggleChip>
+              <ReplayControl
+                now={now}
+                at={at}
+                semester={meta.semester}
+                onSet={(v) =>
+                  setParams((prev) => {
+                    const n = new URLSearchParams(prev)
+                    if (v) n.set('at', v)
+                    else n.delete('at')
+                    return n
+                  })
+                }
+              />
+            </div>
           </div>
-        </div>
-      </section>
+          <div className="px-5 pt-4 pb-2">
+            <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={showOdus} />
+          </div>
+          <div className="border-t border-line px-7 pt-9 pb-6">
+            {D ? (
+              <TimeScrubber day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
+            ) : day.error ? (
+              <ErrorBox error={day.error} onRetry={day.reload} />
+            ) : (
+              <Skeleton className="h-[40px]" />
+            )}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+              <MapLegend meta={meta} />
+              <span className="text-[13px] text-ink-3">강의실을 누르면 그 강의실 화면으로 바뀝니다</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* everything else is one click away */}
       <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
@@ -160,7 +220,6 @@ export default function Overview() {
         </Disclosure>
       </DisclosureList>
 
-      <RoomDrawer open={!!drawerRoom} onClose={() => setDrawerRoom(null)} day={D} meta={meta} room={drawerRoom} now={drawerNow} />
     </div>
   )
 }
@@ -212,12 +271,42 @@ function summarize(state: BuildingState, meta: Meta, day: Day | undefined, minut
 }
 
 /** What the drawer shows under "지금": this room's state and its outdoor unit at the shown minute. */
-function roomNow(state: BuildingState, meta: Meta, room: string, minute: number, label: string) {
+function roomNow(state: BuildingState, meta: Meta, room: string, minute: number, label: string): RoomNow | undefined {
   const r = state.rooms.find((x) => x.room === room)
   if (!r) return undefined
   const oduId = meta.rooms[room]?.odu
   const odu = oduId ? state.odus[oduId] : undefined
   return { ...r, minute, label, odu: odu && oduId ? { id: oduId, ...odu } : undefined }
+}
+
+// ---------------------------------------------------------------- room picker (switch rooms without going back)
+
+function RoomPicker({ meta, state, value, onChange }: { meta: Meta; state: BuildingState; value: string; onChange: (r: string) => void }) {
+  const rooms = Object.values(meta.rooms).sort((a, b) => b.floor - a.floor || a.id.localeCompare(b.id))
+  return (
+    <div className="thin-scroll flex max-w-full gap-1 overflow-x-auto" role="group" aria-label="강의실 선택">
+      {rooms.map((r) => {
+        const st = state.rooms.find((x) => x.room === r.id)
+        const on = r.id === value
+        const run = st && st.mode !== 'off'
+        return (
+          <button
+            key={r.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(r.id)}
+            className={cx(
+              'tnum inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors duration-150',
+              on ? 'border-brand bg-brand-bg text-brand-ink' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+            )}
+          >
+            {run && <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: MODE[st!.mode].color }} aria-hidden />}
+            {r.id}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------- key figures (basis on click)

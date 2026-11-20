@@ -114,11 +114,34 @@ def run(job_id: str) -> dict:
             courses = clean_courses(normalize_records(raw["records"], source=p.get("filename", "이미지")))
             job["result"] = {"raw_count": len(raw["records"]), "notes": raw.get("notes", ""),
                              "preview": service.preview_courses(courses)}
+        elif job["kind"] == "negotiate":
+            from datetime import date as _date
+
+            from . import agents
+
+            def nprogress(p):
+                job["progress"] = {"phase": p.get("phase"), "turns": p.get("turns", [])}
+                _save(job)
+
+            job["result"] = agents.negotiate(int(p["tier"]), _date.fromisoformat(p["date"]), progress=nprogress)
+        elif job["kind"] == "lab":
+            from datetime import date as _date
+
+            from . import lab
+
+            def lprogress(pr):
+                job["progress"] = {"phase": pr.get("phase"), "done": pr.get("done"), "total": pr.get("total")}
+                _save(job)
+
+            job["result"] = lab.run(_date.fromisoformat(p["start"]), int(p["days"]), p.get("mode", "rule"), progress=lprogress)
         elif job["kind"] == "precompute":
             job["result"] = service.precompute()
         elif job["kind"] == "refresh":
             service.refresh_weather()
             job["result"] = service.precompute()
+            from . import planning
+
+            job["result"]["tiers"] = planning.run_daily()
         else:
             raise ValueError(f"unknown job kind {job['kind']}")
         job["status"] = "done"

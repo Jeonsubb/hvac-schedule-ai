@@ -1,46 +1,68 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, ShieldCheck, TrendingDown, Database, SlidersHorizontal, Sparkles, X, CloudSun } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut } from 'lucide-react'
 import { useMeta, useCopilot } from '../lib/context'
+import { useAuth } from '../lib/auth'
 import { cx, fmtDateK, fmtMin } from '../lib/format'
 import { useApi } from '../lib/api'
 import type { Live } from '../lib/types'
 import { Popover, Spinner, ToastHost } from './ui'
+import ModeSwitch from './ModeSwitch'
 
 const Copilot = lazy(() => import('./Copilot'))
 
-const NAV = [
-  { to: '/', label: '운영 현황', icon: LayoutDashboard, desc: '지금 건물 상태와 오늘의 운전' },
-  { to: '/schedule', label: '스케줄·타임라인', icon: CalendarRange, desc: '날짜별 강의와 냉난방 운전 비교' },
-  { to: '/validation', label: '정합성 검증', icon: ShieldCheck, desc: '계획대로 켜고 껐는지 매일 확인' },
-  { to: '/energy', label: '절감 효과', icon: TrendingDown, desc: '4가지 운전 방식의 전력·요금·쾌적 비교' },
-  { to: '/data', label: '일정·데이터', icon: Database, desc: '강의 시간표와 시간표 밖 일정 관리' },
-  { to: '/settings', label: '운영 규칙', icon: SlidersHorizontal, desc: '운전 규칙·설정온도·설비 정보' },
+/** Two sections only (v5): the other screens live as tabs inside them. */
+export const NAV_GROUPS = [
+  {
+    to: '/',
+    label: '운전 현황',
+    icon: LayoutDashboard,
+    desc: '지금 건물 상태, 절감 효과, 쾌적 의견, 운영 규칙',
+    tabs: [
+      { to: '/', label: '현황' },
+      { to: '/energy', label: '절감 효과' },
+      { to: '/comfort', label: '쾌적 의견' },
+      { to: '/settings', label: '운영 규칙' },
+    ],
+  },
+  {
+    to: '/schedule',
+    label: '스케줄 타임라인',
+    icon: CalendarRange,
+    desc: '운전 타임라인, AI 1·2·3차 스케줄, 정합성 검증, 일정·데이터',
+    tabs: [
+      { to: '/schedule', label: '타임라인' },
+      { to: '/plan', label: 'AI 스케줄링' },
+      { to: '/validation', label: '정합성 검증' },
+      { to: '/data', label: '일정·데이터' },
+    ],
+  },
 ]
 
-/** Mark: two floor slabs (4F warm, 3F cool), the same drawing as the building section. */
+export function groupOf(pathname: string) {
+  return NAV_GROUPS.find((g) => g.tabs.some((t) => (t.to === '/' ? pathname === '/' : pathname.startsWith(t.to)))) ?? NAV_GROUPS[0]
+}
+
+/** Mark (v5): a blue disc with two floor slabs (4F warm, 3F cool), the same drawing as the building plan. */
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="7" fill="#142033" />
-      <path d="M6 21.5h13.5l6.5-5H12.5z" fill="#7ea7e0" />
-      <path d="M6 21.5h13.5v2.2H6z" fill="#4f7fc4" />
-      <path d="M6 13h13.5l6.5-5H12.5z" fill="#f2915c" />
-      <path d="M6 13h13.5v2.2H6z" fill="#dc5a2a" />
+      <rect width="32" height="32" rx="16" fill="#2f6fde" />
+      <path d="M7.5 20.6h12.2l5-4.1H12.5z" fill="#cfe0fb" />
+      <path d="M7.5 20.6h12.2v2H7.5z" fill="#9dbdf2" />
+      <path d="M7.5 13.6h12.2l5-4.1H12.5z" fill="#ffffff" />
+      <path d="M7.5 13.6h12.2v2H7.5z" fill="#f2a477" />
     </svg>
   )
 }
 
 export function Logo() {
   return (
-    <div className="flex items-center gap-3">
-      <LogoMark size={32} />
-      <div className="leading-tight">
-        <div className="text-[16px] font-bold tracking-[-0.02em] text-ink" translate="no">
-          ThermoPlan
-        </div>
-        <div className="mt-0.5 text-[13px] text-ink-3">IT관 냉난방 자동 운영</div>
+    <div className="flex items-center gap-2.5">
+      <LogoMark size={34} />
+      <div className="text-[17px] font-bold tracking-[-0.02em] text-brand" translate="no">
+        ThermoPlan
       </div>
     </div>
   )
@@ -48,95 +70,155 @@ export function Logo() {
 
 function Sidebar() {
   const { meta } = useMeta()
+  const { user, logout } = useAuth()
+  const loc = useLocation()
+  const active = groupOf(loc.pathname)
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col bg-paper lg:flex">
-      <div className="px-6 pt-6 pb-8">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] flex-col border-r border-line bg-surface lg:flex">
+      <div className="px-6 pt-7 pb-10">
         <Logo />
       </div>
-      <nav className="flex-1 space-y-1 px-3" aria-label="주 메뉴">
-        {NAV.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            title={n.desc}
-            className={({ isActive }) =>
-              cx(
-                'flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14.5px] transition-colors duration-150',
-                isActive ? 'bg-surface font-semibold text-ink shadow-[0_0_0_1px_var(--color-line)]' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <n.icon size={18} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-ink' : 'text-ink-3'} aria-hidden />
-                {n.label}
-              </>
-            )}
-          </NavLink>
-        ))}
+      <nav className="flex-1 space-y-1" aria-label="주 메뉴">
+        {NAV_GROUPS.map((n) => {
+          const on = active === n
+          return (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              end={n.to === '/'}
+              title={n.desc}
+              aria-current={on ? 'page' : undefined}
+              className={cx(
+                'relative flex h-11 items-center gap-3 px-6 text-[15px] transition-colors duration-150',
+                on ? 'font-semibold text-brand' : 'font-medium text-ink-3 hover:text-ink',
+              )}
+            >
+              <n.icon size={19} strokeWidth={on ? 2.3 : 1.9} className={on ? 'text-brand' : 'text-ink-4'} aria-hidden />
+              {n.label}
+              {/* active marker sits on the sidebar's hairline, as in the mock */}
+              {on && <span className="absolute top-1.5 right-[-1px] bottom-1.5 w-[3px] rounded-l-full bg-brand" aria-hidden />}
+            </NavLink>
+          )
+        })}
       </nav>
-      <div className="px-6 pb-6 text-[13px] leading-relaxed text-ink-3">
-        <div className="font-medium text-ink-2">{meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'}</div>
-        <div className="tnum">{meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'}</div>
+      <div className="space-y-4 px-6 pb-6">
+        <div className="text-[13px] leading-relaxed text-ink-3">
+          <div className="font-medium text-ink-2">{meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'}</div>
+          <div className="tnum">{meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'}</div>
+        </div>
+        {user && (
+          <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
+            <div className="min-w-0">
+              <div className="truncate text-[13.5px] font-semibold text-ink">{user.name}</div>
+              <div className="truncate text-[12.5px] text-ink-3">{user.id}</div>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              aria-label="로그아웃"
+              title="로그아웃"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-ink-3 transition-colors duration-150 hover:bg-hover hover:text-ink"
+            >
+              <LogOut size={16} aria-hidden />
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )
 }
 
-function TopBar() {
-  const { meta, error: metaError } = useMeta()
-  const { open, setOpen } = useCopilot()
+/** Tabs of the current section (the screens that used to be separate menu items). */
+function SectionTabs() {
+  const loc = useLocation()
+  const g = groupOf(loc.pathname)
+  return (
+    <nav className="thin-scroll flex min-w-0 overflow-x-auto" aria-label={`${g.label} 하위 화면`}>
+      <div className="inline-flex shrink-0 gap-0.5 rounded-full bg-[#edf1f7] p-1">
+        {g.tabs.map((t) => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            end={t.to === '/'}
+            className={({ isActive }) =>
+              cx(
+                'inline-flex h-8 shrink-0 items-center rounded-full px-4 text-[14px] whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
+                isActive
+                  ? 'bg-surface font-semibold text-brand-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.05)]'
+                  : 'font-medium text-ink-3 hover:text-ink',
+              )
+            }
+          >
+            {t.label}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+/** "11월 20일 (금) 12:04 | 18.8℃ (부산)" — the reference clock and outdoor air, as one quiet pill. */
+function ClockPill() {
+  const { meta } = useMeta()
   const live = useApi<Live>('/api/live', { maxAgeMs: 60_000, refreshMs: 60_000 })
   const now = meta?.now
+  if (!now) return <span className="hidden h-9 items-center rounded-[10px] bg-[#edf1f7] px-3.5 text-[13.5px] text-ink-3 xl:inline-flex">기준 시각 확인 중…</span>
+  const out = live.data?.outdoor
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-line/70 bg-paper/85 px-8 backdrop-blur-md">
-      <div className="flex min-w-0 items-center gap-5">
-        <span className="lg:hidden">
-          <LogoMark size={28} />
-        </span>
-        {now ? (
-          <div
-            className="flex min-w-0 items-center gap-2.5 text-[14px]"
-            title={now.live ? `실시간 기준 시각입니다. ${now.reason}` : now.reason}
-          >
-            <span className={cx('inline-block h-2 w-2 shrink-0 rounded-full', now.live ? 'bg-good' : 'bg-warn')} aria-hidden />
-            {!now.live && <span className="shrink-0 font-semibold text-warn-ink">대체 기준</span>}
-            <span className="tnum truncate font-medium text-ink">
-              {fmtDateK(now.date)} {fmtMin(now.minute)}
-            </span>
-            <span className="sr-only">{now.live ? '실시간' : ''}</span>
-          </div>
-        ) : metaError ? (
-          <span className="flex items-center gap-2 text-[14px] font-semibold text-crit-ink" title={metaError.message}>
-            <span className="inline-block h-2 w-2 rounded-full bg-crit" aria-hidden />
-            서버 연결 끊김
-          </span>
-        ) : (
-          <span className="text-[14px] text-ink-3">기준 시각 확인 중…</span>
-        )}
-        {live.data && (
-          <div className="hidden items-center gap-1.5 text-[14px] text-ink-2 sm:flex" title={`지금 외기 ${live.data.outdoor.t.toFixed(1)}℃, 습도 ${Math.round(live.data.outdoor.rh)}% (${live.data.outdoor.src})`}>
-            <CloudSun size={17} className="text-ink-3" aria-hidden />
+    <div
+      className="hidden h-9 items-center gap-3 rounded-[10px] bg-[#edf1f7] px-3.5 text-[13.5px] xl:inline-flex"
+      title={now.live ? `실시간 기준 시각입니다.${out ? ` 지금 외기 ${out.t.toFixed(1)}℃, 습도 ${Math.round(out.rh)}% (${out.src})` : ''}` : now.reason}
+    >
+      {!now.live && <span className="font-semibold whitespace-nowrap text-warn-ink">대체 기준</span>}
+      <span className="tnum font-medium whitespace-nowrap text-ink">
+        {fmtDateK(now.date)} {fmtMin(now.minute)}
+      </span>
+      {out && (
+        <>
+          <span className="h-4 w-px bg-line-strong" aria-hidden />
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-ink">
+            <CloudSun size={16} className="text-ink-3" aria-hidden />
             <span className="sr-only">지금 외기</span>
-            <span className="tnum font-medium text-ink">{live.data.outdoor.t.toFixed(1)}℃</span>
-          </div>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <SystemStatus />
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className={cx(
-            'inline-flex h-10 shrink-0 items-center gap-2 rounded-[10px] px-4 text-[14px] font-semibold transition-colors duration-150',
-            open ? 'border border-line-strong bg-surface text-ink hover:bg-hover' : 'bg-ink text-white hover:bg-[#25344e]',
-          )}
-        >
-          {open ? <X size={16} aria-hidden /> : <Sparkles size={16} className="text-[#7fd6a8]" aria-hidden />}
-          {open ? '코파일럿 닫기' : 'AI 코파일럿'}
-        </button>
+            <span className="tnum font-medium">{out.t.toFixed(1)}℃</span>
+            <span className="text-ink-3">(부산)</span>
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+
+function TopBar() {
+  const { open, setOpen } = useCopilot()
+  const loc = useLocation()
+  const g = groupOf(loc.pathname)
+  return (
+    <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/90 backdrop-blur-md">
+      <div className="flex h-[68px] items-center justify-between gap-4 px-8">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="lg:hidden">
+            <LogoMark size={30} />
+          </span>
+          {/* section name, like the mock's page title; the section's screens are the tabs below */}
+          <div className="hidden truncate text-[20px] font-bold tracking-[-0.02em] text-ink lg:block">{g.label}</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ModeSwitch />
+          <SystemStatus />
+          <ClockPill />
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            className={cx(
+              'inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-[14px] font-semibold transition-colors duration-150',
+              open ? 'border border-line-strong bg-surface text-ink hover:bg-hover' : 'bg-brand text-white hover:bg-brand-ink',
+            )}
+          >
+            {open ? <X size={16} aria-hidden /> : <Sparkles size={16} aria-hidden />}
+            {open ? '코파일럿 닫기' : 'AI 코파일럿'}
+          </button>
+        </div>
       </div>
     </header>
   )
@@ -148,91 +230,109 @@ function shortTs(ts?: string | null) {
   return m ? `${Number(m[1])}/${Number(m[2])} ${m[3]}:${m[4]}` : ts
 }
 
-/** AI (Bedrock) health and storage fallback: a dot that opens the details; the fallback badge stays visible. */
+/**
+ * The status pill: green "시스템 정상 운영 중" while the server answers and AI/storage are fine,
+ * amber when AI calls fail or storage fell back, red when the server is unreachable. Opens the details.
+ */
 function SystemStatus() {
-  const { meta } = useMeta()
+  const { meta, error: metaError } = useMeta()
   const ai = meta?.ai
   const st = meta?.storage
-  if (!ai && !st) return null
   const fallback = st?.mode === 'local-fallback'
   const okAt = shortTs(ai?.last_ok)
   const errAt = shortTs(ai?.last_error)
   // ok === null/undefined means no AI call has been made since the server started: not a failure
-  const unknown = ai != null && ai.ok == null
+  const unknown = ai == null || ai.ok == null
   const bad = !!ai && !unknown && !ai.ok
-  const dot = unknown || !ai ? 'bg-ink-4' : ai.ok ? 'bg-good' : 'bg-warn'
-  const short = !ai ? '시스템' : unknown ? 'AI 대기' : ai.ok ? 'AI 정상' : 'AI 불안정'
+  const down = !meta && !!metaError
+  const tone: 'good' | 'warn' | 'crit' | 'idle' = down ? 'crit' : !meta ? 'idle' : bad || fallback ? 'warn' : 'good'
+  const label = down ? '서버 연결 끊김' : !meta ? '상태 확인 중' : bad ? 'AI 연결 불안정' : fallback ? '저장소 대체 모드' : '시스템 정상 운영 중'
+  const pill = {
+    good: 'bg-good-bg text-good-ink',
+    warn: 'bg-warn-bg text-warn-ink',
+    crit: 'bg-crit-bg text-crit-ink',
+    idle: 'bg-[#edf1f7] text-ink-3',
+  }[tone]
+  const dot = { good: 'bg-good soft-ping', warn: 'bg-warn', crit: 'bg-crit', idle: 'bg-ink-4' }[tone]
   return (
-    <div className="hidden items-center gap-2 md:flex">
-      {fallback && (
-        <span
-          className="inline-flex items-center gap-1.5 rounded-[8px] bg-warn-bg px-2.5 py-1 text-[13px] font-medium whitespace-nowrap text-warn-ink"
-          title={`AWS 저장소에 연결하지 못해 서버의 임시 저장소를 쓰고 있습니다. 변경 내용이 서버 재시작 때 사라질 수 있습니다.${st?.last_error ? ` (${st.last_error})` : ''}`}
-        >
-          <span className="inline-block h-2 w-2 rounded-full bg-warn" aria-hidden />
-          데이터 저장소 대체 모드
-        </span>
-      )}
-      <Popover
-        label="시스템 상태"
-        align="end"
-        width={300}
-        buttonClassName={cx(
-          'inline-flex h-10 items-center gap-2 rounded-[10px] px-3 text-[13.5px] font-medium transition-colors duration-150 hover:bg-hover',
-          bad ? 'text-warn-ink' : 'text-ink-2',
-        )}
-        button={
-          <>
-            <span className={cx('inline-block h-2 w-2 rounded-full', dot)} aria-hidden />
-            {short}
-          </>
-        }
-      >
-        <div className="space-y-3">
+    <div className="hidden md:block">
+    <Popover
+      label="시스템 상태"
+      align="end"
+      width={300}
+      buttonClassName={cx('inline-flex h-9 items-center gap-2 rounded-[10px] px-3.5 text-[13.5px] font-semibold whitespace-nowrap transition-[filter] duration-150 hover:brightness-[0.97]', pill)}
+      button={
+        <>
+          <span className={cx('inline-block h-2 w-2 rounded-full', dot)} aria-hidden />
+          {label}
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {down && (
           <div>
-            <div className="text-[14px] font-semibold text-ink">AI 연결 (Bedrock)</div>
-            <div className="mt-0.5 text-[13.5px]">
-              {!ai
-                ? '상태 정보가 없습니다.'
-                : unknown
-                  ? '서버가 시작된 뒤 아직 AI를 호출하지 않았습니다. 첫 호출 결과로 상태가 표시됩니다.'
-                  : ai.ok
-                    ? `정상입니다. 마지막 성공 ${okAt ?? '기록 없음'}`
-                    : `호출이 실패하고 있습니다${errAt ? ` (${errAt})` : ''}. ${okAt ? `마지막 성공 ${okAt}. ` : ''}코파일럿은 같은 질문의 이전 답을 보여 줄 수 있습니다.`}
-            </div>
-            {bad && ai?.error && <div className="mt-1 text-[13px] break-all text-ink-3">{ai.error}</div>}
+            <div className="text-[14px] font-semibold text-crit-ink">서버 연결 끊김</div>
+            <div className="mt-0.5 text-[13.5px] break-all">{metaError?.message}</div>
           </div>
-          <div className="border-t border-line pt-3">
-            <div className="text-[14px] font-semibold text-ink">데이터 저장소</div>
-            <div className="mt-0.5 text-[13.5px]">
-              {fallback ? '대체 모드: 서버 임시 저장소를 쓰고 있습니다. 변경 내용이 서버 재시작 때 사라질 수 있습니다.' : `정상 (${st?.mode ?? '알 수 없음'})`}
-            </div>
+        )}
+        <div>
+          <div className="text-[14px] font-semibold text-ink">AI 연결 (Bedrock)</div>
+          <div className="mt-0.5 text-[13.5px]">
+            {!ai
+              ? '상태 정보가 없습니다.'
+              : unknown
+                ? '서버가 시작된 뒤 아직 AI를 호출하지 않았습니다. 첫 호출 결과로 상태가 표시됩니다.'
+                : ai.ok
+                  ? `정상입니다. 마지막 성공 ${okAt ?? '기록 없음'}`
+                  : `호출이 실패하고 있습니다${errAt ? ` (${errAt})` : ''}. ${okAt ? `마지막 성공 ${okAt}. ` : ''}코파일럿은 같은 질문의 이전 답을 보여 줄 수 있습니다.`}
+          </div>
+          {bad && ai?.error && <div className="mt-1 text-[13px] break-all text-ink-3">{ai.error}</div>}
+        </div>
+        <div className="border-t border-line pt-3">
+          <div className="text-[14px] font-semibold text-ink">데이터 저장소</div>
+          <div className="mt-0.5 text-[13.5px]">
+            {fallback
+              ? `대체 모드: AWS 저장소에 연결하지 못해 서버 임시 저장소를 쓰고 있습니다. 변경 내용이 서버 재시작 때 사라질 수 있습니다.${st?.last_error ? ` (${st.last_error})` : ''}`
+              : `정상 (${st?.mode ?? '알 수 없음'})`}
           </div>
         </div>
-      </Popover>
+        {meta?.now && (
+          <div className="border-t border-line pt-3">
+            <div className="text-[14px] font-semibold text-ink">기준 시각</div>
+            <div className="tnum mt-0.5 text-[13.5px]">
+              {fmtDateK(meta.now.date)} {fmtMin(meta.now.minute)} {meta.now.live ? '(실시간)' : `(${meta.now.reason})`}
+            </div>
+          </div>
+        )}
+      </div>
+    </Popover>
     </div>
   )
 }
 
 function MobileNav() {
+  const loc = useLocation()
+  const active = groupOf(loc.pathname)
   return (
-    <nav className="thin-scroll sticky top-16 z-20 flex gap-1 overflow-x-auto border-b border-line bg-paper px-4 py-2 lg:hidden" aria-label="주 메뉴">
-      {NAV.map((n) => (
-        <NavLink
-          key={n.to}
-          to={n.to}
-          end={n.to === '/'}
-          className={({ isActive }) =>
-            cx(
-              'flex shrink-0 items-center gap-1.5 rounded-[10px] px-3 py-2 text-[14px] font-medium whitespace-nowrap',
-              isActive ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]' : 'text-ink-2 hover:bg-hover',
-            )
-          }
-        >
-          <n.icon size={15} />
-          {n.label}
-        </NavLink>
-      ))}
+    <nav className="thin-scroll sticky top-[68px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2 lg:hidden" aria-label="주 메뉴">
+      {NAV_GROUPS.flatMap((g) =>
+        g.tabs.map((t) => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            end={t.to === '/'}
+            className={({ isActive }) =>
+              cx(
+                'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-medium whitespace-nowrap',
+                isActive ? 'bg-brand-bg text-brand-ink' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
+              )
+            }
+          >
+            {t.to === g.to && <g.icon size={15} aria-hidden />}
+            {t.label}
+          </NavLink>
+        )),
+      )}
     </nav>
   )
 }
@@ -251,10 +351,13 @@ export default function Layout() {
         본문으로 건너뛰기
       </a>
       <Sidebar />
-      <div className={cx('min-h-full lg:pl-[232px]', open && '2xl:pr-[440px]')}>
+      <div className={cx('min-h-full lg:pl-[220px]', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        <main id="main" className="mx-auto max-w-[1480px] px-8 pt-8 pb-20">
+        <div className="mx-auto hidden max-w-[1480px] px-8 pt-6 lg:block">
+          <SectionTabs />
+        </div>
+        <main id="main" className="mx-auto max-w-[1480px] px-8 pt-6 pb-20">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />

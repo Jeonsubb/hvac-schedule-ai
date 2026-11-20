@@ -6,7 +6,7 @@ import type { StrategyKey } from '../lib/types'
 
 // ---------------------------------------------------------------- surfaces
 
-/** Card: white surface + one hairline + 16px radius. No shadow (only floating layers get one). */
+/** Card: white surface + one hairline + 14px radius (v5). No shadow (only floating layers get one). */
 export function Card({
   children,
   className,
@@ -22,7 +22,7 @@ export function Card({
   'aria-labelledby'?: string
 }) {
   return (
-    <As className={cx('rounded-[16px] border border-line bg-surface', pad === true && 'p-6', pad === 'dense' && 'p-5', pad === 'lg' && 'p-8', className)} {...rest}>
+    <As className={cx('rounded-[14px] border border-line bg-surface', pad === true && 'p-6', pad === 'dense' && 'p-5', pad === 'lg' && 'p-8', className)} {...rest}>
       {children}
     </As>
   )
@@ -152,7 +152,7 @@ export function Figure({
 /** Legacy strip (kept for compatibility). New screens use Figure rows without boxes. */
 export function StatStrip({ children, className, cols }: { children: ReactNode; className?: string; cols?: string }) {
   return (
-    <section className={cx('overflow-hidden rounded-[16px] border border-line bg-line', className)}>
+    <section className={cx('overflow-hidden rounded-[14px] border border-line bg-line', className)}>
       <div className={cx('grid gap-px', cols ?? 'grid-cols-2 lg:grid-cols-5 max-lg:[&>*:last-child:nth-child(odd)]:col-span-2')}>{children}</div>
     </section>
   )
@@ -258,11 +258,11 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 
 export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md', className?: string) {
   const v: Record<Variant, string> = {
-    primary: 'bg-ink text-white border border-ink hover:bg-[#25344e] active:bg-[#0d1726]',
+    primary: 'bg-brand text-white border border-brand hover:bg-brand-ink hover:border-brand-ink active:bg-[#18469a]',
     secondary: 'bg-surface text-ink border border-line-strong hover:bg-hover hover:border-ink-4',
     ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-hover hover:text-ink',
     danger: 'bg-surface text-crit-ink border border-[#efc6c6] hover:bg-crit-bg hover:border-[#e3a9a9]',
-    link: 'bg-transparent text-ink border border-transparent underline-offset-4 hover:underline !px-0',
+    link: 'bg-transparent text-brand-ink border border-transparent underline-offset-4 hover:underline !px-0',
   }
   const s = size === 'sm' ? 'h-8 px-3 text-[13px] gap-1.5' : 'h-10 px-4 text-[14px] gap-2'
   return cx(
@@ -331,7 +331,7 @@ export function ToggleChip({ pressed, onChange, children, title }: { pressed: bo
       onClick={() => onChange(!pressed)}
       className={cx(
         'inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
-        pressed ? 'border-ink bg-ink text-white hover:bg-[#25344e]' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4 hover:text-ink',
+        pressed ? 'border-brand bg-brand-bg text-brand-ink hover:bg-[#dde9fc]' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4 hover:text-ink',
       )}
     >
       {children}
@@ -367,7 +367,7 @@ export function Segmented<T extends string>({
             className={cx(
               'inline-flex items-center gap-1.5 rounded-[8px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
               size === 'sm' ? 'h-7 px-2.5 text-[13px]' : 'h-8 px-3 text-[13.5px]',
-              on ? 'bg-surface text-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.06)]' : 'text-ink-3 hover:text-ink',
+              on ? 'bg-surface text-brand-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.06)]' : 'text-ink-3 hover:text-ink',
             )}
           >
             {o.label}
@@ -400,10 +400,10 @@ export function Tabs<T extends string>({
             onClick={() => onChange(t.value)}
             className={cx(
               '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 pt-1 pb-3 text-[14.5px] font-medium transition-colors duration-150',
-              on ? 'border-ink text-ink' : 'border-transparent text-ink-3 hover:text-ink',
+              on ? 'border-brand text-ink' : 'border-transparent text-ink-3 hover:text-ink',
             )}
           >
-            {t.icon && <span className={on ? 'text-ink' : 'text-ink-4'}>{t.icon}</span>}
+            {t.icon && <span className={on ? 'text-brand' : 'text-ink-4'}>{t.icon}</span>}
             {t.label}
             {t.count !== undefined && <span className="tnum text-[13px] font-medium text-ink-3">{t.count}</span>}
           </button>
@@ -511,7 +511,7 @@ export function DisclosureList({ children, title, hideTitle = false, className }
   return (
     <section className={className} aria-label={title}>
       {title && !hideTitle && <h2 className="mb-3 px-1 text-[17px] font-[650] text-ink">{title}</h2>}
-      <div className="divide-y divide-line overflow-hidden rounded-[16px] border border-line bg-surface">{children}</div>
+      <div className="divide-y divide-line overflow-hidden rounded-[14px] border border-line bg-surface">{children}</div>
     </section>
   )
 }
@@ -632,7 +632,7 @@ export function PageSkeleton({ label }: { label: string }) {
       <div className="flex items-center gap-2 text-[14px] text-ink-3">
         <Spinner size={15} /> {label}
       </div>
-      <Skeleton className="h-[420px] rounded-[16px]" />
+      <Skeleton className="h-[420px] rounded-[14px]" />
     </div>
   )
 }
@@ -780,7 +780,7 @@ export function Modal({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        className="pop relative max-h-[90vh] overflow-y-auto overscroll-contain rounded-[16px] bg-surface shadow-[var(--shadow-cover)] outline-none"
+        className="pop relative max-h-[90vh] overflow-y-auto overscroll-contain rounded-[14px] bg-surface shadow-[var(--shadow-cover)] outline-none"
         style={{ width, transformOrigin: 'center' }}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-2">

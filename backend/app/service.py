@@ -195,16 +195,41 @@ class Ctx:
         self.courses = courses()
         self.events = events()
         self.wx = weather_by_date()
+        # applied schedule adjustments (per-room setpoints) in the order they were decided
+        self.adjustments = sorted((a for a in get_store().list_items("adjustment") if a.get("status") == "applied"
+                                   and a.get("kind", "setpoint") == "setpoint"),
+                                  key=lambda a: a.get("decided_at") or a.get("created_at") or "")
+
+
+def room_setpoints(d: date, ctx: Ctx) -> dict:
+    """Per-room setpoints active on date d (later decisions win)."""
+    iso = d.isoformat()
+    out: dict = {}
+    for a in getattr(ctx, "adjustments", []):
+        if a.get("date_from", "") <= iso <= a.get("date_to", ""):
+            ch = {k: float(v) for k, v in (a.get("change") or {}).items() if k in ("sp_heat", "sp_cool")}
+            if ch:
+                for r in a.get("rooms", []):
+                    out.setdefault(r, {}).update(ch)
+    return out
+
+
+def day_settings(d: date, ctx: Ctx) -> dict:
+    """Settings for one day: the global rules plus that day's applied per-room setpoints (AI only)."""
+    rs = room_setpoints(d, ctx)
+    return {**ctx.settings, "room_sp": rs} if rs else ctx.settings
 
 
 def get_day(d: date, ctx: Ctx | None = None, persist: bool = True) -> dict:
     ctx = ctx or Ctx()
-    fp = day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings)
+    sd = day_settings(d, ctx)
+    fp = day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, sd)
     key = f"days/{d.isoformat()}/{fp}.json"
     st = get_store()
     day = st.get_blob(key)
     if day is None:
-        day = engine.compute_day(d, ctx.courses, ctx.events, ctx.wx, ctx.settings)
+        day = engine.compute_day(d, ctx.courses, ctx.events, ctx.wx, sd)
+        day["room_sp"] = sd.get("room_sp") or {}  # per-room setpoints of applied adjustments (AI operation)
         day["fingerprint"] = fp
         day["computed_at"] = now_kst().isoformat(timespec="seconds")
         if persist:
@@ -214,7 +239,7 @@ def get_day(d: date, ctx: Ctx | None = None, persist: bool = True) -> dict:
 
 
 def get_day_summary(d: date, ctx: Ctx) -> dict:
-    fp = day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings)
+    fp = day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, day_settings(d, ctx))
     sm = get_store().get_blob(f"daysum/{d.isoformat()}/{fp}.json")
     if sm is None:
         sm = engine.summarize_day(get_day(d, ctx))
@@ -227,7 +252,7 @@ def semester_summary(ctx: Ctx | None = None, allow_stale: bool = False) -> dict:
     ctx = ctx or Ctx()
     s, e = semester_range()
     dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
-    key_all = _h([now_kst().date().isoformat()] + [day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
+    key_all = _h([now_kst().date().isoformat()] + [day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, day_settings(d, ctx)) for d in dates])
     cached = get_store().get_blob(f"summary/{key_all}.json")
     if cached:
         return cached
@@ -502,12 +527,15 @@ def plan_csv(d: date, strategy: str = "ai") -> str:
     w = csv.writer(buf)
     w.writerow(["date", "device", "room", "time", "command", "mode", "heat_setpoint", "cool_setpoint", "reason"])
     st = settings()
+    rsp = room_setpoints(d, Ctx()) if strategy == "ai" else {}
     plan = day["strategies"][strategy]["plan"]
     for r, ivs in sorted(plan.items()):
+        sh = rsp.get(r, {}).get("sp_heat", st["sp_heat"])
+        sc = rsp.get(r, {}).get("sp_cool", st["sp_cool"])
         for iv in ivs:
             for idu in config.ROOMS[r]["idus"]:
                 mode = "AUTO" if iv.get("kind") == "cond" else "FAN"
-                w.writerow([d.isoformat(), idu["id"], r, min_to_hm(iv["s"]), "ON", mode, st["sp_heat"], st["sp_cool"], iv.get("reason", "")])
+                w.writerow([d.isoformat(), idu["id"], r, min_to_hm(iv["s"]), "ON", mode, sh, sc, iv.get("reason", "")])
                 w.writerow([d.isoformat(), idu["id"], r, min_to_hm(iv["e"]), "OFF", "", "", "", "계획 정지"])
     return buf.getvalue()
 
@@ -515,7 +543,7 @@ def plan_csv(d: date, strategy: str = "ai") -> str:
 def _inputs_key(ctx: Ctx) -> str:
     s, e = semester_range()
     dates = [s + timedelta(days=i) for i in range((e - s).days + 1)]
-    return _h([day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, ctx.settings) for d in dates])
+    return _h([day_fingerprint(d, ctx.courses, ctx.events, ctx.wx, day_settings(d, ctx)) for d in dates])
 
 
 def consolidation(weekday: int | None = None, ctx: Ctx | None = None, allow_stale: bool = False) -> dict:

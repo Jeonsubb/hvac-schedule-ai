@@ -405,9 +405,253 @@ def admin_reset(request: Request):
     st.put_item("settings", "active", config.default_settings())
     seed = timetable.parse_grid_csv(service.RAW_CSV.read_text(encoding="utf-8-sig"), source="부산대 시간표 CSV")
     st.replace_kind("course", {c["id"]: c for c in seed})
-    service.audit("admin", f"데모 초기화: 이벤트 {removed}개 삭제, 운영 규칙 기본값·시간표 원본 복원", "운영자")
+    # v5 state: schedule adjustments, controller commands, occupant/operator feedback (simulated history kept),
+    # operation mode, policy and building profile back to their defaults
+    from . import planning
+
+    st.replace_kind("adjustment", {})
+    st.replace_kind("command", {})
+    kept = {f["id"]: f for f in st.list_items("feedback") if f.get("source") == "simulated"}
+    st.replace_kind("feedback", kept)
+    st.put_item("meta", "op_mode", {"mode": "recommend", "changed_at": None, "by": None})
+    st.put_item("policy", "active", {})
+    st.delete_item("meta", "building_profile")
+    planning.clear_cache()
+    service.audit("admin", f"데모 초기화: 이벤트 {removed}개 삭제, 운영 규칙 기본값·시간표 원본 복원, 조정안·제어 명령·의견 초기화, 추천 모드", "운영자")
     service._queue_precompute(force=True)
     return {"events_removed": removed, "settings": "default", "courses": len(seed)}
+
+
+# ---------------------------------------------------------------- v5: onboarding, tiers, feedback, agents, mode
+
+@app.get("/api/building")
+def get_building():
+    from . import onboarding
+
+    return onboarding.building()
+
+
+@app.put("/api/building")
+def put_building(body: dict = Body(...)):
+    from . import onboarding
+
+    return onboarding.save_building(body)
+
+
+@app.post("/api/onboarding/profile")
+def onboarding_profile(request: Request, body: dict = Body(...)):
+    from . import onboarding
+
+    text = str(body.get("text") or "").strip()
+    if not text or len(text) > 500:
+        raise HTTPException(400, "건물 설명은 1~500자여야 합니다.")
+    _rate_limit(request, "parse")
+    return onboarding.parse_profile(text)
+
+
+@app.post("/api/onboarding/connect")
+def onboarding_connect(body: dict = Body(...)):
+    from . import onboarding
+
+    return onboarding.connect(body)
+
+
+@app.get("/api/onboarding/collect")
+def onboarding_collect():
+    from . import onboarding
+
+    return onboarding.collect()
+
+
+@app.post("/api/onboarding/answers")
+def onboarding_answers(body: dict = Body(...)):
+    from . import onboarding
+
+    ans = body.get("answers")
+    if not isinstance(ans, dict):
+        raise HTTPException(400, "answers는 객체여야 합니다.")
+    return onboarding.apply_answers(ans)
+
+
+@app.get("/api/policy")
+def get_policy():
+    from . import planning
+
+    return planning.policy()
+
+
+@app.put("/api/policy")
+def put_policy(body: dict = Body(...)):
+    from . import planning
+
+    return planning.save_policy(body)
+
+
+@app.get("/api/mode")
+def get_mode():
+    from . import planning
+
+    return planning.mode()
+
+
+@app.put("/api/mode")
+def put_mode(body: dict = Body(...)):
+    from . import planning
+
+    return planning.set_mode(str(body.get("mode")))
+
+
+@app.get("/api/plan/tier/{tier}")
+def plan_tier(tier: int, date: str | None = None):
+    from . import planning
+
+    if tier not in (1, 2, 3):
+        raise HTTPException(400, "tier는 1, 2, 3 중 하나입니다.")
+    try:
+        return planning.tier_plan(tier, _date(date) if date else None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/adjustments")
+def list_adjustments(status: str | None = None):
+    from . import planning
+
+    return planning.adjustments(status)
+
+
+@app.post("/api/adjustments/{adj_id}/approve")
+def approve_adjustment(adj_id: str):
+    from . import planning
+
+    return planning.apply_adjustment(adj_id, "운영자")
+
+
+@app.post("/api/adjustments/{adj_id}/reject")
+def reject_adjustment(adj_id: str):
+    from . import planning
+
+    return planning.reject_adjustment(adj_id, "운영자")
+
+
+@app.get("/api/commands")
+def list_commands(limit: int = 50):
+    from . import planning
+
+    return planning.commands(max(1, min(limit, 500)))
+
+
+@app.post("/api/feedback")
+def post_feedback(request: Request, body: dict = Body(...)):
+    from . import planning
+
+    import hashlib
+
+    _rate_limit(request, "feedback", 20)
+    addr = request.headers.get("cloudfront-viewer-address") or request.headers.get("x-forwarded-for") or (
+        request.client.host if request.client else "")
+    ua = request.headers.get("user-agent", "")
+    client = hashlib.sha1(f"{addr.split(',')[0].rsplit(':', 1)[0]}|{ua}".encode()).hexdigest()[:12]  # not stored raw
+    return planning.add_feedback(body, str(body.get("source") or "occupant"), client)
+
+
+@app.get("/api/feedback")
+def get_feedback(days: int = 14, room: str | None = None):
+    from . import planning
+
+    return planning.feedback_summary(max(1, min(days, 60)), room)
+
+
+@app.post("/api/negotiate")
+def start_negotiation(request: Request, body: dict = Body(...)):
+    from . import planning
+
+    tier = int(body.get("tier") or 3)
+    if tier not in (2, 3):
+        raise HTTPException(400, "협의는 2차(주간) 또는 3차(일일)에서 할 수 있습니다.")
+    d = _date(body["date"]) if body.get("date") else planning.plan_date()
+    _rate_limit(request, "negotiate", 6)
+    job = jobs.create("negotiate", {"tier": tier, "date": d.isoformat()})
+    return {"job": job["id"]}
+
+
+@app.get("/api/negotiate/latest")
+def latest_negotiation(tier: int = 3, date: str | None = None):
+    from . import agents, planning
+
+    d = _date(date) if date else planning.plan_date()
+    res = agents.latest(tier, d)
+    if not res:
+        raise HTTPException(404, "아직 이 날짜의 협의 기록이 없습니다.")
+    return res
+
+
+# ---------------------------------------------------------------- simulation lab (sandbox)
+
+@app.post("/api/lab/run")
+def lab_run(request: Request, body: dict = Body(...)):
+    from . import lab
+
+    mode = "llm" if body.get("mode") == "llm" else "rule"
+    start = _date(body.get("start") or service.now_kst().date().isoformat())
+    days = max(1, min(int(body.get("days") or 5), lab.MAX_DAYS[mode]))
+    _rate_limit(request, "lab", 6 if mode == "rule" else 3)
+    job = jobs.create("lab", {"start": start.isoformat(), "days": days, "mode": mode})
+    return {"job": job["id"], "days": days, "mode": mode}
+
+
+@app.get("/api/lab/last")
+def lab_last():
+    from . import lab
+
+    res = lab.last()
+    if not res:
+        raise HTTPException(404, "아직 실행한 시뮬레이션이 없습니다.")
+    return res
+
+
+@app.get("/api/lab/evaluation")
+def lab_evaluation():
+    """Offline agent evaluation (scripts/eval_agents.py): period outcomes, grounding, consistency."""
+    import json as _json
+
+    from .service import DATA_DIR
+
+    p = DATA_DIR / "evaluation_agents.json"
+    if not p.exists():
+        raise HTTPException(404, "평가 결과가 없습니다. scripts/eval_agents.py를 실행하세요.")
+    return _json.loads(p.read_text(encoding="utf-8"))
+
+
+@app.get("/api/lab/measured")
+def lab_measured():
+    from . import lab
+
+    m = lab.measured()
+    return {k: v for k, v in m.items() if k != "points"} if m else None
+
+
+@app.post("/api/lab/measured")
+async def lab_measured_upload(file: UploadFile = File(...)):
+    from . import lab
+
+    data = await file.read()
+    if len(data) > 3_000_000:
+        raise HTTPException(413, "파일이 너무 큽니다(최대 3MB).")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = data.decode("cp949", errors="replace")
+    m = lab.parse_measured(text, file.filename or "measured.csv")
+    return {k: v for k, v in m.items() if k != "points"}
+
+
+@app.delete("/api/lab/measured")
+def lab_measured_clear():
+    from . import lab
+
+    lab.clear_measured()
+    return {"cleared": True}
 
 
 @app.post("/api/precompute")

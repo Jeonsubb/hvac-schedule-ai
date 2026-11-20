@@ -72,12 +72,16 @@ def simulate_day(
     occupancy: dict[str, list[float]] | None = None,
     guard: bool = False,
     t_adj: float = 18.0,
+    room_sp: dict[str, dict] | None = None,
 ) -> dict:
     """guard=True adds closed-loop correction: while people are present and the unit is
     not conditioning, leaving the comfort band starts conditioning until the room empties."""
     sp_h, sp_c = settings["sp_heat"], settings["sp_cool"]
     lo, hi = settings["comfort_low"], settings["comfort_high"]
     ids = sorted(rooms)
+    # per-room setpoints (AI schedule adjustments: comfort feedback, agent consensus)
+    room_sp = room_sp or {}
+    sp_room = {r: (float(room_sp.get(r, {}).get("sp_heat", sp_h)), float(room_sp.get(r, {}).get("sp_cool", sp_c))) for r in ids}
     phys = {r: RoomPhys(rooms[r]) for r in ids}
     cmds = {r: plan_to_cmd(plans.get(r, [])) for r in ids}
     caps = {r: plan_to_cap(plans.get(r, [])) for r in ids}
@@ -133,7 +137,7 @@ def simulate_day(
             passive = (rp.gam * (b - a) + (rp.gao + rp.vent_g(people, c == FAN)) * (to - a)
                        + rp.internal_gain(people) + rp.solar_gain(ghi))
             passive_of[r] = passive
-            q[r] = thermostat_q(rp, a, passive, sp_h, sp_c, caps[r][m]) if c == COND else 0.0
+            q[r] = thermostat_q(rp, a, passive, sp_room[r][0], sp_room[r][1], caps[r][m]) if c == COND else 0.0
         # outdoor-unit capacity: connected indoor units cannot draw more than the ODU delivers
         for o, rlist in odu_rooms.items():
             cap_w = odus[o]["cap_kw"] * 1000.0

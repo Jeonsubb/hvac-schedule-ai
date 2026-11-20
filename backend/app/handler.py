@@ -14,7 +14,11 @@ def handler(event, context):
         return {"status": jobs.run(event["job_id"]).get("status")}
     if isinstance(event, dict) and event.get("task") == "hourly":
         service.refresh_weather()
-        return service.precompute()
+        out = service.precompute()
+        from . import planning
+
+        out["tiers"] = planning.run_daily()  # 3차(오늘)·2차(이번 주) 재검증; 자동 운전이면 조정안 적용
+        return out
     if isinstance(event, dict) and event.get("task") == "precompute":
         return service.precompute()
     return _asgi(event, context)
