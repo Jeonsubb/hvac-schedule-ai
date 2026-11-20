@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MoveRight, Sparkles, Printer, CalendarDays, TrendingDown, ScatterChart as ScatterIcon, ListChecks, ArrowLeftRight } from 'lucide-react'
+import { MoveRight, Sparkles, Printer, ScatterChart as ScatterIcon, ListChecks } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
@@ -17,7 +17,6 @@ import {
   Figure,
   LegendItem,
   Loading,
-  PageHeader,
   PageSkeleton,
   Segmented,
   Skeleton,
@@ -29,6 +28,7 @@ import {
 } from '../components/ui'
 import { Waterfall, WaterfallLegend, splitNote, useAttribution, waterfallTable } from '../components/Attribution'
 import { DecisionIcon } from '../components/Gantt'
+import '../studio/analytics.css'
 
 type Scope = 'to_date' | 'all'
 
@@ -37,6 +37,7 @@ export default function Energy() {
   const summary = useApi<Summary>('/api/summary')
   const attr = useAttribution()
   const [params, setParams] = useSearchParams()
+  const [lens, setLens] = useState<'attribution' | 'daily' | 'strategies'>('attribution')
   const scope: Scope = params.get('scope') === 'all' ? 'all' : 'to_date'
   const setScope = (v: Scope) => {
     const p = new URLSearchParams(params)
@@ -67,54 +68,60 @@ export default function Energy() {
   const vs30 = A ? pctSaving(A.variants.rule30.kwh, A.variants.ai.kwh) : null
 
   return (
-    <div>
-      <PageHeader
-        title="절감 효과"
-        desc={
-          vs30 != null
-            ? `모든 강의실을 종일 켜 두던 방식과 시간표·날씨에 맞춘 AI 운전을 같은 조건으로 비교했습니다. 쾌적도를 똑같이 맞춘 규칙 운전(30분 전 켜기)과 비교해도 AI가 전력을 ${vs30 >= 0 ? '덜' : '더'} 씁니다.`
-            : '모든 강의실을 종일 켜 두던 방식과 시간표·날씨에 맞춘 AI 운전을 같은 시간표, 같은 날씨로 비교했습니다.'
-        }
-        right={
-          <Segmented
-            label="집계 범위"
-            value={scope}
-            onChange={setScope}
-            options={[
-              { value: 'to_date', label: `오늘까지 (9/1–${fmtDateShort(S.today)})` },
-              { value: 'all', label: '학기 전체 (예상 포함)' },
-            ]}
-          />
-        }
-      />
-
-      <section data-tour="energy-hero" className="rounded-[16px] border border-line bg-surface" aria-label="절감 요약">
-        <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
-        <div className="border-t border-line px-8 pt-7 pb-6">
-          <WaterfallSection A={A} attr={attr} broken={attrBroken} />
+    <div className="analytics-experience energy-experience">
+      <header className="analytics-masthead" data-studio-enter>
+        <div>
+          <p className="analytics-kicker"><span>05 / ENERGY INTELLIGENCE</span><span>시뮬레이션 기반 분석</span></p>
+          <h1>에너지의 흐름을<br /><em>읽다.</em></h1>
         </div>
+        <div className="analytics-masthead-aside">
+          <p>고정 스케줄에서 예측 제어까지.<br />같은 건물, 같은 조건에서 달라지는 에너지.</p>
+          <Segmented label="집계 범위" value={scope} onChange={setScope} options={[
+            { value: 'to_date', label: `오늘까지 · 9/1–${fmtDateShort(S.today)}` },
+            { value: 'all', label: '학기 전체 예상' },
+          ]} />
+        </div>
+      </header>
+
+      <section data-tour="energy-hero" className="energy-impact" aria-label="절감 요약" key={scope}>
+        <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
       </section>
 
-      <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
-        <Disclosure icon={<ArrowLeftRight size={16} aria-hidden />} title="운전 방식 4가지 비교" summary={`AI ${fmtNum(T.ai.kwh)} kWh, 고정 ${fmtNum(T.fixed.kwh)} kWh`}>
-          <StrategyTable T={T} cold={cold} />
-        </Disclosure>
-        <Disclosure icon={<CalendarDays size={16} aria-hidden />} title="일별 전력량과 외기온도" summary={`강의일 ${S.days.filter((d) => d.sessions > 0).length}일`}>
-          <DailyChart S={S} />
-        </Disclosure>
-        <Disclosure icon={<TrendingDown size={16} aria-hidden />} title="AI 누적 절감량" summary={`학기 말 고정 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh 예상`}>
-          <CumulativeChart S={S} />
-        </Disclosure>
-        <Disclosure icon={<ScatterIcon size={16} aria-hidden />} title="전기를 아끼느라 쾌적을 포기했는가" summary={`AI 쾌적 유지율 ${fmtPct(T.ai.comfort_pct, 2)}`}>
-          <ScatterChart T={T} A={A} scope={scope} />
-        </Disclosure>
-        <Disclosure icon={<ListChecks size={16} aria-hidden />} title="AI 판단 유형별 횟수" summary={`학기 ${fmtNum(Object.values(S.decisions).reduce((a, v) => a + v, 0))}회`}>
-          <DecisionChart S={S} />
-        </Disclosure>
-        <Disclosure icon={<MoveRight size={16} aria-hidden />} title="강의실 재배치 권고" summary="학사 부서 검토용">
-          <ConsolidationReport />
-        </Disclosure>
-      </DisclosureList>
+      <section className="energy-analysis-stage" aria-label="에너지 분석 탐색">
+        <div className="analytics-section-head">
+          <div><span className="analytics-section-index">01</span><h2>차이를 만드는 과정</h2></div>
+          <Segmented label="분석 보기" value={lens} onChange={setLens} options={[
+            { value: 'attribution', label: '절감의 구조' },
+            { value: 'daily', label: '시간에 따른 변화' },
+            { value: 'strategies', label: '운전 전략 비교' },
+          ]} />
+        </div>
+        <div className="energy-chart-stage" key={`${scope}-${lens}`}>
+          {lens === 'attribution' ? <WaterfallSection A={A} attr={attr} broken={attrBroken} />
+            : lens === 'daily' ? <DailyChart S={S} /> : <StrategyTable T={T} cold={cold} />}
+        </div>
+        <p className="analytics-source-note">물리 계산 엔진의 운전 전략 비교입니다. Bedrock Agent의 설정온도 협의에 의한 추가 효과와 구분합니다. {vs30 != null ? `같은 쾌적도의 30분 선행 규칙 대비 ${Math.abs(vs30).toFixed(1)}% ${vs30 >= 0 ? '적은' : '많은'} 예상 사용량.` : '같은 쾌적도의 추가 비교는 계산 결과가 준비되면 표시됩니다.'}</p>
+      </section>
+
+      <section className="energy-long-view" aria-labelledby="energy-cumulative">
+        <div className="analytics-section-head"><div><span className="analytics-section-index">02</span><h2 id="energy-cumulative">하루의 차이가 쌓이면</h2></div><span className="analytics-small-note">오늘 이후는 예상값</span></div>
+        <CumulativeChart S={S} />
+      </section>
+
+      <section className="analytics-research" aria-label="분석 근거와 후속 작업">
+        <div className="analytics-section-head"><div><span className="analytics-section-index">03</span><h2>숫자 뒤의 근거</h2></div></div>
+        <DisclosureList className="analytics-disclosures" hideTitle>
+          <Disclosure icon={<ScatterIcon size={16} aria-hidden />} title="에너지와 쾌적의 균형" summary={`예측 제어 쾌적 유지율 ${fmtPct(T.ai.comfort_pct, 2)}`}>
+            <ScatterChart T={T} A={A} scope={scope} />
+          </Disclosure>
+          <Disclosure icon={<ListChecks size={16} aria-hidden />} title="물리 엔진의 운전 판단" summary={`학기 ${fmtNum(Object.values(S.decisions).reduce((a, v) => a + v, 0))}회`}>
+            <DecisionChart S={S} />
+          </Disclosure>
+          <Disclosure icon={<MoveRight size={16} aria-hidden />} title="강의실 재배치의 가능성" summary="학사 부서 검토용 권고">
+            <ConsolidationReport />
+          </Disclosure>
+        </DisclosureList>
+      </section>
     </div>
   )
 }
@@ -132,7 +139,7 @@ function Hero({
   scope: Scope
   computing: boolean
 }) {
-  const vsFixed = pctSaving(T.fixed.kwh, T.ai.kwh) ?? 0
+  const vsFixed = pctSaving(T.fixed.kwh, T.ai.kwh)
   const vsRule = pctSaving(T.rule.kwh, T.ai.kwh) ?? 0
   const r30 = A?.variants.rule30
   const ai = A?.variants.ai
@@ -174,58 +181,37 @@ function Hero({
       </p>
     </div>
   )
+  const energyDelta = T.fixed.kwh - T.ai.kwh
+  const costDelta = T.fixed.cost_krw - T.ai.cost_krw
+  const carbonDelta = T.fixed.co2_kg - T.ai.co2_kg
+  const maximum = Math.max(1, T.fixed.kwh, T.ai.kwh)
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 px-8 pt-8 pb-7">
-      <div className="min-w-0">
-        <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
-          <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
-          이전 운영(중앙 제어 고정 스케줄) 대비 전력
-          {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
-        </span>
-        <span className="mt-2 flex items-baseline gap-1.5">
-          <span className="tnum text-[64px] leading-none font-[650] tracking-[-0.035em] text-ink">−{vsFixed.toFixed(1)}</span>
-          <span className="text-[26px] font-semibold text-ink-3">%</span>
-        </span>
-        <span className="tnum mt-3 block text-[15px] text-ink-2">
-          이전 운영 {fmtNum(T.fixed.kwh)} kWh → AI <b className="font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b> · 아낀 요금 <b className="font-semibold text-ink">{fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원</b> (시뮬레이션)
-        </span>
+    <div className="energy-impact-grid">
+      <div className="energy-impact-statement">
+        <span className="analytics-kicker">{scope === 'all' ? '학기 전체 예상 · 고정 운전 대비' : '기준일까지 · 고정 운전 대비'}</span>
+        <div className="energy-impact-number" aria-label={vsFixed == null ? '비교 기준 없음' : `${Math.abs(vsFixed).toFixed(1)}퍼센트 ${vsFixed >= 0 ? '절감' : '증가'}`}>
+          <span>{vsFixed == null ? '—' : `${vsFixed >= 0 ? '−' : '+'}${Math.abs(vsFixed).toFixed(1)}`}</span><small>{vsFixed != null ? '%' : ''}</small>
+        </div>
+        <p className="energy-impact-caption">{vsFixed == null ? '비교할 고정 운전 사용량이 없습니다.' : energyDelta >= 0 ? '필요한 시간에, 필요한 만큼.' : '늘어난 사용량까지, 정확하게.'}</p>
+        <p className="analytics-source-note">동일 시간표·기상 조건의 열모델 시뮬레이션.<br />실측 에너지 사용량이 아닙니다.</p>
       </div>
-      <div className="flex flex-wrap gap-x-12 gap-y-5 pb-1">
-        {sameComfort ? (
-          <Figure
-            label="같은 쾌적도의 규칙 기반 대비"
-            value={`${vs30! >= 0 ? '−' : '+'}${Math.abs(vs30!).toFixed(1)}`}
-            unit="%"
-            sub={`규칙 30분 전 ${fmtNum(r30!.kwh, 1)} → AI ${fmtNum(ai!.kwh, 1)} kWh`}
-            infoTitle="같은 쾌적도 비교의 근거"
-            info={sameComfort}
-          />
-        ) : (
-          <div className="min-w-[200px]" role="status">
-            <div className="flex items-center gap-2 text-[13px] font-medium text-ink-3">
-              {computing && <Spinner size={13} />}
-              {computing ? '같은 쾌적도 비교 계산 중…' : '같은 쾌적도 비교를 불러오지 못했습니다'}
-            </div>
-            {computing && <Skeleton className="mt-2 h-[34px] w-[120px]" />}
-          </div>
-        )}
-        <Figure
-          label="강의 중 쾌적 유지율"
-          value={T.ai.comfort_pct != null ? T.ai.comfort_pct.toFixed(1) : '–'}
-          unit="%"
-          info={
-            <p className="text-[13.5px]">
-              강의 시간 중 실내온도가 쾌적 범위 안이었던 비율입니다. 이전 운영은 {fmtPct(T.fixed.comfort_pct)}, {COLD_START.short}는 이전 운영 {fmtNum(cold.fixed)}회, AI {fmtNum(cold.ai)}회입니다.
-            </p>
-          }
-        />
-        <Figure
-          label="줄인 탄소"
-          value={((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)}
-          unit="tCO₂"
-          align="right"
-          info={<p className="text-[13.5px]">이전 운영 대비입니다. 전력량에 국가 전력배출계수 0.4173 kgCO₂eq/kWh(2023년도)를 곱했습니다.</p>}
-        />
+      <div className="energy-impact-proof">
+        <div className="energy-usage-pair" aria-label="예상 전력 사용량 비교">
+          <div><span>고정 운전</span><strong className="tnum">{fmtNum(T.fixed.kwh)}<small>kWh</small></strong><i style={{ '--usage': `${T.fixed.kwh / maximum}` } as React.CSSProperties} /></div>
+          <div><span>예측 제어</span><strong className="tnum">{fmtNum(T.ai.kwh)}<small>kWh</small></strong><i style={{ '--usage': `${T.ai.kwh / maximum}` } as React.CSSProperties} /></div>
+        </div>
+        <div className="energy-impact-facts">
+          <div><span>예상 전력 {energyDelta >= 0 ? '감소' : '증가'}</span><strong className="tnum">{fmtNum(Math.abs(energyDelta))}<small>kWh</small></strong></div>
+          <div><span>예상 요금 {costDelta >= 0 ? '감소' : '증가'}</span><strong className="tnum">{fmtNum(Math.abs(costDelta) / 10000, 1)}<small>만원</small></strong></div>
+          <div><span>탄소 {carbonDelta >= 0 ? '감소' : '증가'}</span><strong className="tnum">{(Math.abs(carbonDelta) / 1000).toFixed(2)}<small>tCO₂</small></strong></div>
+        </div>
+        <More label="요금·탄소 산출 기준"><p>요금과 탄소 변화는 고정 운전 대비입니다. 탄소는 전력량에 국가 전력배출계수 0.4173 kgCO₂eq/kWh(2023년도)를 곱한 추정값입니다. 기간과 운전 방식이 같은 응답끼리 비교합니다.</p></More>
+      </div>
+      <div className="energy-guardrails">
+        <span className="analytics-kicker">효율의 조건 / COMFORT FIRST</span>
+        {sameComfort ? <Figure label="같은 쾌적도의 규칙 기반 대비" value={`${vs30! >= 0 ? '−' : '+'}${Math.abs(vs30!).toFixed(1)}`} unit="%" sub={`규칙 30분 전 ${fmtNum(r30!.kwh, 1)} → 예측 제어 ${fmtNum(ai!.kwh, 1)} kWh`} infoTitle="같은 쾌적도 비교의 근거" info={sameComfort} />
+          : <div className="analytics-small-note" role="status">{computing ? <><Spinner size={14} /> 같은 쾌적도 비교 계산 중</> : '같은 쾌적도 비교 자료 없음'}</div>}
+        <Figure label="수업 중 쾌적 유지율" value={T.ai.comfort_pct != null ? T.ai.comfort_pct.toFixed(1) : '—'} unit={T.ai.comfort_pct != null ? '%' : undefined} info={<p>수업 중 예측 실내온도가 쾌적 범위에 들어온 비율입니다. 고정 운전 {fmtPct(T.fixed.comfort_pct)}. {COLD_START.short}: 고정 {fmtNum(cold.fixed)}회, 예측 제어 {fmtNum(cold.ai)}회.</p>} />
       </div>
     </div>
   )
@@ -296,7 +282,10 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
         </div>
       ),
     },
-    { label: '고정 스케줄 대비', cell: (k) => (k === 'fixed' ? <span className="text-ink-3">비교 기준</span> : <span className="font-semibold text-good-ink">−{pctSaving(T.fixed.kwh, T[k].kwh)?.toFixed(1)}%</span>) },
+    { label: '고정 스케줄 대비', cell: (k) => {
+      const saving = pctSaving(T.fixed.kwh, T[k].kwh)
+      return k === 'fixed' ? <span className="text-ink-3">비교 기준</span> : <span className={cx('font-semibold', saving != null && saving >= 0 ? 'text-brand-ink' : 'text-warn-ink')}>{saving == null ? '—' : `${saving >= 0 ? '−' : '+'}${Math.abs(saving).toFixed(1)}%`}</span>
+    } },
     { label: '전기요금', cell: (k) => `${fmtNum(T[k].cost_krw)}원`, best: (k) => T[k].cost_krw === minOf((x) => T[x].cost_krw) },
     { label: '탄소 배출', cell: (k) => `${(T[k].co2_kg / 1000).toFixed(2)} tCO₂`, best: (k) => T[k].co2_kg === minOf((x) => T[x].co2_kg) },
     { label: '최대 전력', cell: (k) => `${T[k].peak_kw.toFixed(1)} kW`, best: (k) => T[k].peak_kw === minOf((x) => T[x].peak_kw) },

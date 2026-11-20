@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import Layout from './components/Layout'
+import StudioShell from './studio/StudioShell'
 import { CopilotProvider, DayProvider, MetaProvider } from './lib/context'
 import { AuthProvider, RequireAuth } from './lib/auth'
 import { TourProvider } from './lib/tour'
@@ -24,9 +25,25 @@ const Signup = lazy(() => import('./pages/Signup'))
 const Setup = lazy(() => import('./pages/Setup'))
 const FeedbackPage = lazy(() => import('./pages/Feedback'))
 const Lab = lazy(() => import('./pages/Lab'))
+const StudioOverview = lazy(() => import('./studio/OperationsStudio'))
+const NegotiationTheater = lazy(() => import('./studio/NegotiationTheater'))
+const ClassicData = lazy(() => import('./pages/ClassicData'))
+const ClassicSchedule = lazy(() => import('./pages/ClassicSchedule'))
+const ClassicEnergy = lazy(() => import('./pages/ClassicEnergy'))
+const ClassicComfort = lazy(() => import('./pages/ClassicComfort'))
+const ClassicValidation = lazy(() => import('./pages/ClassicValidation'))
+const ClassicSettings = lazy(() => import('./pages/ClassicSettings'))
 
 function page(el: React.ReactNode) {
   return <Suspense fallback={<PageSkeleton label="화면을 불러오는 중…" />}>{el}</Suspense>
+}
+
+/** Older tier deep links remain fully functional in the preserved planning workflow. */
+function StudioPlanRoute() {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  if (params.has('tier') || params.get('view') === 'tiers') return <Navigate replace to={`/classic/plan${location.search}${location.hash}`} />
+  return <NegotiationTheater />
 }
 
 export default function App() {
@@ -45,6 +62,24 @@ export default function App() {
             {/* simulation lab: a separate, sandboxed page (opens in its own tab) */}
             <Route path="lab" element={page(<Lab />)} />
             <Route path="setup" element={<RequireAuth onboarding>{page(<Setup />)}</RequireAuth>} />
+            <Route element={<RequireAuth><VoiceProvider><StudioShell /></VoiceProvider></RequireAuth>}>
+              <Route path="studio/overview" element={page(<StudioOverview />)} />
+              <Route path="studio/plan" element={page(<StudioPlanRoute />)} />
+              <Route path="studio/data" element={page(<DataPage />)} />
+              <Route path="studio/schedule" element={page(<Schedule />)} />
+              <Route path="studio/energy" element={page(<Energy />)} />
+              <Route path="studio/comfort" element={page(<Comfort />)} />
+              <Route path="studio/validation" element={page(<Validation />)} />
+              <Route path="studio/settings" element={page(<SettingsPage />)} />
+              <Route path="overview" element={page(<StudioOverview />)} />
+              <Route path="plan" element={page(<StudioPlanRoute />)} />
+              <Route path="data" element={page(<DataPage />)} />
+              <Route path="schedule" element={page(<Schedule />)} />
+              <Route path="energy" element={page(<Energy />)} />
+              <Route path="comfort" element={page(<Comfort />)} />
+              <Route path="validation" element={page(<Validation />)} />
+              <Route path="settings" element={page(<SettingsPage />)} />
+            </Route>
             <Route
               element={
                 <RequireAuth>
@@ -56,14 +91,14 @@ export default function App() {
               }
             >
               <Route index element={page(<Home />)} />
-              <Route path="overview" element={page(<Overview />)} />
-              <Route path="energy" element={page(<Energy />)} />
-              <Route path="comfort" element={page(<Comfort />)} />
-              <Route path="settings" element={page(<SettingsPage />)} />
-              <Route path="schedule" element={page(<Schedule />)} />
-              <Route path="plan" element={page(<Plan />)} />
-              <Route path="validation" element={page(<Validation />)} />
-              <Route path="data" element={page(<DataPage />)} />
+              <Route path="classic/overview" element={page(<Overview />)} />
+              <Route path="classic/plan" element={page(<Plan />)} />
+              <Route path="classic/data" element={page(<ClassicData />)} />
+              <Route path="classic/schedule" element={page(<ClassicSchedule />)} />
+              <Route path="classic/energy" element={page(<ClassicEnergy />)} />
+              <Route path="classic/comfort" element={page(<ClassicComfort />)} />
+              <Route path="classic/validation" element={page(<ClassicValidation />)} />
+              <Route path="classic/settings" element={page(<ClassicSettings />)} />
               <Route path="*" element={page(<NotFound />)} />
             </Route>
           </Routes>

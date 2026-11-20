@@ -1,19 +1,21 @@
-import { useMemo, useState } from 'react'
+import '../studio/workflows.css'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Info, BarChart3 } from 'lucide-react'
 import { useApi } from '../lib/api'
-import { useMeta } from '../lib/context'
+import { useDay, useMeta } from '../lib/context'
 import type { Day, Summary } from '../lib/types'
 import { CHART, ROOM_ORDER, STATUS_COLOR, splitCounts, statusInfo } from '../lib/constants'
 import { cx, fmtDateK, fmtDateShort, fmtNum, fmtPct } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
-import { Badge, Card, ChartCard, Disclosure, DisclosureList, Empty, ErrorBox, IconButton, LegendItem, Loading, PageHeader, PageSkeleton, Popover, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
+import { Badge, Card, ChartCard, Disclosure, DisclosureList, Empty, ErrorBox, IconButton, LegendItem, Loading, PageSkeleton, Popover, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
 import type { ValidationSession } from '../lib/types'
 import RoomDrawer from '../components/RoomDrawer'
 
 
 export default function Validation() {
   const { meta } = useMeta()
+  const { date: referenceDate, setDate: setReferenceDate } = useDay()
   const summary = useApi<Summary>('/api/summary')
   const [params, setParams] = useSearchParams()
   const [roomF, setRoomF] = useState<string>('all')
@@ -21,9 +23,18 @@ export default function Validation() {
 
   const today = summary.data?.today ?? meta?.now.date ?? '2026-11-20'
   const past = useMemo(() => (summary.data?.days ?? []).filter((d) => d.date <= today && d.sessions > 0), [summary.data, today])
-  // default: the most recent lecture day that had something to look at (else today)
+  // Fallback only while the shared reference date is unavailable.
   const latestIssue = useMemo(() => [...past].reverse().find((d) => d.anomalies > 0 || (d.match_rate ?? 100) < 100)?.date, [past])
-  const date = params.get('date') ?? (summary.data ? latestIssue ?? today : null)
+  const linkedDate = params.get('date')
+  const validLinkedDate = linkedDate && /^\d{4}-\d{2}-\d{2}$/.test(linkedDate) && (!meta || linkedDate >= meta.semester.start && linkedDate <= meta.semester.end) ? linkedDate : null
+  const date = validLinkedDate ?? referenceDate ?? (summary.data ? latestIssue ?? today : null)
+  useEffect(() => {
+    if (!linkedDate) return
+    if (validLinkedDate && validLinkedDate !== referenceDate) setReferenceDate(validLinkedDate)
+    const next = new URLSearchParams(params)
+    next.delete('date')
+    setParams(next, { replace: true })
+  }, [linkedDate, validLinkedDate, referenceDate, setReferenceDate, params, setParams])
   const day = useApi<Day>(date ? `/api/day/${date}` : null)
 
   const kpi = useMemo(() => {
@@ -112,8 +123,9 @@ export default function Validation() {
   if (!summary.data || !meta || !date) return <PageSkeleton label="학기 검증 결과를 불러오는 중…" />
 
   const setDate = (d: string) => {
+    setReferenceDate(d)
     const p = new URLSearchParams(params)
-    p.set('date', d)
+    p.delete('date')
     setParams(p, { replace: true })
   }
   const idx = past.findIndex((d) => d.date === date)
@@ -131,20 +143,14 @@ export default function Validation() {
   const hi = meta.settings.comfort_high
 
   return (
-    <div>
-      <PageHeader
-        showDesc
-        title="정합성 검증"
-        desc={
-          <>
-            학기 시작부터 강의 <b className="tnum font-semibold text-ink">{fmtNum(kpi.sessions)}건</b>을 확인했고 정합성은{' '}
-            <b className="tnum font-semibold text-ink">{kpi.match != null ? kpi.match.toFixed(2) : '–'}%</b>입니다. 시스템이{' '}
-            <b className="tnum font-semibold text-ink">{fmtNum(kpi.auto)}건</b>을 바로잡았고, 사람이 확인할 건은{' '}
-            <b className="tnum font-semibold text-crit-ink">{fmtNum(kpi.review)}건</b>입니다.
-          </>
-        }
-        right={
-          <Popover
+    <div className="wf-page wf-validation">
+      <header className="wf-validation-hero">
+        <div className="wf-validation-title"><p className="wf-eyebrow">07 / VALIDATION CONSOLE</p><h1>운전계획의<br /><em>차이를 추적합니다.</em></h1><p>시간표, 계획, 시뮬레이션 실행 결과를 대조합니다.</p></div>
+        <div className="wf-validation-readout">
+          <div><span>학기 정합성</span><strong className="tnum">{kpi.match != null ? kpi.match.toFixed(2) : '—'}<small>%</small></strong><div className="wf-match-track" aria-hidden><span style={{ transform: `scaleX(${Math.max(0, Math.min(100, kpi.match ?? 0)) / 100})` }} /></div></div>
+          <dl><div><dt>검증한 수업</dt><dd>{fmtNum(kpi.sessions)}</dd></div><div><dt>자동 조치</dt><dd>{fmtNum(kpi.auto)}</dd></div><div><dt>확인 필요</dt><dd className="wf-issue-number">{fmtNum(kpi.review)}</dd></div></dl>
+        </div>
+        <div className="wf-validation-method"><Popover
             label="검증 방법"
             align="end"
             width={420}
@@ -173,14 +179,13 @@ export default function Validation() {
                 </li>
               ))}
             </ol>
-          </Popover>
-        }
-      />
+          </Popover></div>
+      </header>
 
-      <div data-tour="val-main" className="grid grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <Card pad={false} className="self-start">
+      <div data-tour="val-main" className="wf-validation-grid">
+        <Card pad={false} className="wf-incident-rail">
           <div className="px-5 pt-5 pb-3">
-            <h2 className="text-[17px] font-[650] text-ink">이상이 있었던 날</h2>
+            <p className="wf-eyebrow">INCIDENT INDEX</p><h2 className="text-[17px] font-[650] text-ink">검토 날짜</h2>
             <p className="mt-0.5 text-[13px] text-ink-3">{issueDays.length}일, 최근 날짜부터</p>
           </div>
           <ul className="thin-scroll max-h-[452px] overflow-y-auto px-3 pb-3">
@@ -215,7 +220,7 @@ export default function Validation() {
           </ul>
         </Card>
 
-        <Card pad={false} className="self-start">
+        <Card pad={false} className="wf-validation-ledger">
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
             <div className="min-w-0">
               <h2 className="flex flex-wrap items-center gap-2.5 text-[17px] font-[650] text-ink">
@@ -273,7 +278,7 @@ export default function Validation() {
             ) : (
               <div className={cx('transition-opacity duration-200', day.loading && 'opacity-60')}>
                 {issues.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-[12px] bg-good-bg px-4 py-3 text-[14px] font-medium text-good-ink">
+                  <div className="wf-validation-clear flex items-center gap-2 text-[14px] font-medium text-good-ink">
                     <StatusBadge group="normal" label="모두 정상" /> 이 날 강의 {inRoom.length}건이 모두 계획대로 운전됐습니다.
                   </div>
                 ) : (
@@ -295,8 +300,8 @@ export default function Validation() {
         </Card>
       </div>
 
-      <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
-        <Disclosure icon={<BarChart3 size={16} aria-hidden />} title="일별 자동 조치와 확인 필요 건수" summary={`강의일 ${past.length}일`}>
+      <DisclosureList className="wf-validation-history" title="자세히 보기" hideTitle>
+        <Disclosure defaultOpen icon={<BarChart3 size={16} aria-hidden />} title="일별 자동 조치와 확인 필요 건수" summary={`강의일 ${past.length}일`}>
           <ChartCard
             bare
             sub="학기 시작부터 오늘까지의 강의일입니다. 막대를 누르면 그날의 강의별 결과가 위에 나옵니다."

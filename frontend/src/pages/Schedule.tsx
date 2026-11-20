@@ -1,15 +1,16 @@
-import { useMemo } from 'react'
+import '../studio/workflows.css'
+import { useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Sun, AlertTriangle, Timer, CalendarDays, Sparkles } from 'lucide-react'
 import { useApi } from '../lib/api'
-import { useMeta } from '../lib/context'
+import { useDay, useMeta } from '../lib/context'
 import type { Day, DaySummary, StrategyKey, Summary } from '../lib/types'
 import { STRATEGY, STRATEGY_KEYS, WEEKDAY, decisionLabel, splitCounts } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtMin, fmtPct, fmtWon, isoDate, josa, pctSaving, weekdayOf } from '../lib/format'
 import Gantt, { GanttLegend } from '../components/Gantt'
 import RoomDrawer from '../components/RoomDrawer'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle } from '../components/EChart'
-import { Badge, Card, Disclosure, ErrorBox, Figure, IconButton, Loading, Note, PageHeader, PageSkeleton, Segmented, StrategyName, ToggleChip, btnCls, inputBase } from '../components/ui'
+import { Badge, Card, Disclosure, ErrorBox, Figure, IconButton, Loading, Note, PageSkeleton, Segmented, StrategyName, ToggleChip, btnCls, inputBase } from '../components/ui'
 
 // sequential, one hue (AI): darker = larger saving vs fixed schedule
 const SAVE_STEPS = [
@@ -27,10 +28,21 @@ function saveBg(p: number | null) {
 
 export default function Schedule() {
   const { meta } = useMeta()
+  const { date: referenceDate, setDate: setReferenceDate } = useDay()
   const [params, setParams] = useSearchParams()
   const summary = useApi<Summary>('/api/summary')
   const today = meta?.now.date ?? summary.data?.today ?? '2026-11-20'
-  const date = params.get('date') ?? today
+  const linkedDate = params.get('date')
+  const validLinkedDate = linkedDate && /^\d{4}-\d{2}-\d{2}$/.test(linkedDate) && (!meta || linkedDate >= meta.semester.start && linkedDate <= meta.semester.end) ? linkedDate : null
+  const date = validLinkedDate ?? referenceDate ?? today
+  // Date links hand off to the same reference date used by the Studio header.
+  useEffect(() => {
+    if (!linkedDate) return
+    if (validLinkedDate && validLinkedDate !== referenceDate) setReferenceDate(validLinkedDate)
+    const next = new URLSearchParams(params)
+    next.delete('date')
+    setParams(next, { replace: true })
+  }, [linkedDate, validLinkedDate, referenceDate, setReferenceDate, params, setParams])
   const primary = (params.get('s') as StrategyKey) || 'ai'
   const overlay = (params.get('o') as StrategyKey | null) || null
   const room = params.get('room')
@@ -39,10 +51,24 @@ export default function Schedule() {
   const showDecisions = params.get('dec') === '1'
   const showPlan = params.get('plan') === '1'
   const day = useApi<Day>(`/api/day/${date}`)
+  const previousDate = useRef(date)
+  // Browsing months is independent; choosing a new day brings its month into view.
+  useEffect(() => {
+    if (previousDate.current === date) return
+    previousDate.current = date
+    setParams((prev) => {
+      if (!prev.get('m') || prev.get('m') === date.slice(0, 7)) return prev
+      const next = new URLSearchParams(prev)
+      next.set('m', date.slice(0, 7))
+      return next
+    }, { replace: true })
+  }, [date, setParams])
 
   const set = (patch: Record<string, string | null>) => {
+    if (patch.date) setReferenceDate(patch.date)
     const p = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) {
+      if (k === 'date') { p.delete('date'); continue }
       if (v == null || v === '') p.delete(k)
       else p.set(k, v)
     }
@@ -60,18 +86,15 @@ export default function Schedule() {
   const isToday = date === meta.now.date
 
   return (
-    <div>
-      <PageHeader
-        title="스케줄 타임라인"
-        desc="날짜를 고르면 그날 강의와 냉난방 운전을 강의실별로 맞춰 봅니다."
-        right={
-          <Link to={`/plan?tier=3&date=${date}`} className={btnCls('secondary')}>
-            <Sparkles size={15} className="text-brand" aria-hidden /> 이 날 AI 3차 검증 보기
-          </Link>
-        }
-      />
+    <div className="wf-page wf-planning">
+      <header className="wf-planning-hero">
+        <div><p className="wf-eyebrow">04 / CALENDAR & PLANNING</p><h1>하루를 고르고.<br /><em>운전을 펼치세요.</em></h1></div>
+        <div className="wf-planning-date"><b className="tnum">{date.slice(8)}</b><span>{date.slice(0, 7).replace('-', ' / ')}<small>{fmtDateK(date)} · 시뮬레이션 계획</small></span></div>
+        <Link to={`/plan?tier=3&date=${date}`} className={btnCls('secondary')}><Sparkles size={15} aria-hidden /> 이 날 AI 3차 검증</Link>
+      </header>
 
-      <div data-tour="sch-calendar" className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="wf-planning-grid">
+      <aside data-tour="sch-calendar" className="wf-calendar-rail">
         <MonthCalendar
           month={month}
           onMonth={(m) => set({ m })}
@@ -83,10 +106,11 @@ export default function Schedule() {
           holidays={meta.holidays}
           loading={summary.loading && !summary.data}
         />
+      </aside>
+      <div className="wf-planning-focus">
         <DayPanel ds={ds} day={day.data?.date === date ? day.data : undefined} date={date} isFuture={date > (summary.data?.today ?? today)} />
-      </div>
 
-      <Card className="mt-6" pad={false} data-tour="sch-timeline">
+      <Card className="wf-planning-timeline" pad={false} data-tour="sch-timeline">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
           <div>
             <h2 className="flex items-center gap-2.5 text-[20px] font-bold tracking-[-0.02em] text-ink">
@@ -95,7 +119,7 @@ export default function Schedule() {
               {ds && !ds.workday && !ds.holiday && <Badge>주말</Badge>}
             </h2>
             <p className="mt-1 text-[13.5px] text-ink-3">
-              {ds ? `수업 ${ds.sessions}건${ds.events ? `, 이벤트 ${ds.events}건` : ''}을 기준으로 실제 가동을 맞춰 봅니다.` : '강의와 실제 가동을 강의실별로 맞춰 봅니다.'}
+              {ds ? `수업 ${ds.sessions}건${ds.events ? `, 이벤트 ${ds.events}건` : ''}을 기준으로 시뮬레이션 운전을 맞춰 봅니다.` : '수업 일정과 시뮬레이션 운전을 강의실별로 비교합니다.'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -189,6 +213,8 @@ export default function Schedule() {
           )}
         </div>
       </Card>
+      </div>
+      </div>
 
       <RoomDrawer
         open={!!room}
@@ -237,7 +263,7 @@ function MonthCalendar({
   const next = isoDate(new Date(y, m, 1)).slice(0, 7)
 
   return (
-    <Card>
+    <Card className="wf-calendar-month">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <IconButton label="이전 달" disabled={prev < minM} onClick={() => onMonth(prev)}>
@@ -369,7 +395,7 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
   const ai = ds.strategies.ai
   const sv = ds.sessions > 0 ? pctSaving(base, ai.kwh) : null
   return (
-    <Card className="flex flex-col">
+    <Card className="wf-planning-day">
       <div className="flex flex-wrap items-center gap-2.5">
         <h2 className="text-[17px] font-[650] tracking-[-0.01em] text-ink">{fmtDateK(date)}</h2>
         {isFuture && <Badge tone="info">예상</Badge>}

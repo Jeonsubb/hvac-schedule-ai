@@ -1,3 +1,4 @@
+import '../studio/workflows.css'
 import { useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -37,11 +38,9 @@ import {
   Loading,
   Modal,
   Note,
-  PageHeader,
   Segmented,
   Spinner,
   StrategyName,
-  Tabs,
   btnCls,
   inputBase,
   inputCls,
@@ -59,24 +58,40 @@ export default function DataPage() {
   const tab: Tab = raw && TABS.includes(raw) ? raw : 'events'
   const { meta } = useMeta()
   const events = useApi<EventRec[]>('/api/events')
+  const modes = [
+    { value: 'events' as Tab, label: '일정 입력', en: 'Schedule intake', icon: CalendarPlus, count: events.data?.length },
+    { value: 'import' as Tab, label: '시간표 가져오기', en: 'Timetable import', icon: Upload },
+    { value: 'courses' as Tab, label: '강의 원장', en: 'Course register', icon: BookOpen, count: meta?.counts.courses },
+    { value: 'audit' as Tab, label: '변경 기록', en: 'Change history', icon: History },
+  ]
   return (
-    <div>
-      <PageHeader title="일정·데이터" desc="시간표 밖 일정(보강, 특강, 휴강, 강의실 변경)을 알려 주면 AI가 그날 운전 계획을 바로 다시 만듭니다." />
-      <Tabs
-        value={tab}
-        onChange={(v) => setParams({ tab: v }, { replace: true })}
-        tabs={[
-          { value: 'events', label: '일정 등록', icon: <CalendarPlus size={16} />, count: events.data?.length },
-          { value: 'courses', label: '강의 시간표', icon: <BookOpen size={16} />, count: meta?.counts.courses },
-          { value: 'import', label: '시간표 가져오기', icon: <Upload size={16} /> },
-          { value: 'audit', label: '변경 기록', icon: <History size={16} /> },
-        ]}
-      />
-      <div className="mt-6">
-        {tab === 'courses' && <CoursesTab />}
-        {tab === 'import' && <ImportTab />}
-        {tab === 'events' && <EventsTab events={events.data} reload={events.reload} />}
-        {tab === 'audit' && <AuditTab />}
+    <div className="wf-page wf-intake">
+      <header className="wf-intake-hero">
+        <div>
+          <p className="wf-eyebrow">03 / INTELLIGENT SCHEDULE INTAKE</p>
+          <h1>일정이 바뀌면,<br /><em>운전도 바뀝니다.</em></h1>
+        </div>
+        <div className="wf-intake-pipeline" aria-label="일정 반영 절차">
+          <p>말 한 줄, 공지 한 장에서<br />검토 가능한 운전계획으로.</p>
+          <ol><li><span>01</span> 입력</li><li><span>02</span> 충돌 검토</li><li><span>03</span> 확인 후 반영</li></ol>
+          <small>기존 시간표와 날씨를 기준으로 엔진이 다시 계산합니다.</small>
+        </div>
+      </header>
+      <div className="wf-intake-layout">
+        <nav className="wf-intake-nav" aria-label="일정 데이터 작업">
+          {modes.map((item, i) => <button key={item.value} type="button" aria-pressed={tab === item.value} onClick={() => setParams({ tab: item.value }, { replace: true })}>
+            <span className="wf-nav-index">0{i + 1}</span><span><b>{item.label}</b><small>{item.en}</small></span>{item.count != null && <span className="wf-nav-count">{item.count}</span>}
+          </button>)}
+          <p className="wf-intake-note">데이터를 읽는 단계와<br />운영에 반영하는 단계를<br />분리해 확인합니다.</p>
+        </nav>
+        <div className="wf-intake-workbench" key={tab}>
+          <div className="wf-workbench-label"><span>{modes.find((m) => m.value === tab)?.en}</span><span>ON:D / INPUT WORKSPACE</span></div>
+          {events.error && tab === 'events' && <ErrorBox error={events.error} onRetry={events.reload} />}
+          {tab === 'courses' && <CoursesTab />}
+          {tab === 'import' && <ImportTab />}
+          {tab === 'events' && <EventsTab events={events.data} reload={events.reload} />}
+          {tab === 'audit' && <AuditTab />}
+        </div>
       </div>
     </div>
   )
@@ -107,7 +122,7 @@ function CoursesTab() {
   const allEst = est > 0 && est === courses.data.length
 
   return (
-    <Card>
+    <Card className="wf-courses">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -362,8 +377,8 @@ function ImportTab() {
   }
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-      <Card className="self-start">
+    <div className="wf-intake-split wf-import-split">
+      <Card className="wf-source-entry">
         <CardHeader title="시간표 파일 올리기" sub="학교 시간표 시스템에서 내려받은 파일이나 시간표 사진을 그대로 올리세요." />
         <div
           onDragOver={(e) => {
@@ -427,7 +442,7 @@ function ImportTab() {
         </div>
       </Card>
 
-      <Card>
+      <Card className="wf-intake-review">
         <CardHeader title="변경 미리보기" sub="반영하기 전에 현재 강의 시간표와 무엇이 달라지는지 확인합니다." />
         {busy && (
           <div className="flex items-center gap-2 rounded-[12px] bg-well px-4 py-3 text-[14px] text-ink" role="status">
@@ -691,8 +706,8 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <Card>
+      <div className="wf-intake-split">
+        <Card className="wf-source-entry">
           <CardHeader title="무슨 일정이 생겼나요?" sub="말로 적거나 LMS 공지 캡처를 올리면 AI가 양식으로 바꾸고, 겹치는 일정을 먼저 확인합니다." />
           <form
             onSubmit={(e) => {
@@ -809,7 +824,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
           </div>
         </Card>
 
-        <Card className={cx(!draft && !result && 'border-dashed bg-transparent')}>
+        <Card className={cx('wf-intake-review', !draft && !result && 'wf-intake-empty')}>
           {draft ? (
             <div className="space-y-4">
               <CardHeader className="mb-1" title="일정 확인" sub="내용을 확인하고, 필요하면 고친 뒤 등록하세요." />
@@ -838,7 +853,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
         </Card>
       </div>
 
-      <Card pad={false}>
+      <Card pad={false} className="wf-receipt-ledger">
         <div className="flex items-baseline justify-between gap-3 px-6 pt-6 pb-4">
           <h2 className="text-[17px] font-[650] text-ink">
             등록된 일정 <span className="tnum ml-1 text-[15px] font-medium text-ink-3">{events?.length ?? ''}</span>
@@ -1159,7 +1174,7 @@ function AuditTab() {
     import: { label: '시간표', tone: 'neutral' },
   }
   return (
-    <Card>
+    <Card className="wf-audit">
       <CardHeader title="변경 기록" sub="운전 계획에 영향을 주는 입력을 누가, 언제, 무엇으로 바꿨는지 남깁니다." right={<Button size="sm" variant="ghost" onClick={audit.reload}>새로고침</Button>} />
       {audit.error ? (
         <ErrorBox error={audit.error} onRetry={audit.reload} />

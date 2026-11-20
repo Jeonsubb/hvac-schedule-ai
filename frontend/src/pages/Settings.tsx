@@ -1,3 +1,4 @@
+import '../studio/workflows.css'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FlaskConical, RotateCcw, Save, Info, AlertTriangle, CheckCircle2, Sparkles, PlugZap, Building2, Scale, Compass, Send } from 'lucide-react'
@@ -8,7 +9,7 @@ import type { BmsCommand, BuildingProfile, GatewayStatus, Policy, Settings, Stra
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
 import ModeSwitch from '../components/ModeSwitch'
-import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast, More} from '../components/ui'
+import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast, More} from '../components/ui'
 
 type NumKey =
   | 'pre_on_min'
@@ -224,37 +225,28 @@ export default function SettingsPage() {
   const optChanged = ['baseline', 'anomalies'].filter((k) => k in changes).length
 
   return (
-    <div>
-      <PageHeader
-        title="운영 규칙"
-        desc="값을 바꾸면 저장하기 전에 시뮬레이션으로 전력과 쾌적 변화를 먼저 확인합니다. 모든 변경은 변경 기록에 남습니다."
-        right={
-          <>
-            <ModeSwitch />
-            <Button variant="ghost" onClick={() => setConfirm('reset')}>
-              <RotateCcw size={15} aria-hidden /> 기본값으로
-            </Button>
-            <Button variant="primary" disabled={!nChanged || invalid || saving} onClick={() => setConfirm('save')}>
-              <Save size={15} aria-hidden /> {nChanged > 0 ? `변경 ${nChanged}개 저장` : '저장'}
-            </Button>
-          </>
-        }
-      />
+    <div className="wf-page wf-configuration">
+      <header className="wf-config-hero">
+        <div><p className="wf-eyebrow">08 / OPERATIONAL CONFIGURATION</p><h1>운영의 기준을<br /><em>정교하게.</em></h1></div>
+        <div className="wf-config-intro"><span className="wf-config-bracket" aria-hidden>[ ]</span><p>설정온도, 시간, 안전 범위.<br />값을 조정하고 실제 시뮬레이션으로<br />변화를 확인한 뒤 저장하세요.</p></div>
+      </header>
+      <div className="wf-config-commandbar">
+        <nav aria-label="설정 구역"><a href="#config-parameters">01 운전 기준</a><a href="#config-preview">02 변경 미리보기</a><a href="#config-infrastructure">03 연결·정책</a></nav>
+        <div><ModeSwitch /><Button variant="ghost" onClick={() => setConfirm('reset')}><RotateCcw size={15} aria-hidden /> 기본값</Button><Button variant="primary" disabled={!nChanged || invalid || saving} onClick={() => setConfirm('save')}><Save size={15} aria-hidden />{nChanged > 0 ? `변경 ${nChanged}개 저장` : '변경 사항 없음'}</Button></div>
+      </div>
 
       {saveErr && (
         <div className="mb-5">
           <ErrorBox title="저장하지 못했습니다" error={saveErr} />
         </div>
       )}
-      <BuildingAndPolicy />
-
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-        <div className="space-y-6">
-          {SECTIONS.map((sec) => (
-            <Card key={sec.key}>
-              <CardHeader title={sec.title} sub={sec.desc} />
+      <div className="wf-config-layout">
+        <div className="wf-config-parameters" id="config-parameters">
+          {SECTIONS.map((sec, i) => (
+            <section key={sec.key} className="wf-config-section">
+              <header><span className="wf-config-index">0{i + 1}</span><div><h2>{sec.title}</h2><p>{sec.desc}</p></div></header>
               {fields(sec)}
-            </Card>
+            </section>
           ))}
 
           <DisclosureList title="고급 설정과 참고 정보" hideTitle>
@@ -347,7 +339,8 @@ export default function SettingsPage() {
           </DisclosureList>
         </div>
 
-        <Card className="xl:sticky xl:top-[88px]">
+        <Card className="wf-config-impact" data-tour="settings-preview">
+          <span id="config-preview" className="wf-eyebrow">CHANGE IMPACT / SIMULATION</span>
           <CardHeader title="시뮬레이션으로 미리보기" sub="바꾼 값으로 실제 시간표와 날씨를 다시 돌려 지금 규칙과 비교합니다. 저장 전이라 운영에는 영향이 없습니다." />
           {nChanged > 0 ? (
             <div className="mb-4 flex flex-wrap gap-1.5">
@@ -392,6 +385,12 @@ export default function SettingsPage() {
           <CopilotHint />
         </Card>
       </div>
+
+      <section className="wf-config-infrastructure" id="config-infrastructure">
+        <Disclosure title="건물 연결·정책·설비 관리" summary="중앙제어 연결, Agent 안전 범위, 게이트웨이와 제어 기록">
+          <BuildingAndPolicy />
+        </Disclosure>
+      </section>
 
       <Modal
         open={!!confirm}

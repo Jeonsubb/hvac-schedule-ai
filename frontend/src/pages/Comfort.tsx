@@ -6,17 +6,15 @@ import type { Feedback, FeedbackSummary } from '../lib/types'
 import { ROOM_ORDER } from '../lib/constants'
 import { SOURCE_LABEL, TAGS, VOTES, meanWord, signed, tagLabel, voteColor, voteLabel } from '../lib/comfort'
 import { cx, fmtTs } from '../lib/format'
+import '../studio/analytics.css'
 import {
   Badge,
   Button,
-  Card,
-  CardHeader,
   Disclosure,
   DisclosureList,
   Empty,
   ErrorBox,
   Field,
-  PageHeader,
   PageSkeleton,
   Segmented,
   Spinner,
@@ -49,47 +47,32 @@ function answer(s: FeedbackSummary): string {
   return `최근 ${s.days}일 의견 ${n}건 중 ${lean}, ${top ? `${top[0]}호(${top[1].n}건)에 가장 많이 몰렸습니다` : '특정 강의실에 몰리지 않았습니다'}. 의견은 다음 2차·3차 스케줄과 에이전트 협의에 반영됩니다.`
 }
 
-function VoteScale({ mean }: { mean: number | null }) {
-  // -3..+3 track with a marker at the mean
-  const pos = mean == null ? null : ((Math.max(-3, Math.min(3, mean)) + 3) / 6) * 100
-  return (
-    <div className="relative mt-3 h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${VOTES[0].color}, ${VOTES[3].color} 50%, ${VOTES[6].color})` }} aria-hidden>
-      {pos != null && <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-ink shadow" style={{ left: `${pos}%` }} />}
-    </div>
-  )
-}
 
 function RoomTiles({ s, sel, onSel }: { s: FeedbackSummary; sel: string | null; onSel: (r: string | null) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="comfort-atlas" aria-label="강의실별 체감 의견 평균">
+      <div className="comfort-atlas-axis" aria-hidden><span>강의실</span><div><span>−3 / 춥다</span><span>0 / 적당하다</span><span>+3 / 덥다</span></div><span>평균 체감</span><span>의견</span></div>
       {ROOM_ORDER.map((r) => {
         const v = s.by_room[r]
+        const mean = v?.n ? v.mean : null
+        const hasMean = mean != null && Number.isFinite(mean)
+        const position = hasMean ? ((Math.max(-3, Math.min(3, mean)) + 3) / 6) * 580 + 10 : null
         const on = sel === r
         return (
-          <button
-            key={r}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onSel(on ? null : r)}
-            className={cx(
-              'rounded-[14px] border p-4 text-left transition-[border-color,box-shadow,background-color] duration-150',
-              on ? 'border-brand shadow-[0_0_0_1px_var(--color-brand)]' : 'border-line hover:border-ink-4',
-            )}
-            style={{ background: v?.n ? `color-mix(in srgb, ${voteColor(v.mean)} 35%, white)` : undefined }}
-          >
-            <div className="flex items-baseline justify-between">
-              <span className="tnum text-[17px] font-[650] text-ink">{r}호</span>
-              <span className="tnum text-[13px] text-ink-2">{v?.n ?? 0}건</span>
-            </div>
-            <div className="mt-1 text-[13.5px] font-medium text-ink-2">{v?.n ? `${meanWord(v.mean)} ${signed(v.mean)}` : '의견 없음'}</div>
-            <VoteScale mean={v?.n ? v.mean : null} />
-            {v?.n ? (
-              <div className="tnum mt-2.5 flex gap-3 text-[12.5px] text-ink-2">
-                <span>추움 {v.cold}</span>
-                <span>더움 {v.hot}</span>
-                <span>답답 {v.stuffy}</span>
-              </div>
-            ) : null}
+          <button key={r} type="button" aria-pressed={on} onClick={() => onSel(on ? null : r)}
+            className={cx('comfort-atlas-room', on && 'is-selected')}
+            title={`${r}호 · ${v?.n ?? 0}건 · ${hasMean ? `${meanWord(mean)}, 평균 ${signed(mean)}` : '의견 없음'}`}>
+            <span className="comfort-atlas-room-id tnum">{r}<small>호</small></span>
+            <svg className="comfort-atlas-trace" viewBox="0 0 600 36" aria-hidden>
+              <line x1="10" x2="590" y1="18" y2="18" stroke="#e1e4ea" strokeWidth="1" />
+              {[-3, -2, -1, 0, 1, 2, 3].map((v) => <line key={v} x1={((v + 3) / 6) * 580 + 10} x2={((v + 3) / 6) * 580 + 10} y1={v === 0 ? 5 : 14} y2={v === 0 ? 31 : 22} stroke={v === 0 ? '#a8aeb8' : '#dde1e7'} strokeWidth="1" />)}
+              {position != null && <g className="comfort-trace-marker" style={{ transform: `translateX(${position}px)` }}>
+                <circle className="comfort-trace-halo" cx="0" cy="18" r="15" fill={voteColor(mean)} opacity=".25" />
+                <circle cx="0" cy="18" r={on ? 7 : 5} fill={voteColor(mean)} stroke={on ? '#1458ff' : '#fff'} strokeWidth="2" />
+              </g>}
+            </svg>
+            <span className="comfort-atlas-mean"><b className="tnum">{hasMean ? signed(mean) : '—'}</b><small>{hasMean ? meanWord(mean) : '의견 없음'}</small></span>
+            <span className="comfort-atlas-count tnum">{v?.n ?? 0}<small>건</small></span>
           </button>
         )
       })}
@@ -353,93 +336,76 @@ export default function Comfort() {
     invalidate('/api/plan')
   }
 
+  const simulated = s.items.filter((f) => f.source === 'simulated').length
+  const real = s.items.filter((f) => f.source === 'occupant' || f.source === 'operator').length
+  const selectedStats = sel ? s.by_room[sel] : undefined
   return (
-    <div>
-      <PageHeader
-        showDesc
-        title="쾌적 의견"
-        desc={answer(s)}
-        right={
-          <Segmented
-            label="기간"
-            value={String(days) as '7' | '14' | '30'}
-            onChange={(v) => setParam('days', v)}
-            options={[
-              { value: '7', label: '7일' },
-              { value: '14', label: '14일' },
-              { value: '30', label: '30일' },
-            ]}
-          />
-        }
-      />
-
-      <div className="space-y-6">
-        <Card data-tour="comfort-rooms">
-          <CardHeader
-            title="강의실별 체감"
-            sub="재실자·운영자 의견의 평균입니다. -3은 춥다, 0은 적당하다, +3은 덥다입니다. 강의실을 누르면 아래 목록과 시간대 표가 그 강의실만 보여 줍니다."
-            right={
-              sel ? (
-                <Button size="sm" variant="ghost" onClick={() => setParam('room', null)}>
-                  전체 보기
-                </Button>
-              ) : undefined
-            }
-          />
-          <RoomTiles s={s} sel={sel} onSel={(r) => setParam('room', r)} />
-        </Card>
-
-        <Card data-tour="comfort-hours">
-          <CardHeader title={sel ? `${sel}호 시간대별 의견` : '강의실 × 시간대 의견'} sub="같은 시간대에 의견이 반복되면 그 시간의 예열·예냉이나 설정온도를 조정할 근거가 됩니다." />
-          <HourGrid s={s} sel={sel} />
-        </Card>
-
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-          <Card>
-            <CardHeader
-              title={sel ? `${sel}호 최근 의견` : '최근 의견'}
-              sub={`${items.length}건`}
-              right={q.loading ? <Spinner size={14} /> : undefined}
-            />
-            {items.length === 0 ? (
-              <Empty title="의견이 없습니다" desc="재실자 QR 링크를 붙이거나 오른쪽 양식으로 전화·메일 문의를 등록하세요." icon={<MessageSquarePlus size={18} />} />
-            ) : (
-              <>
-                <ul className="divide-y divide-line">
-                  {shown.map((f) => (
-                    <FeedbackRow key={f.id} f={f} />
-                  ))}
-                </ul>
-                {items.length > shown.length && (
-                  <button type="button" onClick={() => setShowAll(true)} className="mt-3 text-[14px] font-medium text-brand-ink underline-offset-4 hover:underline">
-                    {items.length - shown.length}건 더 보기
-                  </button>
-                )}
-              </>
-            )}
-          </Card>
-          <div className="space-y-6">
-            <Card data-tour="comfort-form">
-              <CardHeader title="운영자가 받은 의견 등록" sub="전화·메일·민원 게시판으로 들어온 불편도 같은 형식으로 남기면 스케줄 판단에 쓰입니다." />
-              <OperatorForm key={sel ?? 'all'} defaultRoom={sel} onSent={reloadAll} />
-            </Card>
-            <DisclosureList>
-              <Disclosure title="재실자 의견 링크(QR)" icon={<QrCode size={16} aria-hidden />} summary="강의실 10개">
-                <LinkList />
-              </Disclosure>
-              <Disclosure title="의견이 스케줄에 반영되는 방식" icon={<Users size={16} aria-hidden />}>
-                <HowItFeeds />
-                <p className="mt-4 text-[13.5px] text-ink-3">
-                  조정안과 근거는{' '}
-                  <Link to="/plan" className="font-medium text-brand-ink underline-offset-4 hover:underline">
-                    AI 스케줄링
-                  </Link>
-                  에서 확인합니다.
-                </p>
-              </Disclosure>
-            </DisclosureList>
-          </div>
+    <div className="analytics-experience comfort-experience">
+      <header className="analytics-masthead" data-studio-enter>
+        <div>
+          <p className="analytics-kicker"><span>06 / HUMAN SIGNALS</span><span>체감 의견 분석</span></p>
+          <h1>쾌적은,<br /><em>사람의 언어로.</em></h1>
         </div>
+        <div className="analytics-masthead-aside">
+          <p>센서가 아닌 의견으로 읽는 공간.<br />재실자의 체감을 운전 판단의 근거로 연결합니다.</p>
+          <Segmented label="기간" value={String(days) as '7' | '14' | '30'} onChange={(v) => setParam('days', v)} options={[
+            { value: '7', label: '최근 7일' }, { value: '14', label: '14일' }, { value: '30', label: '30일' },
+          ]} />
+        </div>
+      </header>
+
+      {q.error && <div className="analytics-stale-message" role="alert">의견을 갱신하지 못해 마지막 응답을 표시합니다. <button type="button" onClick={q.reload}>다시 시도</button></div>}
+      <div className="comfort-source-ledger" aria-label="의견 출처 구분">
+        <div className="comfort-ledger-total"><strong className="tnum">{s.items.length}</strong><span>조회된 의견<br /><small>최근 {s.days}일</small></span></div>
+        <div><strong className="tnum">{real}</strong><span>재실자·운영자 의견</span></div>
+        <div><strong className="tnum">{simulated}</strong><span>시뮬레이션 의견</span></div>
+        <p>아래 평균에는 조회된 출처가 함께 포함됩니다.<br />각 의견의 출처와 반영 상태는 기록에서 확인합니다.</p>
+      </div>
+
+      <section className="comfort-opinion-field" data-tour="comfort-rooms" aria-labelledby="comfort-field-title">
+        <div className="analytics-section-head">
+          <div><span className="analytics-section-index">01</span><h2 id="comfort-field-title">10개의 공간, 서로 다른 체감</h2></div>
+          {sel ? <Button size="sm" variant="ghost" onClick={() => setParam('room', null)}>전체 강의실</Button> : <span className="analytics-small-note">강의실을 선택해 시간대와 기록 탐색</span>}
+        </div>
+        <RoomTiles s={s} sel={sel} onSel={(r) => setParam('room', r)} />
+        <p className="analytics-source-note">ASHRAE 7점 체감 척도 −3(춥다) ~ +3(덥다)의 의견 평균입니다. 예측 실내온도나 PMV와는 다른 지표입니다.</p>
+      </section>
+
+      <div className="comfort-analysis-layout">
+        <div className="comfort-analysis-main">
+          <section className="comfort-hour-field" data-tour="comfort-hours" aria-labelledby="comfort-hours-title">
+            <div className="analytics-section-head"><div><span className="analytics-section-index">02</span><h2 id="comfort-hours-title">{sel ? `${sel}호의 시간별 체감` : '반복되는 시간, 반복되는 신호'}</h2></div></div>
+            <p className="comfort-section-intro">같은 시간대의 반복 의견은 예열·예냉과 설정온도를 검토할 근거가 됩니다.</p>
+            <HourGrid s={s} sel={sel} />
+          </section>
+          <section className="comfort-feedback-stream" aria-labelledby="comfort-stream-title">
+            <div className="analytics-section-head"><div><span className="analytics-section-index">03</span><h2 id="comfort-stream-title">{sel ? `${sel}호 의견 기록` : '공간에서 온 기록'}</h2></div><span className="analytics-small-note tnum">{items.length}건 {q.loading && <Spinner size={13} />}</span></div>
+            {items.length === 0 ? <Empty title="의견이 없습니다" desc="재실자 QR 링크를 공유하거나 운영자가 받은 문의를 등록하세요." icon={<MessageSquarePlus size={18} />} /> : <>
+              <ul className="comfort-stream-list">{shown.map((f) => <FeedbackRow key={f.id} f={f} />)}</ul>
+              {items.length > shown.length && <button type="button" onClick={() => setShowAll(true)} className="comfort-more-records">{items.length - shown.length}건 더 보기 <span aria-hidden>↓</span></button>}
+            </>}
+          </section>
+        </div>
+        <aside className="comfort-intake-rail">
+          <div className="comfort-selection-summary">
+            <span className="analytics-kicker">{sel ? 'SELECTED SPACE' : 'READ THE SIGNAL'}</span>
+            <h2>{sel ? <>{sel}<small>호</small></> : '의견이 정책이 되는 과정.'}</h2>
+            {sel && <p>{selectedStats?.n ? `${meanWord(selectedStats.mean)} · 평균 ${signed(selectedStats.mean)} · ${selectedStats.n}건` : '선택 기간에 등록된 의견이 없습니다.'}</p>}
+            <p>{answer(s)}</p>
+          </div>
+          <section className="comfort-intake-form" data-tour="comfort-form" aria-labelledby="comfort-intake-title">
+            <p className="analytics-kicker">CAPTURE / OPERATOR INPUT</p>
+            <h2 id="comfort-intake-title">들은 의견을,<br />판단의 근거로.</h2>
+            <p className="comfort-section-intro">전화·메일·민원으로 들어온 불편을 운영자 의견으로 등록합니다.</p>
+            <OperatorForm key={sel ?? 'all'} defaultRoom={sel} onSent={reloadAll} />
+          </section>
+          <DisclosureList className="analytics-disclosures" hideTitle>
+            <Disclosure title="재실자 의견 링크 / QR" icon={<QrCode size={16} aria-hidden />} summary="10개 강의실"><LinkList /></Disclosure>
+            <Disclosure title="운전계획에 반영되는 방식" icon={<Users size={16} aria-hidden />}>
+              <HowItFeeds /><p className="mt-4 text-[13px] text-ink-3">조정안과 협의 근거는 <Link to="/plan" className="text-brand-ink hover:underline">AI 협의 화면</Link>에서 확인합니다.</p>
+            </Disclosure>
+          </DisclosureList>
+        </aside>
       </div>
     </div>
   )

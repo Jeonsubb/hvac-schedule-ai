@@ -460,12 +460,12 @@ function Result({
         </>
       )}
 
-      <Adjustments cmp={cmp} stale={stale} onChanged={onChanged} />
+      <NegotiationAdjustments cmp={cmp} stale={stale} onChanged={onChanged} />
 
       <div id="evidence" className="mt-5 scroll-mt-24">
         <DisclosureList title="근거" hideTitle>
           <Disclosure title="협의 근거 자세히 보기" summary={`${cmp.rounds ?? 0}라운드 · 실제 발언, 제안 온도, 확인한 자료, 재시뮬레이션 결과`} defaultOpen={typeof window !== 'undefined' && window.location.hash === '#evidence'}>
-            <Evidence cmp={cmp} />
+            <NegotiationEvidence cmp={cmp} />
           </Disclosure>
         </DisclosureList>
       </div>
@@ -551,7 +551,7 @@ function RunDiff({ rooms, b, a }: { rooms: string[]; b: PlanView; a: PlanView })
   )
 }
 
-function Adjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolean; onChanged: () => void }) {
+export function NegotiationAdjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolean; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const list = cmp.adjustments ?? []
   const decide = async (a: NegAdjustment, action: 'approve' | 'reject') => {
@@ -626,7 +626,7 @@ function Adjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolea
 }
 
 /** The recorded negotiation itself: fetched only when the operator opens it. */
-function Evidence({ cmp }: { cmp: NegCompare }) {
+export function NegotiationEvidence({ cmp }: { cmp: NegCompare }) {
   const [neg, setNeg] = useState<Negotiation | null | undefined>(undefined)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => {
