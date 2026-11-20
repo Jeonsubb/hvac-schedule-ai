@@ -1,0 +1,409 @@
+{
+ "period": {
+  "dates": [
+   "2026-11-02",
+   "2026-11-03",
+   "2026-11-04",
+   "2026-11-05",
+   "2026-11-06",
+   "2026-11-09",
+   "2026-11-10",
+   "2026-11-11",
+   "2026-11-12",
+   "2026-11-13",
+   "2026-11-16",
+   "2026-11-17",
+   "2026-11-18",
+   "2026-11-19",
+   "2026-11-20"
+  ],
+  "totals": {
+   "current": {
+    "kwh": 1618.7,
+    "cost_krw": 208671,
+    "pmv_ok_pct": 60.0,
+    "pmv_mean": -0.39,
+    "discomfort_dm": 0.0,
+    "cold_starts": 0
+   },
+   "rule": {
+    "kwh": 370.8,
+    "cost_krw": 48473,
+    "pmv_ok_pct": 34.8,
+    "pmv_mean": -0.71,
+    "discomfort_dm": 205.1,
+    "cold_starts": 28
+   },
+   "ai": {
+    "kwh": 324.6,
+    "cost_krw": 41739,
+    "pmv_ok_pct": 32.4,
+    "pmv_mean": -0.74,
+    "discomfort_dm": 17.2,
+    "cold_starts": 4
+   },
+   "agents": {
+    "kwh": 332.1,
+    "cost_krw": 42715,
+    "pmv_ok_pct": 32.4,
+    "pmv_mean": -0.73,
+    "discomfort_dm": 23.3,
+    "cold_starts": 5
+   }
+  },
+  "agreement_pct": 100.0,
+  "policy_pct": 100.0,
+  "complaint_room_days": 51,
+  "complaint_room_pmv": {
+   "current": -0.45,
+   "rule": -0.81,
+   "ai": -0.83,
+   "agents": -0.79
+  },
+  "regret": {
+   "days": [
+    {
+     "date": "2026-11-02",
+     "j_current_plan": 3033,
+     "j_negotiated": 2871,
+     "j_optimum": 2602,
+     "regret_won": 269,
+     "gap_closed_pct": 37.6
+    },
+    {
+     "date": "2026-11-03",
+     "j_current_plan": 2292,
+     "j_negotiated": 2194,
+     "j_optimum": 2084,
+     "regret_won": 109,
+     "gap_closed_pct": 47.3
+    },
+    {
+     "date": "2026-11-04",
+     "j_current_plan": 1967,
+     "j_negotiated": 1932,
+     "j_optimum": 1676,
+     "regret_won": 256,
+     "gap_closed_pct": 11.9
+    },
+    {
+     "date": "2026-11-05",
+     "j_current_plan": 1441,
+     "j_negotiated": 1658,
+     "j_optimum": 1289,
+     "regret_won": 369,
+     "gap_closed_pct": -143.9
+    },
+    {
+     "date": "2026-11-06",
+     "j_current_plan": 1000,
+     "j_negotiated": 996,
+     "j_optimum": 963,
+     "regret_won": 33,
+     "gap_closed_pct": 11.8
+    },
+    {
+     "date": "2026-11-09",
+     "j_current_plan": 9035,
+     "j_negotiated": 8639,
+     "j_optimum": 7576,
+     "regret_won": 1063,
+     "gap_closed_pct": 27.2
+    },
+    {
+     "date": "2026-11-10",
+     "j_current_plan": 6582,
+     "j_negotiated": 6435,
+     "j_optimum": 5680,
+     "regret_won": 755,
+     "gap_closed_pct": 16.3
+    },
+    {
+     "date": "2026-11-11",
+     "j_current_plan": 7017,
+     "j_negotiated": 6801,
+     "j_optimum": 6095,
+     "regret_won": 706,
+     "gap_closed_pct": 23.5
+    },
+    {
+     "date": "2026-11-12",
+     "j_current_plan": 5690,
+     "j_negotiated": 5641,
+     "j_optimum": 4738,
+     "regret_won": 902,
+     "gap_closed_pct": 5.1
+    },
+    {
+     "date": "2026-11-13",
+     "j_current_plan": 3944,
+     "j_negotiated": 3783,
+     "j_optimum": 3133,
+     "regret_won": 650,
+     "gap_closed_pct": 19.8
+    },
+    {
+     "date": "2026-11-16",
+     "j_current_plan": 6297,
+     "j_negotiated": 6154,
+     "j_optimum": 5421,
+     "regret_won": 733,
+     "gap_closed_pct": 16.4
+    },
+    {
+     "date": "2026-11-17",
+     "j_current_plan": 4104,
+     "j_negotiated": 3987,
+     "j_optimum": 3515,
+     "regret_won": 472,
+     "gap_closed_pct": 19.8
+    },
+    {
+     "date": "2026-11-18",
+     "j_current_plan": 2824,
+     "j_negotiated": 2805,
+     "j_optimum": 2622,
+     "regret_won": 183,
+     "gap_closed_pct": 9.2
+    },
+    {
+     "date": "2026-11-19",
+     "j_current_plan": 7367,
+     "j_negotiated": 7160,
+     "j_optimum": 6439,
+     "regret_won": 721,
+     "gap_closed_pct": 22.3
+    },
+    {
+     "date": "2026-11-20",
+     "j_current_plan": 6685,
+     "j_negotiated": 6402,
+     "j_optimum": 5548,
+     "regret_won": 854,
+     "gap_closed_pct": 24.9
+    }
+   ],
+   "regret_won": 8075,
+   "j_current_plan": 69278,
+   "j_negotiated": 67458,
+   "j_optimum": 59381
+  },
+  "comfort_sweep": [
+   {
+    "comfort_won": 0,
+    "kwh": 226.8,
+    "cost_krw": 29713,
+    "pmv_mean": -0.83
+   },
+   {
+    "comfort_won": 150,
+    "kwh": 231.7,
+    "cost_krw": 30252,
+    "pmv_mean": -0.82
+   },
+   {
+    "comfort_won": 300,
+    "kwh": 253.3,
+    "cost_krw": 32925,
+    "pmv_mean": -0.79
+   },
+   {
+    "comfort_won": 600,
+    "kwh": 349.7,
+    "cost_krw": 45063,
+    "pmv_mean": -0.7
+   },
+   {
+    "comfort_won": 1200,
+    "kwh": 389.7,
+    "cost_krw": 49978,
+    "pmv_mean": -0.66
+   },
+   {
+    "comfort_won": 2500,
+    "kwh": 404.3,
+    "cost_krw": 51760,
+    "pmv_mean": -0.65
+   },
+   {
+    "comfort_won": 5000,
+    "kwh": 404.3,
+    "cost_krw": 51760,
+    "pmv_mean": -0.65
+   },
+   {
+    "comfort_won": 10000,
+    "kwh": 404.3,
+    "cost_krw": 51760,
+    "pmv_mean": -0.65
+   }
+  ]
+ },
+ "llm": [
+  {
+   "date": "2026-11-23",
+   "ai_runs": 3,
+   "seconds": [
+    26.3,
+    28.7,
+    27.5
+   ],
+   "grounding": {
+    "checked": 304,
+    "grounded": 304,
+    "direct": 295,
+    "direct_rate": 97.0,
+    "null_pass_rate": 32.2,
+    "rate": 100.0,
+    "ungrounded": []
+   },
+   "consistency": {
+    "runs": 3,
+    "rooms": 9,
+    "identical_rooms_pct": 66.7,
+    "max_setpoint_spread_c": 1.0,
+    "kwh_min": 96.33,
+    "kwh_max": 97.31
+   },
+   "agreed": [
+    false,
+    false,
+    false
+   ],
+   "regret": {
+    "llm": [
+     {
+      "j_current_plan": 12805,
+      "j_negotiated": 12156,
+      "j_optimum": 10917,
+      "regret_won": 1239,
+      "gap_closed_pct": 34.3
+     },
+     {
+      "j_current_plan": 12805,
+      "j_negotiated": 12436,
+      "j_optimum": 10917,
+      "regret_won": 1518,
+      "gap_closed_pct": 19.6
+     },
+     {
+      "j_current_plan": 12805,
+      "j_negotiated": 12246,
+      "j_optimum": 10917,
+      "regret_won": 1329,
+      "gap_closed_pct": 29.6
+     }
+    ],
+    "rule": {
+     "j_current_plan": 12805,
+     "j_negotiated": 12246,
+     "j_optimum": 10917,
+     "regret_won": 1329,
+     "gap_closed_pct": 29.6
+    }
+   },
+   "llm_vs_rule": {
+    "llm_kwh": [
+     96.4,
+     96.33,
+     97.31
+    ],
+    "rule_kwh": 92.9,
+    "llm_pmv": [
+     -1.27,
+     -1.29,
+     -1.27
+    ],
+    "rule_pmv": -1.31,
+    "baseline_kwh": 96.67,
+    "baseline_pmv": -1.28
+   }
+  },
+  {
+   "date": "2026-11-24",
+   "ai_runs": 3,
+   "seconds": [
+    28.2,
+    21.0,
+    29.5
+   ],
+   "grounding": {
+    "checked": 318,
+    "grounded": 317,
+    "direct": 306,
+    "direct_rate": 96.2,
+    "null_pass_rate": 35.7,
+    "rate": 99.7,
+    "ungrounded": [
+     {
+      "agent": "occupant",
+      "round": 1,
+      "value": 241.0
+     }
+    ]
+   },
+   "consistency": {
+    "runs": 3,
+    "rooms": 10,
+    "identical_rooms_pct": 60.0,
+    "max_setpoint_spread_c": 1.0,
+    "kwh_min": 51.28,
+    "kwh_max": 53.11
+   },
+   "agreed": [
+    false,
+    false,
+    true
+   ],
+   "regret": {
+    "llm": [
+     {
+      "j_current_plan": 8216,
+      "j_negotiated": 7807,
+      "j_optimum": 7235,
+      "regret_won": 572,
+      "gap_closed_pct": 41.7
+     },
+     {
+      "j_current_plan": 8216,
+      "j_negotiated": 7900,
+      "j_optimum": 7235,
+      "regret_won": 666,
+      "gap_closed_pct": 32.2
+     },
+     {
+      "j_current_plan": 8216,
+      "j_negotiated": 7940,
+      "j_optimum": 7235,
+      "regret_won": 705,
+      "gap_closed_pct": 28.1
+     }
+    ],
+    "rule": {
+     "j_current_plan": 8216,
+     "j_negotiated": 7883,
+     "j_optimum": 7235,
+     "regret_won": 648,
+     "gap_closed_pct": 34.0
+    }
+   },
+   "llm_vs_rule": {
+    "llm_kwh": [
+     53.11,
+     51.49,
+     51.28
+    ],
+    "rule_kwh": 50.65,
+    "llm_pmv": [
+     -1.06,
+     -1.08,
+     -1.07
+    ],
+    "rule_pmv": -1.08,
+    "baseline_kwh": 51.24,
+    "baseline_pmv": -1.08
+   }
+  }
+ ],
+ "created_at": "2026-11-20T18:37:14+09:00"
+}
