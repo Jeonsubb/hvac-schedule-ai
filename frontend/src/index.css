@@ -485,3 +485,66 @@ body {
     background: #fff;
   }
 }
+
+/* ---------------------------------------------------------------- 온디 (voice screen) */
+.voice-stage {
+  background: var(--color-surface);
+}
+@keyframes voice-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.voice-card {
+  animation: voice-card-in 0.5s var(--ease-out) both;
+}
+@keyframes voice-bar-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+.voice-bar {
+  transform-origin: left;
+  animation: voice-bar-in 0.7s var(--ease-out) 0.15s both;
+}
+@keyframes voice-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.voice-line {
+  animation: voice-line-in 0.35s var(--ease-out) both;
+}
+@keyframes voice-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.voice-live {
+  animation: voice-live 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-card,
+  .voice-bar,
+  .voice-line,
+  .voice-live {
+    animation: none;
+  }
+}

@@ -6,7 +6,7 @@ import type { ImportPreview, ImportResponse, Job, OpModeKey, TierDay, TierPlan }
 import { Ondy } from './PublicShell'
 import { RunSteps, useTierRun } from './TierRun'
 import { cx, fmtKwh, fmtNum, parseDate, weekdayOf } from '../lib/format'
-import { Button, ErrorBox, Modal, Spinner, toast } from './ui'
+import { Button, ErrorBox, Modal, Spinner, toast, More} from './ui'
 
 const WEEK = ['월', '화', '수', '목', '금', '토', '일']
 
@@ -193,10 +193,10 @@ export default function TimetableApply({ open, onClose, onApplied }: { open: boo
 
       {(stage === 'upload' || stage === 'reading') && (
         <div>
-          <p className="text-[14.5px] leading-relaxed text-ink-2">
+          <More><p>
             학사 시스템에서 내려받은 강의 시간표를 올리세요. CSV·Excel·JSON은 바로 읽고, 이미지·PDF는 AI(Bedrock)가 표로 옮깁니다. 지금은 시간표가 없어 모든 강의실을 중앙 제어 고정 스케줄로
             운전하고 있습니다.
-          </p>
+          </p></More>
           <input
             ref={input}
             type="file"

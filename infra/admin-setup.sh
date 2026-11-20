@@ -24,7 +24,8 @@ cat > /tmp/api-policy.json <<EOF
  {"Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:PutItem","dynamodb:DeleteItem","dynamodb:UpdateItem","dynamodb:Query","dynamodb:BatchWriteItem"],"Resource":"arn:aws:dynamodb:${REGION}:${ACC}:table/hvac-ai-data"},
  {"Effect":"Allow","Action":"ssm:GetParameter","Resource":"arn:aws:ssm:${REGION}:${ACC}:parameter/hvac-ai/kma-key"},
  {"Effect":"Allow","Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],"Resource":["arn:aws:bedrock:*::foundation-model/anthropic.*","arn:aws:bedrock:*:${ACC}:inference-profile/*"]},
- {"Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:${REGION}:${ACC}:function:hvac-ai-api"}
+ {"Effect":"Allow","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:${REGION}:${ACC}:function:hvac-ai-api"},
+ {"Effect":"Allow","Action":["polly:SynthesizeSpeech","transcribe:StartStreamTranscriptionWebSocket"],"Resource":"*"}
 ]}
 EOF
 cat > /tmp/scheduler-policy.json <<EOF

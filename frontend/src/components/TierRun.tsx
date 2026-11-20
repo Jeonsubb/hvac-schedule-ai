@@ -194,7 +194,7 @@ export function RunGate({
                   <ErrorBox title="계산하지 못했습니다" error={run.err} />
                 </div>
               )}
-              <Button variant="primary" className="mt-6 h-12 px-6 text-[15px]" onClick={run.start}>
+              <Button variant="primary" className="mt-6" onClick={run.start}>
                 <Play size={16} aria-hidden /> {c.button}
               </Button>
             </>

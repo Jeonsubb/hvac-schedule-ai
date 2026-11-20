@@ -47,6 +47,7 @@ import {
   inputCls,
   tbl,
   toast,
+  More,
 } from '../components/ui'
 
 type Tab = 'courses' | 'import' | 'events' | 'audit'
@@ -268,9 +269,9 @@ function WeekGrid({ courses, roomFilter }: { courses: Course[]; roomFilter: stri
         ))}
       </div>
       {rooms.length > 2 && (
-        <p className="mt-3 text-[13px] text-ink-3">
+        <More className="mt-3"><p>
           요일 칸 안에서 왼쪽부터 {rooms.join(', ')}호 순서이고, 블록의 숫자는 호수 끝 두 자리입니다. 강의실을 하나 고르면 과목명이 보입니다.
-        </p>
+        </p></More>
       )}
     </div>
   )
@@ -489,7 +490,7 @@ function ImportTab() {
                   <Link to="/plan" className={btnCls('primary', 'sm')}>
                     <Sparkles size={14} aria-hidden /> AI 협의로 개선안 검토
                   </Link>
-                  <Link to="/" className={btnCls('secondary', 'sm')}>
+                  <Link to="/overview" className={btnCls('secondary', 'sm')}>
                     운영 현황 타임라인에서 보기
                   </Link>
                 </span>
@@ -1087,14 +1088,14 @@ export function BeforeAfter({ r }: { r: EventResult }) {
         <CmpCell label="예측 제어 예상 전력량" before={`${fmtKwh(b.strategies.ai.kwh)}`} after={`${fmtKwh(a.strategies.ai.kwh)} kWh`} changed />
         <CmpCell label="수업 중 쾌적 범위" before={fmtPct(b.strategies.ai.comfort_pct)} after={fmtPct(a.strategies.ai.comfort_pct)} changed={b.strategies.ai.comfort_pct !== a.strategies.ai.comfort_pct} />
       </div>
-      <p className="text-[13px] leading-[1.55] text-ink-3">
+      <More><p>
         일정이 늘거나 줄어서 생긴 예상 소비량 변화입니다(시뮬레이션). 절감 효과가 아니며, 수업이 추가되면 소비량이 늘 수 있습니다. 기본 운전계획만 다시 계산했고 AI 협의는 아직 실행하지 않았습니다.
-      </p>
+      </p></More>
       <div className="flex flex-wrap gap-2">
         <Link to={`/plan?date=${r.event.date}`} className={btnCls('primary', 'md')}>
           <Sparkles size={15} aria-hidden /> AI 협의로 개선안 검토
         </Link>
-        <Link to={`/?room=${r.event.new_room ?? r.event.room ?? ''}`} onClick={() => setDate(r.event.date)} className={btnCls('secondary', 'md')}>
+        <Link to={`/overview?room=${r.event.new_room ?? r.event.room ?? ''}`} onClick={() => setDate(r.event.date)} className={btnCls('secondary', 'md')}>
           운영 현황 타임라인에서 보기
         </Link>
       </div>

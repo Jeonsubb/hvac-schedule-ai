@@ -25,6 +25,7 @@ import {
   StrategyName,
   TableToggle,
   DataTable,
+  More,
 } from '../components/ui'
 import { Waterfall, WaterfallLegend, splitNote, useAttribution, waterfallTable } from '../components/Attribution'
 import { DecisionIcon } from '../components/Gantt'
@@ -305,7 +306,7 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
   ]
   return (
     <div>
-      <p className="mb-4 text-[13.5px] text-ink-3">같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다.</p>
+      <More className="mb-4"><p>같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다.</p></More>
       <div className="overflow-x-auto rounded-[12px] border border-line">
         <table className="tnum w-full min-w-[760px] table-fixed text-[14px]">
           <colgroup>
@@ -755,7 +756,7 @@ function ConsolidationReport() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-[72ch] text-[13.5px] text-ink-3">같은 유형이고 정원이 맞으며 그 시간에 비어 있는 강의실로 옮겨, 같은 실외기에 강의를 모읍니다.</p>
+        <More><p>같은 유형이고 정원이 맞으며 그 시간에 비어 있는 강의실로 옮겨, 같은 실외기에 강의를 모읍니다.</p></More>
         <div className="flex flex-wrap items-center gap-2">
           {stale && (
             <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-3" title="이전 결과를 보여 주면서 최신 시간표로 다시 계산하고 있습니다">

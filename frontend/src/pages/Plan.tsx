@@ -29,7 +29,7 @@ import { ORIGIN_META, SourceIcon, sourceMeta } from '../components/dataSources'
 import AgentDebate from '../components/AgentDebate'
 import AgentOptimize from '../components/AgentOptimize'
 import { AgentAvatar } from '../components/Characters'
-import { Button, Card, CardHeader, Disclosure, DisclosureList, Empty, ErrorBox, Figure, PageHeader, PageSkeleton, Segmented, Spinner, btnCls, inputBase, toast } from '../components/ui'
+import { Button, Card, CardHeader, Disclosure, DisclosureList, Empty, ErrorBox, Figure, PageHeader, PageSkeleton, Segmented, Spinner, btnCls, inputBase, toast, More} from '../components/ui'
 import ChangeResponse from '../components/ChangeResponse'
 import { Ondy } from '../components/PublicShell'
 import { RunGate, RunLine, RunSteps, useTierRun } from '../components/TierRun'
@@ -138,7 +138,7 @@ export default function Plan() {
             title="아직 AI 스케줄이 없습니다"
             desc="운전 현황 화면 오른쪽 위의 '시간표 넣기'로 시간표를 반영하면 1차 스케줄이 만들어지고, AI 운전을 적용하면 2·3차 검증이 이어집니다."
             action={
-              <Link to="/" className={btnCls('primary', 'md')}>
+              <Link to="/overview" className={btnCls('primary', 'md')}>
                 운전 현황으로 가기
               </Link>
             }
@@ -328,7 +328,7 @@ function SummaryRow({
                 onClick={onDebate}
                 aria-expanded={debateOpen}
                 aria-controls="debate"
-                className="inline-flex h-11 items-center gap-2.5 rounded-full pr-5 pl-1.5 text-[14.5px] font-semibold text-white shadow-[0_6px_18px_rgb(47_111_222/0.28)] transition-[background-color] duration-150 hover:bg-brand-ink"
+                className="ond-press inline-flex h-10 items-center gap-2 rounded-[8px] pr-4 pl-1.5 text-[14px] font-bold text-white hover:bg-brand-ink"
                 style={{ background: BRAND }}
               >
                 <span className="flex -space-x-2">
@@ -738,7 +738,7 @@ function MonthVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
       </Card>
       <DisclosureList title="월간 계획 자세히" hideTitle className="self-start">
         <Disclosure title="강의실 × 요일 수업 패턴" summary="월간 계획의 뼈대">
-          <p className="mb-3 text-[13.5px] text-ink-3">막대는 08–22시 사이 수업 시간이고, 이 패턴에 예열·관성 정지를 더해 운전 시간을 정합니다.</p>
+          <More className="mb-3"><p>막대는 08–22시 사이 수업 시간이고, 이 패턴에 예열·관성 정지를 더해 운전 시간을 정합니다.</p></More>
           <WeekPattern rooms={plan.rooms ?? []} meta={meta} />
         </Disclosure>
       </DisclosureList>
@@ -848,7 +848,7 @@ function WeekVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
       </Card>
       <DisclosureList title="주간 계획 자세히" hideTitle>
         <Disclosure title="강의실별 주간 계획" summary="설정온도 · CO₂ · 환기 · 의견 · 일사">
-          <p className="mb-3 text-[13.5px] text-ink-3">설정온도는 적용된 조정을 포함합니다. CO₂ 최고값은 예상 인원과 환기 단계로 예측했고, 일사는 방향을 반영한 오후 부하입니다.</p>
+          <More className="mb-3"><p>설정온도는 적용된 조정을 포함합니다. CO₂ 최고값은 예상 인원과 환기 단계로 예측했고, 일사는 방향을 반영한 오후 부하입니다.</p></More>
           <RoomTable rooms={rooms} meta={meta} />
         </Disclosure>
       </DisclosureList>

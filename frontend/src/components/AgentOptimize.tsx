@@ -9,7 +9,7 @@ import { NEG_STATE, changedLabel, mergeIntervals, samePlan, signed } from '../li
 import EChart, { axisCommon, type EChartsOption } from './EChart'
 import DayTimeline from './DayTimeline'
 import { DebateEvidence } from './AgentDebate'
-import { Badge, Button, Disclosure, DisclosureList, ErrorBox, Note, Skeleton, Spinner, btnCls, toast } from './ui'
+import { Badge, Button, Disclosure, DisclosureList, ErrorBox, Note, Skeleton, Spinner, btnCls, toast, More, HeadMore } from './ui'
 
 /**
  * AI 최적화: the day's base plan, one button that runs the real two-agent negotiation, and — as soon as the
@@ -124,7 +124,7 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
         {fx && ai ? (
           <div className="mt-5 border-t border-line pt-4">
             <div className="text-[13.5px] font-semibold text-ink">첫 번째 비교 · 고정 스케줄 vs 기본 예측 제어</div>
-            <p className="mt-0.5 text-[12.5px] text-ink-3">물리 계산 엔진의 효과입니다. AI Agent 협의와는 별개이며, 같은 시간표·날씨·초기 조건으로 계산했습니다.</p>
+            <More className="mt-0.5"><p>물리 계산 엔진의 효과입니다. AI Agent 협의와는 별개이며, 같은 시간표·날씨·초기 조건으로 계산했습니다.</p></More>
             <div className="mt-3 space-y-2">
               <HBar label={`고정 스케줄 (${meta.settings.fixed_on}~${meta.settings.fixed_off} 일괄)`} kwh={fx.kwh} max={Math.max(fx.kwh, ai.kwh)} color={GREY} comfort={fx.comfort_pct} />
               <HBar label={`기본 예측 제어${cmp?.state === 'applied' ? ' (AI 협의 설정온도 적용 중)' : ''}`} kwh={ai.kwh} max={Math.max(fx.kwh, ai.kwh)} color={INK} comfort={ai.comfort_pct} />
@@ -151,19 +151,19 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
             type="button"
             onClick={start}
             disabled={running || noClass}
-            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-5 text-[14.5px] font-semibold text-white transition-colors hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50"
+            className="ond-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] px-4 text-[14px] font-bold text-white hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: BRAND }}
           >
             {running ? <Spinner size={15} className="text-white" /> : has ? <RotateCw size={15} aria-hidden /> : <Play size={15} aria-hidden />}
             {running ? '협의 실행 중…' : has ? '비용·쾌적 Agent 다시 협의' : '비용·쾌적 Agent 협의 실행'}
           </button>
         </div>
-        <p className="mt-3 text-[13px] text-ink-3">
+        <More label="실행 조건" className="mt-3"><p>
           실행 대상: {fmtDateK(date)} 하루 · 협의 대상은 설정온도뿐이며 켜고 끄는 시각은 엔진이 다시 계산합니다 · 다시 협의하면 이전 협의안 위에 쌓이지 않고 새 결과로 바뀝니다 · 설정온도는 쾌적 범위 아래로 내려가지 않습니다 ·{' '}
           {mode === 'auto'
             ? '자동 운전 모드: 0.5℃ 이내 변경은 바로 적용되고, 그보다 큰 변경은 승인을 기다립니다.'
             : '추천 모드: 결과는 승인 대기 추천안으로만 저장되고, 승인하기 전에는 운영계획이 바뀌지 않습니다.'}
-        </p>
+        </p></More>
         {noClass && <Note tone="warn">이 날짜에는 수업이 없어 협의할 대상이 없습니다. 상단에서 수업이 있는 평일을 고르세요.</Note>}
         {running && (
           <div className="mt-4 rounded-[12px] bg-well px-4 py-3" role="status" aria-live="polite">
@@ -215,15 +215,13 @@ function progressLabel(phase: string): string {
 }
 
 function StepTitle({ n, title, sub, id }: { n: number; title: string; sub?: string; id?: string }) {
-  return (
-    <div className="min-w-0 flex-1">
-      <h2 id={id} className="flex items-center gap-2.5 text-[17px] leading-[1.35] font-bold tracking-[-0.015em] text-ink">
-        <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12.5px] font-bold text-white">{n}</span>
-        {title}
-      </h2>
-      {sub && <p className="mt-1 max-w-[80ch] text-[13px] leading-[1.55] text-ink-3">{sub}</p>}
-    </div>
+  const h = (
+    <h2 id={id} className="flex items-center gap-2.5 text-[17px] leading-[1.35] font-bold tracking-[-0.015em] text-ink">
+      <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12.5px] font-bold text-white">{n}</span>
+      {title}
+    </h2>
   )
+  return <div className="min-w-0 flex-1">{sub ? <HeadMore heading={h}>{sub}</HeadMore> : h}</div>
 }
 
 function Fact({ k, v }: { k: string; v: string }) {
@@ -619,7 +617,7 @@ function Adjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolea
         </>
       )}
       <div className="mt-3">
-        <Link to="/" className={btnCls('link', 'sm')}>
+        <Link to="/overview" className={btnCls('link', 'sm')}>
           운영 현황 타임라인에서 확인
         </Link>
       </div>
@@ -682,7 +680,7 @@ function Evidence({ cmp }: { cmp: NegCompare }) {
                 : `실제 접수 ${src.real}건`}
           </p>
         )}
-        <p className="mt-1.5 text-ink-3">실제 실내 센서 값은 쓰이지 않았습니다. Agent의 말과 수치가 다르면 시뮬레이터 수치를 따릅니다.</p>
+        <More className="mt-1.5"><p>실제 실내 센서 값은 쓰이지 않았습니다. Agent의 말과 수치가 다르면 시뮬레이터 수치를 따릅니다.</p></More>
       </div>
       {neg === undefined ? (
         <Skeleton className="h-[160px]" />

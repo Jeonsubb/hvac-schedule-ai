@@ -7,7 +7,7 @@ import { cx, fmtDateK, fmtKwh, fmtWon } from '../lib/format'
 import { AGENT_META, AgentAvatar, type AgentKey } from './Characters'
 import { BRAND, HATCH, PillChip } from './Gantt'
 import { SourceIcon, sourceMeta } from './dataSources'
-import { Card, ErrorBox, Loading, Note, Spinner } from './ui'
+import { Card, ErrorBox, Loading, Note, Spinner, More} from './ui'
 
 /**
  * 에이전트 협의: 관리자 에이전트 '관리자 온디'(요금·전력)와 사용자 에이전트 '사용자 온디'(쾌적)가 설정온도를 두고 번갈아 제안하고,
@@ -118,9 +118,9 @@ export default function AgentDebate({ tier, date, mode, onChanged }: { tier: 2 |
             에이전트 협의
             <span className="rounded-full bg-brand-bg px-2.5 py-[2px] text-[12.5px] font-semibold text-brand-ink">{tier === 2 ? '2차 · 주간' : '3차 · 일일'}</span>
           </h2>
-          <p className="mt-1 text-[13.5px] text-ink-3">
+          <More className="mt-1"><p>
             {fmtDateK(date)} 기준. 요금과 쾌적은 서로 맞바꾸는 관계라서, 두 에이전트가 같은 데이터를 보고 설정온도를 주고받은 뒤 시뮬레이터 결과로 합의합니다.
-          </p>
+          </p></More>
         </div>
         <div className="flex items-center gap-2">
           {running && (
@@ -244,9 +244,9 @@ function EmptyDebate({ onStart }: { onStart: () => void }) {
         <AgentAvatar agent="occupant" size={56} />
       </div>
       <div className="text-[16px] font-semibold text-ink">아직 이 날짜로 협의한 기록이 없습니다</div>
-      <p className="max-w-md text-[13.5px] leading-relaxed text-ink-3">
+      <More><p>
         협의를 시작하면 관리자 온디가 전력을 아끼는 설정온도를 먼저 제안하고, 사용자 온디가 쾌적 의견과 체감 지수로 반박합니다. 시뮬레이터가 매 제안을 검증합니다.
-      </p>
+      </p></More>
       <button
         type="button"
         onClick={onStart}

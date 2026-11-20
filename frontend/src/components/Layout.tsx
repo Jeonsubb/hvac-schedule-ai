@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react'
+import { AudioLines, LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, ChevronRight, ChevronsLeft, ChevronsRight, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
 import { useMeta, useCopilot, useDay } from '../lib/context'
 import { useAuth } from '../lib/auth'
@@ -11,18 +11,19 @@ import type { Live } from '../lib/types'
 import { Popover, Spinner, ToastHost } from './ui'
 import TourOverlay from './TourOverlay'
 import { useTour } from '../lib/tour'
+import VoiceDock from './voice/VoiceDock'
 
 const Copilot = lazy(() => import('./Copilot'))
 
 /** Three sections in the order of the work: see the day, change the timetable, let the agents review it. */
 export const NAV_GROUPS = [
   {
-    to: '/',
+    to: '/overview',
     label: '운영 현황',
     icon: LayoutDashboard,
     desc: '선택한 날짜의 전체 운전계획과 예상 효과',
     tabs: [
-      { to: '/', label: '현황' },
+      { to: '/overview', label: '현황' },
       { to: '/energy', label: '절감 효과' },
       { to: '/comfort', label: '쾌적 의견' },
     ],
@@ -54,7 +55,11 @@ export const NAV_GROUPS = [
   },
 ]
 
+/** 온디 (voice): not in the menu; the ON:D logo opens it */
+const HOME_GROUP = { to: '/', label: '온디', icon: AudioLines, desc: '말로 묻고, 답과 데이터를 보고, 화면으로 이동', tabs: [{ to: '/', label: '온디' }] }
+
 export function groupOf(pathname: string) {
+  if (pathname === '/') return HOME_GROUP
   return NAV_GROUPS.find((g) => g.tabs.some((t) => (t.to === '/' ? pathname === '/' : pathname.startsWith(t.to)))) ?? NAV_GROUPS[0]
 }
 
@@ -93,7 +98,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
       className={cx('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 ease-out lg:flex', collapsed ? 'w-[76px]' : 'w-[244px]')}
     >
       <div className={cx('flex h-16 shrink-0 items-center', collapsed ? 'justify-center' : 'justify-between pr-3 pl-5')}>
-        <NavLink to="/" className="rounded-[10px]" aria-label="ON:D 홈으로">
+        <NavLink to="/" className="rounded-[10px]" aria-label="온디에게 말로 묻기" title="온디에게 말로 묻기">
           <Wordmark size={collapsed ? 15 : 22} />
         </NavLink>
         {!collapsed && (
@@ -173,6 +178,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           </button>
         </div>
       )}
+      {/* the voice orb (헤이 온디) docks in this corner on every screen */}
+      <div className="h-[104px] shrink-0" aria-hidden />
     </aside>
   )
 }
@@ -339,7 +346,7 @@ function TopBar() {
     <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
       <div className="flex h-16 items-center justify-between gap-4 px-[clamp(16px,2.4vw,32px)]">
         <div className="flex min-w-0 items-center gap-4">
-          <NavLink to="/" className="rounded-[10px] lg:hidden" aria-label="ON:D 홈으로">
+          <NavLink to="/" className="rounded-[10px] lg:hidden" aria-label="온디에게 말로 묻기" title="온디에게 말로 묻기">
             <Logo />
           </NavLink>
           <Crumbs />
@@ -484,9 +491,10 @@ export default function Layout() {
   const loc = useLocation()
   // the demo account sees the chapter tour once, on its first visit (the full screens are dense)
   useEffect(() => {
-    if (user?.id === '부산대학교' && !tour.seen()) tour.start(0)
+    // (not on the voice start screen: the tour begins with the first operating screen the operator opens)
+    if (user?.id === '부산대학교' && loc.pathname !== '/' && !tour.seen()) tour.start(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+  }, [user?.id, loc.pathname === '/'])
   const { open } = useCopilot()
   // load the copilot (markdown renderer, cards) the first time it is opened, then keep it mounted
   const [loaded, setLoaded] = useState(open)
@@ -539,6 +547,7 @@ export default function Layout() {
           </ErrorBoundary>
         </Suspense>
       )}
+      <VoiceDock />
       <TourOverlay />
       <ToastHost />
     </div>

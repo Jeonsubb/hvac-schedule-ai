@@ -23,6 +23,7 @@ import {
   btnCls,
   inputCls,
   toast,
+  More,
 } from '../components/ui'
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 8) // 08–22
@@ -259,7 +260,7 @@ function LinkList() {
   }
   return (
     <div>
-      <p className="mb-3 text-[13.5px] text-ink-3">강의실 문 옆에 QR 코드로 붙여 두면 재실자가 로그인 없이 바로 의견을 보냅니다. 이름이나 학번은 받지 않습니다.</p>
+      <More className="mb-3"><p>강의실 문 옆에 QR 코드로 붙여 두면 재실자가 로그인 없이 바로 의견을 보냅니다. 이름이나 학번은 받지 않습니다.</p></More>
       <ul className="grid gap-2 sm:grid-cols-2">
         {ROOM_ORDER.map((r) => {
           const url = `${base}/feedback?room=${r}`
@@ -355,6 +356,7 @@ export default function Comfort() {
   return (
     <div>
       <PageHeader
+        showDesc
         title="쾌적 의견"
         desc={answer(s)}
         right={

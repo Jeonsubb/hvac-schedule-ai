@@ -390,6 +390,47 @@ def chat(request: Request, body: dict = Body(...)):
     return {"job": job["id"]}
 
 
+@app.get("/api/voice/session")
+def voice_session(request: Request):
+    """Hey ON:D: a presigned Amazon Transcribe streaming URL and the spoken acknowledgement."""
+    from . import voice
+
+    _rate_limit(request, "voice_session", 60)
+    return voice.session()
+
+
+@app.post("/api/voice/turn")
+def voice_turn(request: Request, body: dict = Body(...)):
+    """One spoken exchange: transcript in, sentence + Polly audio + data cards + navigation out."""
+    from . import ai, voice
+
+    raw = body.get("messages") or []
+    msgs = [{"role": m.get("role"), "content": str(m.get("content"))[:1000],
+             **({"memo": str(m["memo"])[:2500]} if m.get("role") == "assistant" and m.get("memo") else {})}
+            for m in raw if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content")]
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    if not msgs or msgs[-1]["role"] != "user":
+        raise HTTPException(400, "messages의 마지막은 user 메시지여야 합니다.")
+    _rate_limit(request, "voice", 40)
+    try:
+        return voice.turn(msgs[-10:], page=str(body.get("page") or "/")[:80], day=str(body.get("date") or "")[:10] or None,
+                          speak=body.get("speak", True) is not False)
+    except ai.QuotaExceeded as e:
+        raise HTTPException(429, str(e))
+
+
+@app.post("/api/voice/tts")
+def voice_tts(request: Request, body: dict = Body(...)):
+    from . import voice
+
+    text = str(body.get("text") or "").strip()[:600]
+    if not text:
+        raise HTTPException(400, "text가 필요합니다.")
+    _rate_limit(request, "voice_tts", 40)
+    return {"audio": voice._audio_b64(text)}
+
+
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str):
     job = jobs.get(job_id)

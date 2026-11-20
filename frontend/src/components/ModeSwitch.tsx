@@ -5,7 +5,7 @@ import { Bot, Hand, Inbox, Check, X } from 'lucide-react'
 import { apiSend, invalidate, useApi } from '../lib/api'
 import type { Adjustment, OpMode, OpModeKey } from '../lib/types'
 import { cx, fmtDateShort, fmtKwh, fmtNum } from '../lib/format'
-import { Popover, Spinner, btnCls, toast } from './ui'
+import { Popover, Spinner, btnCls, toast, More} from './ui'
 
 const TIER_LABEL: Record<number, string> = { 1: '1차 월간', 2: '2차 주간', 3: '3차 일일' }
 
@@ -176,7 +176,7 @@ export default function ModeSwitch() {
             </Link>
           </div>
           <PendingList onDone={q.reload} />
-          <p className="mt-3 text-[13px] leading-[1.5] text-ink-3">승인하면 해당 강의실 실내기에 설정온도·환기 명령을 보내고 운전을 다시 계산합니다. 중앙제어기가 연결되어 있지 않으면 명령은 시뮬레이터가 받고, 운영 규칙 › 최근 제어 명령에 그렇게 표시됩니다.</p>
+          <More className="mt-3"><p>승인하면 해당 강의실 실내기에 설정온도·환기 명령을 보내고 운전을 다시 계산합니다. 중앙제어기가 연결되어 있지 않으면 명령은 시뮬레이터가 받고, 운영 규칙 › 최근 제어 명령에 그렇게 표시됩니다.</p></More>
         </Popover>
       )}
     </div>

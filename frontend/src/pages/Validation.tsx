@@ -133,6 +133,7 @@ export default function Validation() {
   return (
     <div>
       <PageHeader
+        showDesc
         title="정합성 검증"
         desc={
           <>

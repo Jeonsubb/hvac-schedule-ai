@@ -4,8 +4,10 @@ import Layout from './components/Layout'
 import { CopilotProvider, DayProvider, MetaProvider } from './lib/context'
 import { AuthProvider, RequireAuth } from './lib/auth'
 import { TourProvider } from './lib/tour'
+import { VoiceProvider } from './lib/voice/agent'
 import { PageSkeleton } from './components/ui'
 
+const Home = lazy(() => import('./pages/Home'))
 const Overview = lazy(() => import('./pages/Overview'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const Plan = lazy(() => import('./pages/Plan'))
@@ -46,11 +48,15 @@ export default function App() {
             <Route
               element={
                 <RequireAuth>
-                  <Layout />
+                  {/* one voice session above the operator screens: a spoken jump to another screen keeps talking there */}
+                  <VoiceProvider>
+                    <Layout />
+                  </VoiceProvider>
                 </RequireAuth>
               }
             >
-              <Route index element={page(<Overview />)} />
+              <Route index element={page(<Home />)} />
+              <Route path="overview" element={page(<Overview />)} />
               <Route path="energy" element={page(<Energy />)} />
               <Route path="comfort" element={page(<Comfort />)} />
               <Route path="settings" element={page(<SettingsPage />)} />

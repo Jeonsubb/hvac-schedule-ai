@@ -8,7 +8,7 @@ import type { BmsCommand, BuildingProfile, GatewayStatus, Policy, Settings, Stra
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
 import ModeSwitch from '../components/ModeSwitch'
-import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast } from '../components/ui'
+import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast, More} from '../components/ui'
 
 type NumKey =
   | 'pre_on_min'
@@ -478,9 +478,9 @@ export function WhatIfTable({ wi, compact = false }: { wi: WhatIf; compact?: boo
         </tbody>
       </table>
       {!compact && (
-        <p className="mt-3 text-[13px] leading-relaxed text-ink-3">
+        <More className="mt-3"><p>
           규칙 값은 주로 &lsquo;규칙 기반&rsquo;에, 설정온도와 쾌적 범위는 모든 방식에 영향을 줍니다. 시작 이탈은 강의가 시작될 때 실내가 쾌적 범위 밖(너무 춥거나 더움)이었던 횟수입니다.
-        </p>
+        </p></More>
       )}
     </div>
   )
@@ -586,9 +586,9 @@ function Equipment() {
             )
           })}
           </ul>
-          <p className="mt-3 text-[13px] leading-relaxed text-ink-3">
+          <More className="mt-3"><p>
             실외기는 연결된 실내기가 하나라도 켜져 있으면 가동하고, 모두 꺼지면 정지합니다. 같은 실외기에 묶인 강의실끼리 강의를 모으면 실외기 가동 시간이 줄어듭니다(절감 효과의 강의실 재배치 권고).
-          </p>
+          </p></More>
         </div>
       </div>
     </div>
@@ -859,7 +859,7 @@ function BuildingAndPolicy() {
                   variant="ghost"
                   onClick={() => {
                     setApplied(false)
-                    nav('/')
+                    nav('/overview')
                   }}
                   title="시연용: 대시보드를 시간표를 넣기 전(현재 운영) 상태로 되돌립니다"
                 >
@@ -937,7 +937,7 @@ function BuildingAndPolicy() {
       {form && P && (
         <DisclosureList>
           <Disclosure title="운전 정책 바꾸기" icon={<Scale size={16} aria-hidden />} summary={nDiff ? `변경 ${nDiff}개` : `출석률 ${attendancePct(P.attendance)}% 가정`}>
-            <p className="mb-4 text-[13.5px] text-ink-3">AI와 두 에이전트는 이 범위 밖으로 설정온도를 바꾸지 않습니다. 근거는 정부 지침과 학교보건법이며, 학교는 자체 기준을 정할 수 있습니다.</p>
+            <More className="mb-4"><p>AI와 두 에이전트는 이 범위 밖으로 설정온도를 바꾸지 않습니다. 근거는 정부 지침과 학교보건법이며, 학교는 자체 기준을 정할 수 있습니다.</p></More>
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
               {POLICY_FIELDS.map((f) => {
                 const raw = form[f.k] as number
@@ -989,9 +989,9 @@ function BuildingAndPolicy() {
             </div>
           </Disclosure>
           <Disclosure title="강의실 방향(일사 반영)" icon={<Compass size={16} aria-hidden />} summary="가정값">
-            <p className="mb-4 text-[13.5px] text-ink-3">
+            <More className="mb-4"><p>
               <Badge tone="warn">가정값</Badge> 도면 확인 전 가정한 방향입니다. 2차·3차 스케줄은 이 방향으로 오후 일사 부하를 추정합니다. 바꾼 뒤 위의 &lsquo;정책 저장&rsquo;을 누르세요.
-            </p>
+            </p></More>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {ROOM_ORDER.map((r) => {
                 const v = form.orient?.[r] ?? ''
@@ -1020,7 +1020,7 @@ function BuildingAndPolicy() {
             <GatewayLive />
           </Disclosure>
           <Disclosure title="최근 제어 명령" icon={<Send size={16} aria-hidden />} summary="중앙 제어기로 보낸 기록">
-            <p className="mb-3 text-[13.5px] text-ink-3">자동 운전 모드이거나 담당자가 승인한 조정안만 중앙 제어기에 보냅니다. 게이트웨이가 연결되어 있으면 BACnet으로 쓰고 되읽어 확인하며, 없으면 시뮬레이터가 대신 받습니다.</p>
+            <More className="mb-3"><p>자동 운전 모드이거나 담당자가 승인한 조정안만 중앙 제어기에 보냅니다. 게이트웨이가 연결되어 있으면 BACnet으로 쓰고 되읽어 확인하며, 없으면 시뮬레이터가 대신 받습니다.</p></More>
             <PolicyCommands />
           </Disclosure>
         </DisclosureList>

@@ -30,6 +30,62 @@ export function Card({
   )
 }
 
+/**
+ * Explanations stay out of the way: the screens show the data, and a small "자세히 보기" opens the words
+ * about it in place. Used by the page header, card headers and every long caption.
+ */
+export function More({ children, label = '자세히 보기', className, defaultOpen = false }: { children: ReactNode; label?: string; className?: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const id = useId()
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+        className="ond-press -ml-2 inline-flex h-7 items-center gap-0.5 rounded-full px-2 text-[12px] font-semibold text-ink-3 hover:bg-hover hover:text-ink"
+      >
+        {open ? '접기' : label}
+        <ChevronDown size={14} className={cx('transition-transform duration-150', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open && (
+        <div id={id} className="fade-in mt-1 max-w-[80ch] text-[13px] leading-[1.6] text-ink-2">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A heading with its explanation folded away: "자세히 보기" sits beside the title and opens the text under it. */
+export function HeadMore({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        {heading}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen(!open)}
+          className="ond-press inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-[12px] font-semibold text-ink-3 hover:bg-hover hover:text-ink"
+        >
+          {open ? '접기' : '자세히 보기'}
+          <ChevronDown size={13} className={cx('transition-transform duration-150', open && 'rotate-180')} aria-hidden />
+        </button>
+      </div>
+      {open && (
+        <div id={id} className="fade-in mt-1.5 max-w-[80ch] text-[13px] leading-[1.6] text-ink-2">
+          {children}
+        </div>
+      )}
+    </>
+  )
+}
+
 export function CardHeader({
   title,
   sub,
@@ -48,11 +104,22 @@ export function CardHeader({
   return (
     <div className={cx('mb-5 flex items-start justify-between gap-x-4 gap-y-2 max-sm:flex-wrap', className)}>
       <div className="min-w-0 flex-1">
-        <h2 id={id} className="flex items-center gap-2 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
-          {icon && <span className="flex text-ink-3">{icon}</span>}
-          {title}
-        </h2>
-        {sub && <div className="mt-1 text-[13px] leading-[1.5] text-ink-3">{sub}</div>}
+        {(() => {
+          const h = (
+            <h2 id={id} className="flex items-center gap-2 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
+              {icon && <span className="flex text-ink-3">{icon}</span>}
+              {title}
+            </h2>
+          )
+          // a long sentence under the title is an explanation: folded behind "자세히 보기"; short facts stay
+          if (typeof sub === 'string' && sub.length > 34) return <HeadMore heading={h}>{sub}</HeadMore>
+          return (
+            <>
+              {h}
+              {sub && <div className="mt-1 text-[13px] leading-[1.5] text-ink-3">{sub}</div>}
+            </>
+          )
+        })()}
       </div>
       {right && <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{right}</div>}
     </div>
@@ -60,13 +127,19 @@ export function CardHeader({
 }
 
 /** Page title + the page's one-sentence answer + at most one action group. */
-export function PageHeader({ title, desc, right, className }: { title: string; desc?: ReactNode; right?: ReactNode; className?: string }) {
+export function PageHeader({ title, desc, right, className, showDesc = false }: { title: string; desc?: ReactNode; right?: ReactNode; className?: string; /** the sentence is the page's answer (numbers), not an explanation */ showDesc?: boolean }) {
   return (
     <div className={cx('mb-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
       <div className="min-w-0 flex-[1_1_20rem]">
         {/* SEED screen-title scale (t9 bold); the breadcrumb above already says where we are */}
-        <h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
-        {desc && <p className="pretty mt-1.5 max-w-[72ch] text-[14px] leading-[1.6] text-ink-2">{desc}</p>}
+        {desc && !showDesc ? (
+          <HeadMore heading={<h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>}>{desc}</HeadMore>
+        ) : (
+          <>
+            <h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
+            {desc && <p className="pretty mt-1.5 max-w-[72ch] text-[14px] leading-[1.6] text-ink-2">{desc}</p>}
+          </>
+        )}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -899,7 +972,7 @@ export function ChartCard({
         <CardHeader title={title} sub={sub} right={actions} />
       ) : (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0 flex-1 text-[13.5px] text-ink-3">{sub}</div>
+          <div className="min-w-0 flex-1">{sub && <More>{sub}</More>}</div>
           <div className="flex shrink-0 items-center gap-2">{actions}</div>
         </div>
       )}

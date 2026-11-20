@@ -25,25 +25,25 @@ export const CHAPTERS: TourChapter[] = [
     question: '오늘 어느 방을 언제 운전하나',
     steps: [
       {
-        path: '/',
+        path: '/overview',
         target: 'ov-brief',
         title: '오늘 요약과 확인할 일',
         body: '강의 시간표에 수업이 있는 강의실만, 수업 전에 미리 켜고 끝나면 끄는 서비스입니다. 담당자가 승인하거나 확인해야 할 일이 있으면 이 줄에 먼저 나옵니다.',
       },
       {
-        path: '/',
+        path: '/overview',
         target: 'ov-summary',
         title: '핵심 지표 세 가지',
         body: '오늘 쓸 전기와 요금, 모든 강의실을 종일 켜 둘 때와의 차이, 수업 시간 중 실내가 쾌적했던 비율입니다. 모두 시뮬레이션 값입니다.',
       },
       {
-        path: '/',
+        path: '/overview',
         target: 'ov-building',
         title: '강의실 전체 운전 타임라인',
         body: '회색 칸은 수업 일정, 파란 막대는 냉난방을 켜는 구간입니다. 세로선을 끌면 선택 시각이 바뀌고, 공간 보기로 바꾸면 배치 개념도로 볼 수 있습니다.',
       },
       {
-        path: '/',
+        path: '/overview',
         target: 'ov-time',
         title: '선택한 강의실 상세',
         body: '타임라인에서 강의실을 누르면 선택 시각의 예측 실내온도, 설정온도, 운전 상태, 추정 CO₂를 보여 줍니다. 실제 센서 값이 아닙니다.',

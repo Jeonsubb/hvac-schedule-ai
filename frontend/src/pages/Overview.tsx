@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CalendarPlus, CircleCheck, Download, FileUp, Inbox, PiggyBank, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, CalendarPlus, ChevronDown, CircleCheck, Download, FileUp, Inbox, PiggyBank, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useDay, useMeta } from '../lib/context'
 import { DECISION, statusInfo } from '../lib/constants'
@@ -30,7 +30,7 @@ import {
 import BuildingView, { MapLegend } from '../components/BuildingView'
 import DayTimeline from '../components/DayTimeline'
 import TimetableApply from '../components/TimetableApply'
-import { Badge, Button, ErrorBox, PageSkeleton, Popover, Segmented, Skeleton, btnCls } from '../components/ui'
+import { Badge, Button, ErrorBox, PageSkeleton, Popover, Segmented, Skeleton, btnCls, More} from '../components/ui'
 
 /**
  * 운영 현황: the whole day's operating plan first. Three numbers, the ten-room ON/OFF timeline, one
@@ -79,6 +79,7 @@ export default function Overview() {
   const [showCompare, setShowCompare] = useState(false)
   const [minute, setMinute] = useState<number | null>(null)
   const [view, setView] = useState<'timeline' | 'map'>('timeline')
+  const [kpiMore, setKpiMore] = useState(false)
   // choices belong to one date: start again from the operating plan when the date changes
   useEffect(() => {
     setPicked(null)
@@ -172,6 +173,7 @@ export default function Overview() {
       {/* three numbers, all of the selected plan */}
       <section data-tour="ov-summary" className="grid grid-cols-1 divide-y divide-line rounded-[16px] border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="핵심 지표">
         <Kpi
+          showSub={kpiMore}
           label="하루 예상 전기 사용"
           num={sel.kwh}
           fmt={(v) => fmtKwh(v)}
@@ -180,6 +182,7 @@ export default function Overview() {
           sub={`${sel.costKrw != null ? `전기요금 약 ${fmtNum(sel.costKrw)}원 · ` : ''}${sel.label}${sel.badge ? ` (${sel.badge})` : ''} · 시뮬레이션`}
         />
         <Kpi
+          showSub={kpiMore}
           label="종일 켜 둘 때(고정 운전)보다"
           num={saving ?? undefined}
           fmt={(v) => `${v >= 0 ? '−' : '+'}${Math.abs(v).toFixed(1)}`}
@@ -194,6 +197,7 @@ export default function Overview() {
           }
         />
         <Kpi
+          showSub={kpiMore}
           label="수업 시간 중 쾌적했던 비율"
           num={noClass ? undefined : (sel.comfortPct ?? undefined)}
           fmt={(v) => v.toFixed(0)}
@@ -207,7 +211,19 @@ export default function Overview() {
         />
       </section>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+      <div className="mt-1 flex justify-end">
+        <button
+          type="button"
+          aria-expanded={kpiMore}
+          onClick={() => setKpiMore(!kpiMore)}
+          className="ond-press inline-flex h-7 items-center gap-0.5 rounded-full px-2 text-[12px] font-semibold text-ink-3 hover:bg-hover hover:text-ink"
+        >
+          {kpiMore ? '접기' : '자세히 보기'}
+          <ChevronDown size={14} className={cx('transition-transform duration-150', kpiMore && 'rotate-180')} aria-hidden />
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         <section data-tour="ov-building" className="min-w-0 rounded-[16px] border border-line bg-surface p-5" aria-labelledby="tl-title">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -264,9 +280,9 @@ export default function Overview() {
             />
           ) : (
             <div>
-              <p className="mb-2 text-[12.5px] text-ink-3">
+              <More className="mb-2"><p>
                 실제 도면이 아닌 배치 개념도입니다. 색은 선택 시각 {fmtMin(m)}의 예측 실내온도와 계획 운전 상태({sel.label})입니다.
-              </p>
+              </p></More>
               <div className="thin-scroll overflow-x-auto">
                 <BuildingView
                   meta={meta}
@@ -291,7 +307,7 @@ export default function Overview() {
           )}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[12.5px] text-ink-3">
-            <span>
+            <More><span>
               수업: 실제 시간표·등록 일정 · 냉난방 ON/OFF: 물리 계산 엔진의 계획(시뮬레이션) · 날씨: {D.weather.src_forecast}
               {partner && key !== 'fixed' && partnerKey !== 'fixed' && (
                 <>
@@ -299,7 +315,8 @@ export default function Overview() {
                   · 운전시간 {planMinutes(Object.values(partner.rooms).flatMap((r) => r.plan)) === planMinutes(Object.values(sel.rooms).flatMap((r) => r.plan)) && rooms.every((r) => samePlan(sel.rooms[r].plan, partner.rooms[r].plan)) ? '변화 없음' : '변화 있음'}
                 </>
               )}
-            </span>
+              </span>
+            </More>
             {key !== 'nego' && (
               <a href={`/api/export/plan.csv?date=${date}&strategy=${key === 'fixed' ? 'fixed' : 'ai'}`} className={btnCls('ghost', 'sm')} download>
                 <Download size={13} aria-hidden /> 운전계획 CSV
@@ -385,7 +402,11 @@ function Brief({ day, meta, op, fixed, date }: { day: Day; meta: Meta; op: PlanM
         {wxErr && <span className="inline-flex h-8 items-center rounded-full bg-warn-bg px-3 text-[13px] font-medium text-warn-ink">날씨 자료를 일부 받지 못했습니다</span>}
         {aiDown && <span className="inline-flex h-8 items-center rounded-full bg-warn-bg px-3 text-[13px] font-medium text-warn-ink">AI 연결이 불안정합니다</span>}
         <span className="ml-auto text-[12.5px] text-ink-3">
-          {modeQ.data ? (auto ? '자동 운전: 작은 조정(0.5℃ 이내)은 AI가 바로 반영합니다' : '추천 모드: AI 조정안은 승인한 것만 반영합니다') : ''}
+          {modeQ.data && (
+            <span title={auto ? '작은 조정(0.5℃ 이내)은 AI가 바로 반영하고, 큰 조정은 승인을 기다립니다' : 'AI 조정안은 담당자가 승인한 것만 반영합니다'}>
+              {auto ? '자동 운전' : '추천 모드 · 승인 후 반영'}
+            </span>
+          )}
         </span>
       </div>
     </section>
@@ -407,9 +428,9 @@ function roomStatus(iv: Interval | undefined, cur: { title: string; end: string 
 /** Where to go from here: the three things an operator does with this service, one sentence each. */
 function NextSteps({ date, room }: { date: string; room: string }) {
   const items = [
-    { to: '/data', icon: CalendarPlus, title: '일정이 바뀌었나요?', body: '휴강·보강·특강을 말로 적거나 공지 캡처를 올리면, AI가 그날 운전 계획을 바로 다시 만듭니다.', cta: '일정 등록하기' },
-    { to: `/plan?date=${date}&room=${room}`, icon: Sparkles, title: 'AI 조정안 검토하기', body: '전기요금을 줄이려는 AI와 쾌적을 지키려는 AI가 조율한 설정온도를 전후 비교로 보고, 담당자가 승인합니다.', cta: 'AI 최적화 열기' },
-    { to: '/energy', icon: PiggyBank, title: '얼마나 아꼈는지 보기', body: '이번 학기에 아낀 전기와 요금, 그리고 그 절감이 어디서 나왔는지 확인합니다.', cta: '절감 효과 보기' },
+    { to: '/data', icon: CalendarPlus, title: '일정이 바뀌었나요?', body: '휴강·특강을 말이나 공지 캡처로 등록', cta: '일정 등록하기' },
+    { to: `/plan?date=${date}&room=${room}`, icon: Sparkles, title: 'AI 조정안 검토하기', body: '조율안을 전후 비교로 보고 승인', cta: 'AI 최적화 열기' },
+    { to: '/energy', icon: PiggyBank, title: '얼마나 아꼈는지 보기', body: '학기 절감량과 절감 요인 확인', cta: '절감 효과 보기' },
   ]
   return (
     <section className="mt-8" aria-labelledby="next-title">
@@ -463,7 +484,7 @@ function useTween(target: number | undefined): number | undefined {
   return v
 }
 
-function Kpi({ label, value, unit, sub, num, fmt }: { label: string; value: string; unit?: string; sub: string; num?: number; fmt?: (v: number) => string }) {
+function Kpi({ label, value, unit, sub, num, fmt, showSub = false }: { label: string; value: string; unit?: string; sub: string; num?: number; fmt?: (v: number) => string; showSub?: boolean }) {
   const t = useTween(num)
   const shown = num != null && t != null && fmt ? fmt(t) : value
   return (
@@ -475,7 +496,7 @@ function Kpi({ label, value, unit, sub, num, fmt }: { label: string; value: stri
         </span>
         {unit && <span className="text-[14px] font-medium text-ink-3">{unit}</span>}
       </div>
-      <div className="tnum mt-1 text-[12.5px] leading-snug text-ink-3">{sub}</div>
+      {showSub && <div className="tnum fade-in mt-1 text-[12.5px] leading-snug text-ink-3">{sub}</div>}
     </div>
   )
 }
@@ -588,9 +609,8 @@ function RoomPanel({
         {r?.kwh != null && <Row k="하루 예상 전기 사용" v={`${r.kwh.toFixed(1)} kWh`} />}
       </dl>
       {planKey !== 'fixed' && why.length > 0 && (
-        <div className="mt-4">
-          <div className="text-[13px] font-semibold text-ink">이렇게 정한 이유</div>
-          <ul className="mt-1.5 space-y-1.5">
+        <More className="mt-3" label="이렇게 정한 이유">
+          <ul className="space-y-1.5">
             {why.map((d, i) => (
               <li key={i} className="rounded-[10px] bg-bg-informative-weak px-3 py-2 text-[12.5px] leading-snug text-fg-informative-contrast">
                 <span className="font-semibold">{DECISION[d.type]?.label ?? d.type}</span>
@@ -599,11 +619,11 @@ function RoomPanel({
               </li>
             ))}
           </ul>
-        </div>
+        </More>
       )}
-      <p className="mt-3 text-[12px] leading-relaxed text-ink-3">
+      <More className="mt-3"><p>
         실내온도·켜고 끄는 시각·전력은 열모델 시뮬레이션, CO₂·인원은 정원×출석률 가정으로 계산한 추정값입니다. 실제 센서 값이 아닙니다.
-      </p>
+      </p></More>
     </div>
   )
 }
@@ -693,7 +713,7 @@ function AiSummary({
           <h2 id="ai-sum" className="text-[16px] font-bold tracking-[-0.015em] text-ink">
             AI 추천 요약
           </h2>
-          <p className="mt-1 text-[13.5px] text-ink-3">{fmtDateK(date)} 계획은 아직 AI 협의를 거치지 않았습니다. 비용·쾌적 두 Agent가 설정온도를 협의하면 결과가 여기에 표시됩니다.</p>
+          <p className="mt-1 text-[13.5px] text-ink-3">{fmtDateK(date)} 계획은 아직 AI 협의를 거치지 않았습니다.</p>
         </div>
         <Link to={to} className={btnCls('secondary', 'md')}>
           AI 협의 실행하러 가기 <ArrowRight size={15} aria-hidden />
@@ -757,10 +777,10 @@ function AiSummary({
           </dd>
         </div>
       </dl>
-      <p className="mt-3 text-[12.5px] text-ink-3">
+      <More className="mt-3"><p>
         비용을 줄이려는 AI와 쾌적을 지키려는 AI가 강의실별 설정온도를 조율한 결과입니다. 켜고 끄는 시각은 그 온도로 다시 계산합니다. {cmp.created_at ? `협의 시각 ${cmp.created_at.slice(5, 16).replace('T', ' ')} · ` : ''}
         {cmp.state === 'pending' ? '승인 전이므로 현재 운영계획은 바뀌지 않았습니다.' : cmp.state === 'applied' ? '승인되어 현재 운영계획에 반영되어 있습니다.' : ''}
-      </p>
+      </p></More>
     </section>
   )
 }
