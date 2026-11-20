@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, Settings as SettingsIcon } from 'lucide-react'
 import { useMeta, useCopilot } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import { cx, fmtDateK, fmtMin } from '../lib/format'
@@ -22,11 +22,9 @@ export const NAV_GROUPS = [
     icon: LayoutDashboard,
     desc: '지금 건물 상태, 절감 효과, 쾌적 의견, 운영 규칙',
     tabs: [
-      { to: '/', label: '현황' },
-      { to: '/energy', label: '절감 효과' },
-      { to: '/comfort', label: '쾌적 의견' },
-      { to: '/settings', label: '운영 규칙' },
-    ],
+  { to: '/', label: '현황' },
+  { to: '/comfort', label: '쾌적 의견' },
+],
   },
   {
     to: '/schedule',
@@ -40,6 +38,13 @@ export const NAV_GROUPS = [
       { to: '/data', label: '일정·데이터' },
     ],
   },
+  {
+  to: '/settings',
+  label: '설정',
+  icon: SettingsIcon,
+  desc: '온도 범위와 운전 시간 등 운영 규칙 설정',
+  tabs: [{ to: '/settings', label: '설정' }],
+},
 ]
 
 export function groupOf(pathname: string) {
@@ -131,7 +136,7 @@ function Sidebar() {
 }
 
 /** Tabs of the current section (the screens that used to be separate menu items). */
-function SectionTabs() {
+export function SectionTabs() {
   const loc = useLocation()
   const g = groupOf(loc.pathname)
   return (
@@ -193,19 +198,44 @@ function ClockPill() {
 function TopBar() {
   const { open, setOpen } = useCopilot()
   const tour = useTour()
-  const loc = useLocation()
-  const g = groupOf(loc.pathname)
+  const { pathname } = useLocation()
+
+  const showControlsOnLeft = pathname === '/' || pathname === '/schedule'
+  const section = groupOf(pathname)
+
+  const statusControls = (
+    <>
+      <ModeSwitch />
+      <SystemStatus />
+      <ClockPill />
+    </>
+  )
+
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/90 backdrop-blur-md">
-      <div className="flex h-[68px] items-center justify-between gap-4 px-8">
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="lg:hidden">
+      <div
+        className={cx(
+          'flex items-center justify-between gap-4',
+          showControlsOnLeft
+            ? 'min-h-[68px] px-4 py-2 sm:px-8'
+            : 'h-[68px] px-8',
+        )}
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span className="shrink-0 lg:hidden">
             <LogoMark size={30} />
           </span>
-          {/* section name, like the mock's page title; the section's screens are the tabs below */}
-          <div className="hidden truncate text-[20px] font-bold tracking-[-0.02em] text-ink lg:block">{g.label}</div>
+
+          {showControlsOnLeft ? (
+            statusControls
+          ) : (
+            <div className="hidden truncate text-[20px] font-bold tracking-[-0.02em] text-ink lg:block">
+              {section.label}
+            </div>
+          )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => tour.start(0)}
@@ -214,16 +244,18 @@ function TopBar() {
           >
             <BookOpenText size={15} aria-hidden /> 챕터로 보기
           </button>
-          <ModeSwitch />
-          <SystemStatus />
-          <ClockPill />
+
+          {!showControlsOnLeft && statusControls}
+
           <button
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             className={cx(
               'inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-[14px] font-semibold transition-colors duration-150',
-              open ? 'border border-line-strong bg-surface text-ink hover:bg-hover' : 'bg-brand text-white hover:bg-brand-ink',
+              open
+                ? 'border border-line-strong bg-surface text-ink hover:bg-hover'
+                : 'bg-brand text-white hover:bg-brand-ink',
             )}
           >
             {open ? <X size={16} aria-hidden /> : <Sparkles size={16} aria-hidden />}
@@ -372,9 +404,11 @@ export default function Layout() {
       <div className={cx('min-h-full lg:pl-[220px]', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        <div className="mx-auto hidden max-w-[1480px] px-8 pt-6 lg:block">
-          <SectionTabs />
-        </div>
+        {loc.pathname !== '/' && groupOf(loc.pathname).tabs.length > 1 && (
+  <div className="mx-auto hidden max-w-[1480px] px-8 pt-6 lg:block">
+    <SectionTabs />
+  </div>
+)}
         <main id="main" className="mx-auto max-w-[1480px] px-8 pt-6 pb-20">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
