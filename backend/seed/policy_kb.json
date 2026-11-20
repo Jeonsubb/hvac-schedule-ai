@@ -1,0 +1,222 @@
+[
+  {
+    "id": "public-rule-scope",
+    "title": "국립대학도 공공기관 에너지 규정을 따릅니다",
+    "summary": "정부의 「공공기관 에너지이용 합리화 추진에 관한 규정」은 국립·공립 대학을 공공기관으로 정합니다. 그래서 부산대도 냉난방 온도 관리, 에너지 실적 보고 같은 의무를 집니다.",
+    "numbers": {},
+    "applies_to": "「고등교육법」 제3조의 국립·공립 대학(부산대 포함)",
+    "source": "기후에너지환경부고시 제2026-111호 「공공기관 에너지이용 합리화 추진에 관한 규정」 제2조제1호바목",
+    "url": "https://www.law.go.kr/행정규칙/공공기관에너지이용합리화추진에관한규정",
+    "date": "2026-04-30",
+    "status": "원문 확인"
+  },
+  {
+    "id": "public-rule-temp",
+    "title": "공공기관 냉난방 온도 원칙: 난방 18℃ 이하, 냉방 28℃ 이상",
+    "summary": "공공기관 건물은 난방할 때 평균 18℃ 이하, 냉방할 때 평균 28℃ 이상으로 실내온도를 유지하는 것이 원칙입니다. 여기서 말하는 온도는 에어컨 설정값이 아니라 건물 여러 곳에서 잰 평균 실내온도입니다.",
+    "numbers": {"heating_max_c": 18, "cooling_min_c": 28},
+    "applies_to": "공공기관 건물 전반(학교·교육시설 등 예외는 별도 항목 참고)",
+    "source": "기후에너지환경부고시 제2026-111호 제14조제1항 본문, 별표 5(실내온도 산정방법)",
+    "url": "https://www.law.go.kr/행정규칙/공공기관에너지이용합리화추진에관한규정",
+    "date": "2026-04-30",
+    "status": "원문 확인"
+  },
+  {
+    "id": "classroom-exception",
+    "title": "강의실은 학교 자체위원회가 온도를 탄력적으로 정할 수 있습니다",
+    "summary": "학교·교육시설처럼 많은 사람이 함께 쓰는 공간은 18℃·28℃ 원칙 대신 학교의 에너지절약추진위원회 결정에 따라 온도를 탄력적으로 운영할 수 있습니다. 교직원 사무공간은 이 예외에 들어가지 않습니다.",
+    "numbers": {},
+    "applies_to": "학교·교육시설 등 다수 이용 공간(사무공간 제외), 노후 중앙식 설비로 온도가 고르지 않은 시설",
+    "source": "기후에너지환경부고시 제2026-111호 제14조제1항 단서 제1호·제8호, 제4조제3항(자체위원회)",
+    "url": "https://www.law.go.kr/행정규칙/공공기관에너지이용합리화추진에관한규정",
+    "date": "2026-04-30",
+    "status": "원문 확인"
+  },
+  {
+    "id": "classroom-exception-gov-explain",
+    "title": "정부 해설: 학교는 28℃ 제한을 받지 않고 기관이 기준을 정합니다",
+    "summary": "산업통상자원부는 학교·도서관·민원실처럼 여러 사람이 쓰는 시설에는 냉방 28℃ 제한이 적용되지 않고, 기관별로 적정 온도 기준을 정한다고 설명했습니다.",
+    "numbers": {"cooling_min_c_general": 28},
+    "applies_to": "학교, 도서관, 민원실, 의료기관 등",
+    "source": "산업통상자원부 보도설명자료 「더운데 아직 아니라네요... 공공기관·학교는 버티는 중」 해명",
+    "url": "https://www.motir.go.kr/attach/down/095a2dda9c864e1d90d751f7668a1117/376b1433aa76a251f6e4755a82b6bbf7",
+    "date": "2017-06-01",
+    "status": "원문 확인"
+  },
+  {
+    "id": "public-rule-amendment-2026-11",
+    "title": "개정안 예고: 냉방 26℃ 이상, 난방 20℃ 이하 (아직 확정 전)",
+    "summary": "정부가 공공기관 기준을 냉방 26℃ 이상, 난방 20℃ 이하로 바꾸는 개정안을 2026년 11월 13일 예고했습니다. 폭염과 한파에 대응하려는 것이며, 11월 23일까지 의견을 받은 뒤 확정됩니다.",
+    "numbers": {"heating_max_c": 20, "cooling_min_c": 26, "comment_deadline": "2026-11-23"},
+    "applies_to": "공공기관 전반(학교 예외 조항 변경은 예고문에 없음)",
+    "source": "기후에너지환경부공고 제2026-1019호 「공공기관 에너지이용 합리화 추진에 관한 규정」 일부개정안 행정예고",
+    "url": "https://www.mcee.go.kr/m/mob/board/read.do?menuId=108&boardMasterId=827&boardId=1906050",
+    "date": "2026-11-13",
+    "status": "원문 확인"
+  },
+  {
+    "id": "energy-act-temp-limit",
+    "title": "에너지이용 합리화법의 냉난방 제한온도: 냉방 26℃ 이상, 난방 20℃ 이하",
+    "summary": "정부가 에너지 절약을 위해 건물을 '냉난방온도 제한건물'로 지정하면 냉방은 26℃ 이상, 난방은 20℃ 이하로 유지해야 합니다. 공공기관 업무용 건물과 에너지를 많이 쓰는 건물이 지정 대상입니다.",
+    "numbers": {"heating_max_c": 20, "cooling_min_c": 26},
+    "applies_to": "장관이 지정·고시한 냉난방온도 제한건물(공공기관 업무용 건물, 연간 2천 toe 이상 건물)",
+    "source": "「에너지이용 합리화법」 제36조의2, 같은 법 시행규칙 제31조의2·제31조의3 (기후에너지환경부령 제42호)",
+    "url": "https://www.law.go.kr/법령/에너지이용합리화법시행규칙",
+    "date": "2026-06-22",
+    "status": "원문 확인"
+  },
+  {
+    "id": "school-health-temp-humidity",
+    "title": "학교보건법 교실 기준: 18~28℃, 습도 30~80%",
+    "summary": "학교보건법은 교실 실내온도를 18~28℃(난방은 18~20℃, 냉방은 26~28℃), 습도를 30~80%로 정합니다. 대학은 이 기준에 준하는 자체 기준을 정할 수 있어서, 대학 강의실에서는 기준선으로 참고합니다.",
+    "numbers": {"temp_min_c": 18, "temp_max_c": 28, "heating_min_c": 18, "heating_max_c": 20, "cooling_min_c": 26, "cooling_max_c": 28, "rh_min_pct": 30, "rh_max_pct": 80},
+    "applies_to": "초·중·고 교실은 직접 기준, 대학은 같은 시행규칙 제6조에 따라 준하는 별도 기준을 정할 수 있음",
+    "source": "학교보건법 시행규칙(교육부령 제366호) 제3조제1항제1호 별표 2 제4호, 제6조",
+    "url": "https://www.law.go.kr/법령/학교보건법시행규칙",
+    "date": "2019-09-17",
+    "status": "원문 확인"
+  },
+  {
+    "id": "school-health-air-quality",
+    "title": "교실 공기 기준: 이산화탄소 1,000ppm, 환기량 1인당 시간당 21.6㎥",
+    "summary": "강의실이 답답하고 졸린 것은 온도보다 환기 문제일 수 있습니다. 학교보건법은 교실 이산화탄소를 1,000ppm 이하(기계 환기 위주면 1,500ppm), 환기량을 1인당 시간당 21.6㎥ 이상으로 정합니다.",
+    "numbers": {"co2_max_ppm": 1000, "co2_max_ppm_mechanical": 1500, "ventilation_m3_per_person_h": 21.6, "pm25_max_ugm3": 35, "desk_lux_min": 300},
+    "applies_to": "초·중·고 교실은 직접 기준, 대학은 준하는 별도 기준을 정할 수 있음",
+    "source": "학교보건법 시행규칙 별표 2 제1호·제3호, 별표 4의2",
+    "url": "https://www.law.go.kr/법령/학교보건법시행규칙",
+    "date": "2019-10-24",
+    "status": "원문 확인"
+  },
+  {
+    "id": "summer-2025-peak-plan",
+    "title": "여름 피크 대응: 평상시 26℃, 부산 순차 운휴 17:00~17:30",
+    "summary": "2025년 여름 정부 방침은 공공기관이 평상시 26℃를 유지하고, 전력 예비력이 부족할 것으로 보이면 오후 피크 시간에 지역별로 30분씩 냉방기를 쉬게 하는 것이었습니다. 부산은 17:00~17:30이고, 예비전력이 5.5GW 미만이면 기준을 28℃로 올립니다.",
+    "numbers": {"cooling_normal_c": 26, "cooling_emergency_c": 28, "busan_rotation_start": "17:00", "busan_rotation_end": "17:30", "rotation_trigger_reserve_gw": 11.1, "emergency_reserve_gw": 5.5},
+    "applies_to": "공공기관(2025년 여름 전력수급 대책 기간). 2026년 방침은 확인 못 함",
+    "source": "산업통상자원부 보도자료 「그린버튼으로 공공기관 에너지 절감 가속…여름철 합리화 추진방안과 함께 본격화」",
+    "url": "https://www.motir.go.kr/attach/down/095a2dda9c864e1d90d751f7668a1117/c7f7a3496d974d8c920f372ac221f346",
+    "date": "2025-06-26",
+    "status": "원문 확인"
+  },
+  {
+    "id": "winter-2022-crisis-precedent",
+    "title": "에너지 위기 때에도 강의실은 난방 제한에서 빠졌습니다 (2022년 선례)",
+    "summary": "2022년 겨울 에너지 위기 때 정부는 공공기관 난방을 17℃ 이하로 낮추고 부산 지역은 16:00~16:30에 난방기를 쉬게 했습니다. 하지만 학교·교육시설(사무공간 제외)은 이 온도 제한과 순차 운휴에서 제외했습니다.",
+    "numbers": {"heating_max_c": 17, "busan_rotation_start": "16:00", "busan_rotation_end": "16:30"},
+    "applies_to": "공공기관(2022~23년 겨울 한시 조치), 학교·교육시설은 제외",
+    "source": "산업통상자원부 공고 제2022-766호 「공공기관 에너지사용의 제한에 관한 공고」 제4조·제6조",
+    "url": "https://cse.snu.ac.kr/api/v1/file/1695914537553_2.%20(%EA%B3%B5%EA%B3%A0%20%EC%A0%9C2022-766%ED%98%B8)%20%EA%B3%B5%EA%B3%B5%EA%B8%B0%EA%B4%80%20%EC%97%90%EB%84%88%EC%A7%80%EC%82%AC%EC%9A%A9%EC%9D%98%20%EC%A0%9C%ED%95%9C%EC%97%90%20%EA%B4%80%ED%95%9C%20%EA%B3%B5%EA%B3%A0.pdf",
+    "date": "2022-10-11",
+    "status": "원문 확인"
+  },
+  {
+    "id": "resource-crisis-2026-guideline",
+    "title": "2026 자원안보위기 국민행동지침: 난방 20℃, 냉방 26℃ 권장",
+    "summary": "중동 사태로 2026년 4월 자원안보위기 '경계'가 발령되면서 정부는 적정 실내온도로 난방 20℃, 냉방 26℃를 권장했습니다. 이를 지키면 냉난방 에너지를 20% 이상 줄일 수 있고, 저녁 5시~8시가 전기 사용이 가장 몰리는 시간이라고 안내했습니다.",
+    "numbers": {"heating_recommended_c": 20, "cooling_recommended_c": 26, "saving_pct_min": 20, "peak_start": "17:00", "peak_end": "20:00"},
+    "applies_to": "가정·직장·공공기관 전반(권고)",
+    "source": "정책브리핑 「자원안보위기 '경계' 발령…\"함께해요, 생활 속 에너지 절약\"」",
+    "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148961542",
+    "date": "2026-04-02",
+    "status": "원문 확인"
+  },
+  {
+    "id": "resource-crisis-2026-downgrade",
+    "title": "원유 위기경보는 2026년 6월 말 '주의'로 낮아졌습니다",
+    "summary": "정부는 2026년 6월 30일 원유 자원안보 위기경보를 '경계'에서 '주의'로 한 단계 낮추고 LNG 경보는 해제했습니다. 공공기관 차량 2부제도 완화됐습니다. 11월 현재 경보 단계는 확인하지 못했습니다.",
+    "numbers": {},
+    "applies_to": "국가 에너지 위기 대응 전반",
+    "source": "아시아경제 「정부, 원유 자원안보 위기경보 '주의'로 하향…公기관 2부제→5부제 전환」",
+    "url": "https://view.asiae.co.kr/article/2026063010384617167",
+    "date": "2026-06-30",
+    "status": "보도 기준"
+  },
+  {
+    "id": "heating-1c-saving",
+    "title": "난방 온도를 1℃ 낮추면 난방 에너지가 약 7% 줄어듭니다",
+    "summary": "한국에너지공단은 겨울 적정 실내온도를 20℃로 안내하고, 난방 설정을 1℃ 낮추면 난방에 드는 에너지를 약 7% 아낄 수 있다고 봅니다. 그래서 수업에 지장이 없는 범위에서 조금 낮게 운영합니다.",
+    "numbers": {"heating_recommended_c": 20, "saving_pct_per_c": 7},
+    "applies_to": "겨울철 난방 일반",
+    "source": "중부일보 「권장 '실내온도 20℃'인데…공공기관 28~30℃ '파워난방'」 (한국에너지공단 인용)",
+    "url": "https://v.daum.net/v/20260111151804240",
+    "date": "2026-01-11",
+    "status": "보도 기준"
+  },
+  {
+    "id": "why-central-control",
+    "title": "왜 강의실 냉난방을 중앙에서 관리하나요?",
+    "summary": "개별 에어컨은 마지막으로 나간 사람이 끄지 않으면 빈 강의실에서 계속 돌아갑니다. 국내 대학 실험에서 시간표에 맞춰 빈 강의실 냉방을 끈 강의실은 그렇지 않은 강의실보다 에너지를 30~60% 적게 썼습니다. 학교는 평균 실내온도 기준을 지키고 그 실적을 정부에 보고해야 하므로 중앙에서 관리합니다.",
+    "numbers": {"saving_pct_min": 30, "saving_pct_max": 60},
+    "applies_to": "개별식 시스템 에어컨(EHP)을 쓰는 대학 강의실",
+    "source": "정기범, 「대학교 강의실 EHP 제어를 이용한 에너지 절약 시스템」, 한국안전경영과학회지 16(2), 167쪽~",
+    "url": "https://koreascience.kr/article/JAKO201421154208693.pdf",
+    "date": "2014-06",
+    "status": "원문 확인"
+  },
+  {
+    "id": "pnu-campus-ops-2020",
+    "title": "부산대 강의실 냉난방기 운영 방식 (2020년 학내 보도)",
+    "summary": "2020년 학내 보도에 따르면 부산대 강의실 냉방기는 켜고 끌 수 있지만 26℃ 아래로는 내려가지 않고, 난방은 20℃ 이하 기준을 따랐습니다. 냉난방기는 9시~18시에 가동하고 18시에 일괄로 꺼지며, 필요하면 다시 켤 수 있었습니다. 지금 운영과 다를 수 있습니다.",
+    "numbers": {"cooling_min_c": 26, "heating_max_c": 20, "auto_off_time": "18:00"},
+    "applies_to": "부산대 학내 강의실(2020년 기준)",
+    "source": "채널PNU 「온도가 야속해! 학내 냉·난방기의 속사정」",
+    "url": "https://channelpnu.pusan.ac.kr/news/articleView.html?idxno=10310",
+    "date": "2020-06-13",
+    "status": "보도 기준"
+  },
+  {
+    "id": "pnu-it-building-ops",
+    "title": "IT관 현재 운영: 중앙 설정 22℃, 개별 변경은 약 1분 뒤 원래대로",
+    "summary": "IT관 시스템 에어컨은 중앙에서 22℃로 설정되어 있고, 강의실에서 켜고 끄거나 온도를 바꾸면 약 1분 뒤 중앙 설정으로 돌아갑니다. 운영자는 정책 범위(최소~최대)만 정하고 실내기는 그 안에서 스스로 조절합니다. 공개 문서가 아니라 팀 인터뷰 내용입니다.",
+    "numbers": {"central_setpoint_c": 22, "local_override_revert_min": 1},
+    "applies_to": "부산대 IT관 강의실(2026-11 인터뷰 기준)",
+    "source": "ThermoPlan 팀 현장 인터뷰(부산대 시스템 에어컨 운영 사무실), 기록: docs/design_v2_field.md",
+    "url": "",
+    "date": "2026-11",
+    "status": "확인 못 함"
+  },
+  {
+    "id": "univ-reporting-evaluation",
+    "title": "국립대는 에너지 실적을 정부에 보고하고 평가받습니다",
+    "summary": "국립대학은 매년 1월 31일까지 에너지 절약 계획, 3월 31일까지 실적을 제출하고, 매월 전월 에너지 사용량을 홈페이지 등에 공개해야 합니다. 평가표에는 겨울·여름 적정 실내온도 준수 항목(4점)이 있고, 결과는 정부 업무평가에 반영되거나 공표될 수 있습니다.",
+    "numbers": {"plan_due": "01-31", "result_due": "03-31", "indoor_temp_compliance_points": 4},
+    "applies_to": "국립대학 및 공립대학(별표 2 제출대상 기관)",
+    "source": "기후에너지환경부고시 제2026-111호 제20조~제24조, 별표 2, 별표 3의1",
+    "url": "https://www.law.go.kr/행정규칙/공공기관에너지이용합리화추진에관한규정",
+    "date": "2026-04-30",
+    "status": "원문 확인"
+  },
+  {
+    "id": "public-building-bems-diagnosis",
+    "title": "공공건물의 BEMS·에너지진단·스마트 계량 의무",
+    "summary": "공공기관은 연면적 10,000㎡ 이상 건물을 새로 지으면 건물에너지관리시스템(BEMS)을 갖춰야 하고, 3,000㎡ 이상 업무시설 건물은 5년마다 에너지진단을 받아야 합니다. 시간대별 전력량을 재는 지능형 전력계량(AMI)도 설치해야 합니다.",
+    "numbers": {"bems_floor_area_m2": 10000, "diagnosis_floor_area_m2": 3000, "diagnosis_cycle_years": 5},
+    "applies_to": "공공기관 소유 건축물(국립대 포함). 에너지진단 대상은 건축물대장 주용도가 업무시설인 건물",
+    "source": "기후에너지환경부고시 제2026-111호 제6조제2항, 제7조, 제15조의2, 별표 1",
+    "url": "https://www.law.go.kr/행정규칙/공공기관에너지이용합리화추진에관한규정",
+    "date": "2026-04-30",
+    "status": "원문 확인"
+  },
+  {
+    "id": "univ-electricity-cost",
+    "title": "거점국립대 전기료가 2년 사이 크게 늘었습니다",
+    "summary": "부산대를 포함한 거점국립대 10곳의 전기료는 2022년 697억 원에서 2024년 980억 원으로 늘었습니다. 교육용 전기 단가도 2020년 kWh당 104원에서 2024년 143원으로 올랐습니다. 아낀 전기는 학교 예산 부담을 줄입니다.",
+    "numbers": {"flagship10_cost_2022_krw_100m": 697, "flagship10_cost_2023_krw_100m": 935, "flagship10_cost_2024_krw_100m": 980, "edu_tariff_2020_krw_kwh": 104, "edu_tariff_2024_krw_kwh": 143},
+    "applies_to": "거점국립대 10곳(서울대·부산대·경북대·전남대·충남대·전북대·충북대·강원대·경상국립대·제주대)",
+    "source": "한국경제 「[단독] 거점국립대 전기료만 年1000억…AI연구 못할 판」 (서지영 의원실 자료)",
+    "url": "https://www.hankyung.com/article/2025103166361",
+    "date": "2025-10-31",
+    "status": "보도 기준"
+  },
+  {
+    "id": "comfort-pmv-standard",
+    "title": "쾌적 기준: 체감 지수(PMV) -0.5~+0.5 안이면 대부분 쾌적합니다",
+    "summary": "국제 기준(ASHRAE 55, ISO 7730)은 체감 지수 PMV가 -0.5~+0.5 안이면 약 80% 이상이 쾌적하다고 봅니다. 실제 현장 조사에서는 이보다 더 좁게 맞춰도 만족도가 뚜렷하게 높아지지 않았습니다. 그래서 ThermoPlan은 이 범위 안에서 전기를 가장 적게 쓰는 온도를 고릅니다.",
+    "numbers": {"pmv_min": -0.5, "pmv_max": 0.5, "acceptability_pct": 80, "iso7730_ppd_max_pct_A": 6, "iso7730_ppd_max_pct_B": 10, "iso7730_ppd_max_pct_C": 15},
+    "applies_to": "기계식 냉난방 실내 공간 일반",
+    "source": "Li, Parkinson, Brager, Schiavon, Cheung, Froese, \"A data-driven approach to defining acceptable temperature ranges in buildings\", Building and Environment",
+    "url": "https://escholarship.org/uc/item/4qm4c7bk",
+    "date": "2019-02-25",
+    "status": "원문 확인"
+  }
+]
