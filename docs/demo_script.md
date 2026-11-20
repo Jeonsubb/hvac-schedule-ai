@@ -6,9 +6,9 @@
 
 ## 발표 당일 준비 (발표 1시간 전, 5분)
 
-1. `aws login --profile hvac` → `AWS_PROFILE=hvac ./infra/ec2-deploy.sh sync-login` (AI 기능은 로그인 후 12시간 동안 동작)
-2. `AWS_PROFILE=hvac ./infra/ec2-deploy.sh demo-reset` (리허설 중 등록한 이벤트·설정 초기화)
-3. `./scripts/warm_demo.sh` (대본의 AI 질문을 미리 한 번씩 실행. AI 연결이 끊겨도 같은 질문은 저장된 답으로 응답)
+1. `aws login --profile hvac` (다음 단계의 운영자 키 조회에만 필요합니다. API는 Lambda 실행 역할로 동작하므로 로그인 세션과 무관합니다)
+2. `AWS_PROFILE=hvac ./infra/deploy.sh demo-reset` (리허설 중 등록한 이벤트·설정 초기화)
+3. `./scripts/warm_demo.sh` (대본의 AI 질문을 미리 한 번씩 실행해서 Lambda 콜드 스타트를 없앱니다. AI 연결이 끊겨도 같은 질문은 저장된 답으로 응답)
 4. 상단 표시줄이 "AI 연결 정상"인지 확인
 
 ## 0. 문제와 고객 (20초)
@@ -61,5 +61,5 @@
 - **재실 감지는 진짜인가?** 강의실 재실 센서(PIR·CO₂) 또는 출결 시스템 연동을 가정한 시뮬레이션입니다. 기여는 학기 −51 kWh로 가장 작은 단계입니다.
 - **수치를 믿을 수 있나?** 설비 물리값은 가정값입니다. 같은 모델·같은 날씨·같은 현장 상황에서 기능을 하나씩 켜는 상대 비교로 보여줍니다. 실외기 곡선은 EnergyPlus VRF 예제 형태, 요금은 한전 교육용(을) 공식 요금표입니다.
 - **실제 설비 연동은?** 계획을 중앙제어기용 CSV(기기, 시각, On/Off, 설정온도)로 내보냅니다.
-- **AWS 구성은?** 웹은 CloudFront+S3, 데이터는 DynamoDB+S3, AI는 Bedrock입니다. 배포 계정에 IAM 역할 생성 권한이 없어서 API는 EC2에서 돌고, 역할만 생기면 Lambda로 바꾸는 템플릿이 준비되어 있습니다(이슈 #1).
+- **AWS 구성은?** 전부 서버리스입니다. 웹은 CloudFront+S3, API는 Lambda(Function URL), 데이터는 DynamoDB+S3, AI는 Bedrock이고, 매시 날씨 갱신은 EventBridge Scheduler가 Lambda를 부릅니다. 오래 걸리는 AI 작업(시간표 추출, 코파일럿)은 Lambda가 자기 자신을 비동기로 호출해서 처리하고, 실행 역할마다 필요한 권한만 붙였습니다.
 - **이미지 추출은 믿을 만한가?** CSV로 그린 시간표 이미지 2장에서 42/42 블록이 일치했고, 실제 휴강 공지 형식 캡처도 처리합니다. 실제 사진 정확도는 추가 검증이 필요합니다.

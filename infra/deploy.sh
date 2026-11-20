@@ -4,6 +4,7 @@
 #   AWS_PROFILE=hvac ./infra/deploy.sh lambda                 # full serverless (needs infra/admin-setup.sh done once)
 #   AWS_PROFILE=hvac ./infra/deploy.sh external <api-host>    # web + data on AWS, /api/* -> external host (e.g. tunnel)
 #   AWS_PROFILE=hvac ./infra/deploy.sh frontend               # rebuild and upload the web app only
+#   AWS_PROFILE=hvac ./infra/deploy.sh demo-reset             # remove all events, restore default rules
 # First run needs the KMA service key: KMA_KEY=... ./infra/deploy.sh ...
 set -euo pipefail
 
@@ -38,6 +39,11 @@ ensure_params() {
       --tags Key=project,Value=hvac-ai >/dev/null
   fi
   ORIGIN_SECRET="$(aws ssm get-parameter --name /hvac-ai/origin-secret --with-decryption --query Parameter.Value --output text)"
+  if ! aws ssm get-parameter --name /hvac-ai/operator-key >/dev/null 2>&1; then
+    aws ssm put-parameter --name /hvac-ai/operator-key --type SecureString --value "$(openssl rand -hex 16)" \
+      --tags Key=project,Value=hvac-ai >/dev/null
+  fi
+  OPERATOR_KEY="$(aws ssm get-parameter --name /hvac-ai/operator-key --with-decryption --query Parameter.Value --output text)"
 }
 
 build_backend() {
@@ -83,7 +89,7 @@ case "$MODE" in
   lambda)
     ensure_artifacts_bucket
     build_backend
-    deploy_stack ApiMode=lambda CodeBucket="$ART_BUCKET" CodeKey="$CODE_KEY" \
+    deploy_stack ApiMode=lambda CodeBucket="$ART_BUCKET" CodeKey="$CODE_KEY" OperatorKey="$OPERATOR_KEY" \
       FunctionRoleArn="arn:aws:iam::${ACCOUNT}:role/hvac-ai-api-role" \
       SchedulerRoleArn="arn:aws:iam::${ACCOUNT}:role/hvac-ai-scheduler-role"
     aws lambda invoke --function-name hvac-ai-api --invocation-type Event \
@@ -97,6 +103,9 @@ case "$MODE" in
     ;;
   frontend)
     deploy_frontend
+    ;;
+  demo-reset)
+    curl -s -m 60 -X POST -H "x-operator-key: $OPERATOR_KEY" "$(output SiteUrl)/api/admin/reset"; echo
     ;;
   *) echo "unknown mode $MODE" >&2; exit 1 ;;
 esac

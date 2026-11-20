@@ -28,6 +28,11 @@ Parameters:
   OriginSecret:
     Type: String
     NoEcho: true
+  OperatorKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Header value that unlocks /api/admin/reset (empty disables it)
   KmaKeyParam:
     Type: String
     Default: /hvac-ai/kma-key
@@ -96,6 +101,7 @@ Resources:
           DATA_BUCKET: !Ref DataBucket
           TABLE_NAME: !Ref Table
           ORIGIN_SECRET: !Ref OriginSecret
+          OPERATOR_KEY: !Ref OperatorKey
           KMA_KEY_PARAM: !Ref KmaKeyParam
           BEDROCK_REGION: !Ref AWS::Region
           MODEL_SONNET: global.anthropic.claude-sonnet-5-5

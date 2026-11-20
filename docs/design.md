@@ -156,8 +156,8 @@ EventBridge Scheduler (매시) ─▶ 같은 Lambda (날씨 수집 → 오늘·�
 
 | 영역 | 설계 당시 | 현재 구현 | 이유 |
 |---|---|---|---|
-| 배포 | Lambda + EventBridge | CloudFront·S3·DynamoDB는 그대로, API는 EC2(Caddy HTTPS) + systemd 타이머 | 배포 사용자에게 IAM 역할 생성 권한이 없음. 관리자가 `infra/admin-setup.sh`를 실행하면 `deploy.sh lambda`로 전환 (이슈 #1) |
-| 저장소 | DynamoDB + S3 | `ResilientStore`: AWS에 쓰고 로컬 디스크에 미러, AWS 실패 시 미러로 계속 서비스 | 역할 없는 호스트는 운영자 로그인 세션(최대 12시간)을 빌려 쓰므로 만료에 대비 |
+| 배포 | Lambda + EventBridge | 설계대로 Lambda(Function URL) + EventBridge Scheduler | 11/20 오후까지는 배포 사용자에게 IAM 역할 생성 권한이 없어서 API를 EC2(Caddy HTTPS) + systemd 타이머로 임시 운영했습니다. 권한이 생긴 뒤 `infra/admin-setup.sh` → `deploy.sh lambda`로 전환하고 EC2는 삭제했습니다 (이슈 #1) |
+| 저장소 | DynamoDB + S3 | DynamoDB + S3를 직접 사용(`AwsStore`). `ResilientStore`(로컬 미러)는 `LOCAL_MIRROR`를 지정했을 때만 사용 | 로컬 미러는 EC2가 운영자 로그인 세션(최대 12시간)을 빌려 쓰던 시기에 만료에 대비하려고 만든 계층입니다. Lambda는 실행 역할을 쓰므로 필요하지 않습니다 |
 | 열모델 | 2R2C | 2R2C + 환기(전열교환기 60%) + 인접 공간 결합(구조체-복도·옆방) | 리뷰 지적(날씨 영향 미미, 비현실적 저온) |
 | 실외기 | 부분부하 곡선만 | 실외기 용량 제약(요청 합이 용량 초과 시 비례 축소) + EnergyPlus VRF 예제 형태의 부분부하 곡선 | 동시 기동 포화를 표현해야 예열 판단이 현실적 |
 | AI 예열 | 정격 출력 기준 최적 기동 | 실외기 분담 출력과 60% 저부하 예열 중 도달 가능하고 전력이 적은 쪽 | 월요일 아침 동시 기동 포화 해결 |

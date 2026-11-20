@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the ThermoPlan API on this machine against the AWS data store (S3 + DynamoDB + Bedrock)
 # and expose it through a Cloudflare quick tunnel so CloudFront can use it as the /api origin.
-# Used while Lambda execution roles are unavailable (see infra/admin-setup.sh).
+# Emergency fallback when the Lambda API is unavailable; uses this Mac's `aws login` session (max 12 h).
 #
 #   AWS_PROFILE=hvac ./infra/run-local-api.sh start   # prints the tunnel host
 #   ./infra/run-local-api.sh stop

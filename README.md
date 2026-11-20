@@ -36,19 +36,22 @@ _2026-11-20T02:53+09:00 기준 배포 API에서 자동 생성 (엔진 v13)._
 
 ## 구성
 
-현재 운영 구성입니다. 배포 사용자에게 IAM 역할 생성 권한이 없어서 API만 EC2에서 실행합니다([이슈 #1](https://github.com/Jeonsubb/hvac-schedule-ai/issues/1)).
+서버 없이 관리형 서비스로만 운영합니다. 그림: [docs/architecture.png](docs/architecture.png)
 
 ```
 브라우저 ─▶ CloudFront ─┬─ /*      ─▶ S3 (React 정적 파일, OAC)
-                        └─ /api/*  ─▶ EC2 t4g.small (Caddy HTTPS → FastAPI, 비밀 헤더 검사)
-                                         ├─ DynamoDB (강의·이벤트·설정·변경기록·작업)
-                                         ├─ S3 (날짜별 계산 결과, 날씨 캐시)  + 로컬 미러(ResilientStore)
+                        └─ /api/*  ─▶ Lambda Function URL (FastAPI + Mangum, arm64, 비밀 헤더 검사)
+                                         ├─ DynamoDB (강의·이벤트·설정·변경기록·작업 상태)
+                                         ├─ S3 (날짜별 계산 결과, 날씨 캐시, 큰 작업 결과)
                                          ├─ Amazon Bedrock (Claude Sonnet 5.5 / Haiku 5.5)
+                                         ├─ SSM Parameter Store (기상청 인증키)
                                          └─ 기상청 API(공공데이터포털), Open-Meteo
-EC2 systemd 타이머 (매시 20분) ─▶ 날씨 수집 → 예보 스냅숏 저장 → 바뀐 날짜만 재계산
+EventBridge Scheduler (매시 20분) ─▶ Lambda: 날씨 수집 → 예보 스냅숏 저장 → 바뀐 날짜만 재계산
 ```
 
-목표 구성(`infra/template.yaml`의 `ApiMode=lambda`)은 API를 Lambda Function URL로, 매시 작업을 EventBridge Scheduler로 옮깁니다. 관리자가 `infra/admin-setup.sh`를 한 번 실행하면 `./infra/deploy.sh lambda`로 전환합니다.
+- 오래 걸리는 AI 작업(시간표 이미지 추출, 코파일럿)은 작업 상태를 DynamoDB에 기록하고, Lambda가 자기 자신을 비동기로 호출해서 처리합니다. 화면은 작업 상태를 조회해서 결과를 받습니다. 재시도가 와도 같은 작업을 다시 실행하지 않습니다.
+- 실행 역할은 두 개입니다. API 역할(`hvac-ai-api-role`)은 이 프로젝트의 테이블·버킷·파라미터와 Bedrock 모델 호출만 허용하고, 스케줄러 역할(`hvac-ai-scheduler-role`)은 Lambda 호출만 허용합니다(`infra/admin-setup.sh`).
+- 모든 리소스는 CloudFormation 스택 `hvac-ai`(`infra/template.yaml`) 하나로 관리합니다.
 
 | 경로 | 내용 |
 |---|---|
@@ -80,16 +83,15 @@ cd ../frontend && npm install && npm run dev   # http://localhost:5173 (/api →
 
 ## 배포
 
-배포 사용자(`hvac-dev-donghun`)에게는 IAM 역할 생성 권한이 없습니다. 그래서 두 가지 모드를 지원합니다.
-
 | 모드 | 구성 | 명령 |
 |---|---|---|
-| `lambda` (목표) | CloudFront + S3 웹, Lambda API, DynamoDB + S3 데이터, Bedrock, EventBridge 매시 갱신 | 관리자가 CloudShell에서 `infra/admin-setup.sh`를 한 번 실행한 뒤 `AWS_PROFILE=hvac ./infra/deploy.sh lambda` |
-| `external` (현재) | CloudFront + S3 웹, DynamoDB + S3 데이터, Bedrock은 그대로이고 API 서버만 로컬 Mac에서 실행해 Cloudflare 터널로 연결 | `AWS_PROFILE=hvac ./infra/run-local-api.sh start` → `AWS_PROFILE=hvac ./infra/deploy.sh external "$(cat infra/.run/tunnel.host)"` |
+| `lambda` (현재) | CloudFront + S3 웹, Lambda API, DynamoDB + S3 데이터, Bedrock, EventBridge 매시 갱신 | 처음 한 번 `AWS_PROFILE=hvac bash infra/admin-setup.sh`로 실행 역할을 만든 뒤 `AWS_PROFILE=hvac ./infra/deploy.sh lambda` |
+| `external` (비상용) | Lambda에 문제가 생겼을 때 API만 로컬 Mac에서 실행하고 Cloudflare 터널로 연결합니다. 웹·데이터·Bedrock은 그대로입니다. Mac의 로그인 세션을 쓰므로 최대 12시간만 동작합니다. | `AWS_PROFILE=hvac ./infra/run-local-api.sh start` → `AWS_PROFILE=hvac ./infra/deploy.sh external "$(cat infra/.run/tunnel.host)"` |
 
 - 기상청 키는 처음 한 번 `KMA_KEY=<인증키>`로 넘기면 SSM Parameter Store(SecureString)에 저장됩니다.
 - API는 CloudFront만 아는 비밀 헤더가 없으면 403으로 거절합니다.
 - 프런트엔드만 다시 올릴 때: `AWS_PROFILE=hvac ./infra/deploy.sh frontend`
+- 데모 초기화(이벤트 삭제, 운영 규칙과 시간표를 원본으로 복원): `AWS_PROFILE=hvac ./infra/deploy.sh demo-reset`. API는 SSM의 운영자 키가 헤더에 있어야만 초기화를 실행합니다.
 
 ## 가정과 한계
 
