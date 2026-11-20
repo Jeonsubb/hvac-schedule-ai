@@ -88,7 +88,7 @@ export default function Energy() {
         }
       />
 
-      <section className="rounded-[16px] border border-line bg-surface" aria-label="절감 요약">
+      <section data-tour="energy-hero" className="rounded-[16px] border border-line bg-surface" aria-label="절감 요약">
         <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
         <div className="border-t border-line px-8 pt-7 pb-6">
           <WaterfallSection A={A} attr={attr} broken={attrBroken} />

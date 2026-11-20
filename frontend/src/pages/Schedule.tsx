@@ -71,7 +71,7 @@ export default function Schedule() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div data-tour="sch-calendar" className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <MonthCalendar
           month={month}
           onMonth={(m) => set({ m })}
@@ -86,7 +86,7 @@ export default function Schedule() {
         <DayPanel ds={ds} day={day.data?.date === date ? day.data : undefined} date={date} isFuture={date > (summary.data?.today ?? today)} />
       </div>
 
-      <Card className="mt-6" pad={false}>
+      <Card className="mt-6" pad={false} data-tour="sch-timeline">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
           <div>
             <h2 className="flex items-center gap-2.5 text-[20px] font-bold tracking-[-0.02em] text-ink">

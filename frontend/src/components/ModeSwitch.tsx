@@ -127,7 +127,7 @@ export default function ModeSwitch() {
   const pending = Number(m.pending) || 0
 
   return (
-    <div className="hidden items-center gap-2 md:flex">
+    <div data-tour="mode" className="hidden items-center gap-2 md:flex">
       <div className="inline-flex rounded-[10px] bg-[#eef0f4] p-[3px]" role="radiogroup" aria-label="운전 모드">
         {opts.map((o) => {
           const on = m.mode === o.key

@@ -176,7 +176,7 @@ export default function Validation() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div data-tour="val-main" className="grid grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
         <Card pad={false} className="self-start">
           <div className="px-5 pt-5 pb-3">
             <h2 className="text-[17px] font-[650] text-ink">이상이 있었던 날</h2>

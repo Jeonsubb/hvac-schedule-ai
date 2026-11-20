@@ -20,6 +20,8 @@ export function Card({
   as?: 'section' | 'div'
   'aria-label'?: string
   'aria-labelledby'?: string
+  /** chapter tour anchor */
+  'data-tour'?: string
 }) {
   return (
     <As className={cx('rounded-[14px] border border-line bg-surface', pad === true && 'p-6', pad === 'dense' && 'p-5', pad === 'lg' && 'p-8', className)} {...rest}>

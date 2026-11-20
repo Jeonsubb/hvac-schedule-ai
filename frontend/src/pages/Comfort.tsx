@@ -372,7 +372,7 @@ export default function Comfort() {
       />
 
       <div className="space-y-6">
-        <Card>
+        <Card data-tour="comfort-rooms">
           <CardHeader
             title="강의실별 체감"
             sub="재실자·운영자 의견의 평균입니다. -3은 춥다, 0은 적당하다, +3은 덥다입니다. 강의실을 누르면 아래 목록과 시간대 표가 그 강의실만 보여 줍니다."
@@ -387,7 +387,7 @@ export default function Comfort() {
           <RoomTiles s={s} sel={sel} onSel={(r) => setParam('room', r)} />
         </Card>
 
-        <Card>
+        <Card data-tour="comfort-hours">
           <CardHeader title={sel ? `${sel}호 시간대별 의견` : '강의실 × 시간대 의견'} sub="같은 시간대에 의견이 반복되면 그 시간의 예열·예냉이나 설정온도를 조정할 근거가 됩니다." />
           <HourGrid s={s} sel={sel} />
         </Card>
@@ -417,7 +417,7 @@ export default function Comfort() {
             )}
           </Card>
           <div className="space-y-6">
-            <Card>
+            <Card data-tour="comfort-form">
               <CardHeader title="운영자가 받은 의견 등록" sub="전화·메일·민원 게시판으로 들어온 불편도 같은 형식으로 남기면 스케줄 판단에 쓰입니다." />
               <OperatorForm key={sel ?? 'all'} defaultRoom={sel} onSent={reloadAll} />
             </Card>

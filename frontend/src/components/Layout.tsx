@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
-import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut } from 'lucide-react'
+import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText } from 'lucide-react'
 import { useMeta, useCopilot } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import { cx, fmtDateK, fmtMin } from '../lib/format'
@@ -9,6 +9,8 @@ import { useApi } from '../lib/api'
 import type { Live } from '../lib/types'
 import { Popover, Spinner, ToastHost } from './ui'
 import ModeSwitch from './ModeSwitch'
+import TourOverlay from './TourOverlay'
+import { useTour } from '../lib/tour'
 
 const Copilot = lazy(() => import('./Copilot'))
 
@@ -190,6 +192,7 @@ function ClockPill() {
 
 function TopBar() {
   const { open, setOpen } = useCopilot()
+  const tour = useTour()
   const loc = useLocation()
   const g = groupOf(loc.pathname)
   return (
@@ -203,6 +206,14 @@ function TopBar() {
           <div className="hidden truncate text-[20px] font-bold tracking-[-0.02em] text-ink lg:block">{g.label}</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => tour.start(0)}
+            title="화면을 챕터별로 하나씩 안내합니다"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-[13.5px] font-semibold text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink"
+          >
+            <BookOpenText size={15} aria-hidden /> 챕터로 보기
+          </button>
           <ModeSwitch />
           <SystemStatus />
           <ClockPill />
@@ -338,6 +349,13 @@ function MobileNav() {
 }
 
 export default function Layout() {
+  const tour = useTour()
+  const { user } = useAuth()
+  // the demo account sees the chapter tour once, on its first visit (the full screens are dense)
+  useEffect(() => {
+    if (user?.id === '부산대학교' && !tour.seen()) tour.start(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
   const { open } = useCopilot()
   const loc = useLocation()
   // load the copilot (markdown renderer, cards) the first time it is opened, then keep it mounted
@@ -377,6 +395,7 @@ export default function Layout() {
           </ErrorBoundary>
         </Suspense>
       )}
+      <TourOverlay />
       <ToastHost />
     </div>
   )

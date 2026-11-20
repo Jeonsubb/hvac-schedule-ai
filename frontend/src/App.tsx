@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { CopilotProvider, MetaProvider } from './lib/context'
 import { AuthProvider, RequireAuth } from './lib/auth'
+import { TourProvider } from './lib/tour'
 import { PageSkeleton } from './components/ui'
 
 const Overview = lazy(() => import('./pages/Overview'))
@@ -29,6 +30,7 @@ function page(el: React.ReactNode) {
 export default function App() {
   return (
     <AuthProvider>
+      <TourProvider>
       <MetaProvider>
         <CopilotProvider>
           <Routes>
@@ -60,6 +62,7 @@ export default function App() {
           </Routes>
         </CopilotProvider>
       </MetaProvider>
+      </TourProvider>
     </AuthProvider>
   )
 }

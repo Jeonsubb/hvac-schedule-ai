@@ -111,7 +111,9 @@ export default function Plan() {
         }
       />
 
-      <TierPipeline tier={t} onChange={(n) => set({ tier: String(n), debate: n === 1 ? null : params.get('debate') })} />
+      <div data-tour="plan-tiers">
+        <TierPipeline tier={t} onChange={(n) => set({ tier: String(n), debate: n === 1 ? null : params.get('debate') })} />
+      </div>
 
       {res.error && !plan ? (
         <div className="mt-6">
@@ -123,15 +125,25 @@ export default function Plan() {
         </div>
       ) : (
         <div className={cx('mt-6 space-y-6 transition-opacity duration-200', res.loading && 'opacity-60')}>
-          <SummaryRow plan={plan} onDebate={t === 1 ? undefined : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} />
-          <SourcesStrip sources={plan.sources} />
-          <TierVisual plan={plan} meta={meta} />
+          <div data-tour="plan-summary">
+            <SummaryRow plan={plan} onDebate={t === 1 ? undefined : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} />
+          </div>
+          <div data-tour="plan-sources">
+            <SourcesStrip sources={plan.sources} />
+          </div>
+          <div data-tour="plan-visual">
+            <TierVisual plan={plan} meta={meta} />
+          </div>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <ChecksCard checks={plan.checks} />
-            <AdjustmentsCard items={plan.adjustments} mode={plan.mode} onChanged={() => invalidateAll()} />
+            <div data-tour="plan-checks" className="min-w-0">
+              <ChecksCard checks={plan.checks} />
+            </div>
+            <div data-tour="plan-adjustments" className="min-w-0">
+              <AdjustmentsCard items={plan.adjustments} mode={plan.mode} onChanged={() => invalidateAll()} />
+            </div>
           </div>
           {t !== 1 && debateOpen && (
-            <section id="debate" className="scroll-mt-24">
+            <section id="debate" data-tour="plan-debate" className="scroll-mt-24">
               <AgentDebate tier={t as 2 | 3} date={anchor} mode={plan.mode} onChanged={() => invalidateAll()} />
             </section>
           )}

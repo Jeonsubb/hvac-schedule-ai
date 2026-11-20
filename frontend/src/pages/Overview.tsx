@@ -80,7 +80,7 @@ export default function Overview() {
   return (
     <div>
       {/* the page's answer: one sentence from the data + three key numbers */}
-      <header className="mb-6 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+      <header data-tour="ov-summary" className="mb-6 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[26px] leading-[1.2] font-bold tracking-[-0.025em] text-[#2b3447]">운영 현황</h1>
@@ -139,7 +139,7 @@ export default function Overview() {
         </section>
       ) : (
         /* hero: the building as floor plates */
-        <section className="rounded-[14px] border border-line bg-surface" aria-labelledby="bv-title">
+        <section data-tour="ov-building" className="rounded-[14px] border border-line bg-surface" aria-labelledby="bv-title">
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <h2 id="bv-title" className="text-[17px] font-[650] tracking-[-0.01em] text-ink">
@@ -176,7 +176,7 @@ export default function Overview() {
           <div className="px-5 pt-4 pb-2">
             <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={showOdus} />
           </div>
-          <div className="border-t border-line px-7 pt-9 pb-6">
+          <div data-tour="ov-time" className="border-t border-line px-7 pt-9 pb-6">
             {D ? (
               <TimeScrubber day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
             ) : day.error ? (
