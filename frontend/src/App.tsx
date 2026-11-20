@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import { CopilotProvider, MetaProvider } from './lib/context'
+import { CopilotProvider, DayProvider, MetaProvider } from './lib/context'
 import { AuthProvider, RequireAuth } from './lib/auth'
 import { TourProvider } from './lib/tour'
 import { PageSkeleton } from './components/ui'
@@ -31,6 +31,7 @@ export default function App() {
     <AuthProvider>
       <TourProvider>
       <MetaProvider>
+        <DayProvider>
         <CopilotProvider>
           <Routes>
             <Route path="welcome" element={page(<Welcome />)} />
@@ -59,6 +60,7 @@ export default function App() {
             </Route>
           </Routes>
         </CopilotProvider>
+        </DayProvider>
       </MetaProvider>
       </TourProvider>
     </AuthProvider>

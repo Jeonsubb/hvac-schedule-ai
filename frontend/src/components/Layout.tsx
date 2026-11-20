@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
 import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText, Settings as SettingsIcon } from 'lucide-react'
 import { Wordmark } from './PublicShell'
-import { useMeta, useCopilot } from '../lib/context'
+import { useMeta, useCopilot, useDay } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import { cx, fmtDateK, fmtMin } from '../lib/format'
 import { useApi } from '../lib/api'
@@ -14,29 +14,35 @@ import { useTour } from '../lib/tour'
 
 const Copilot = lazy(() => import('./Copilot'))
 
-/** Two sections only (v5): the other screens live as tabs inside them. */
+/** Three sections in the order of the work: see the day, change the timetable, let the agents review it. */
 export const NAV_GROUPS = [
   {
     to: '/',
-    label: '운전 현황',
+    label: '운영 현황',
     icon: LayoutDashboard,
-    desc: '지금 건물 상태, 절감 효과, 쾌적 의견, 운영 규칙',
+    desc: '선택한 날짜의 전체 운전계획과 예상 효과',
     tabs: [
       { to: '/', label: '현황' },
       { to: '/comfort', label: '쾌적 의견' },
     ],
   },
   {
-    to: '/schedule',
-    label: '스케줄 타임라인',
+    to: '/data',
+    label: '일정 관리',
     icon: CalendarRange,
-    desc: '운전 타임라인, AI 1·2·3차 스케줄, 정합성 검증, 일정·데이터',
+    desc: '시간표 업로드, 특별 일정 등록, 달력',
     tabs: [
-      { to: '/schedule', label: '타임라인' },
-      { to: '/plan', label: 'AI 스케줄링' },
+      { to: '/data', label: '시간표·일정' },
+      { to: '/schedule', label: '달력' },
       { to: '/validation', label: '정합성 검증' },
-      { to: '/data', label: '일정·데이터' },
     ],
+  },
+  {
+    to: '/plan',
+    label: 'AI 최적화',
+    icon: Sparkles,
+    desc: '비용·쾌적 Agent의 설정온도 협의와 협의 전후 비교',
+    tabs: [{ to: '/plan', label: 'AI 최적화' }],
   },
   {
     to: '/settings',
@@ -195,6 +201,35 @@ function AccountMenu() {
   )
 }
 
+/** The reference date of every screen, and a standing reminder that all building values are simulated. */
+function DayPicker() {
+  const { meta } = useMeta()
+  const { date, setDate } = useDay()
+  return (
+    <div className="flex items-center gap-2">
+      <label className="sr-only" htmlFor="ond-date">
+        기준 날짜
+      </label>
+      <input
+        id="ond-date"
+        type="date"
+        className="tnum h-10 max-w-[150px] rounded-full border border-line bg-surface px-3 text-[14px] font-medium text-ink sm:max-w-none sm:px-3.5"
+        value={date ?? ''}
+        min={meta?.semester.start}
+        max={meta?.semester.end}
+        onChange={(e) => e.target.value && setDate(e.target.value)}
+        title="모든 화면의 기준 날짜입니다. 수업이 있는 평일을 고르세요."
+      />
+      <span
+        className="hidden h-7 items-center rounded-full border border-line px-2.5 text-[12.5px] font-semibold whitespace-nowrap text-ink-2 md:inline-flex"
+        title="실내온도·CO₂·PMV·전력·냉난방 운전은 모두 시뮬레이션 또는 추정값입니다. 실제 건물 센서나 냉난방 설비와 연결되어 있지 않습니다."
+      >
+        시뮬레이션
+      </span>
+    </div>
+  )
+}
+
 function TopBar() {
   const { open, setOpen } = useCopilot()
   return (
@@ -207,17 +242,18 @@ function TopBar() {
           <MainNav />
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <DayPicker />
           <button
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             className={cx(
-              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-[14px] font-semibold transition-colors duration-200',
+              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-3 text-[14px] font-semibold transition-colors duration-200 sm:px-4',
               open ? 'border border-[rgb(12_14_19/0.18)] bg-surface text-ink hover:border-[rgb(12_14_19/0.5)]' : 'bg-ink text-white hover:bg-[#2a2e37]',
             )}
           >
             {open ? <X size={16} aria-hidden /> : <Sparkles size={16} className="text-[#8fb3f0]" aria-hidden />}
-            {open ? '코파일럿 닫기' : 'AI 코파일럿'}
+            <span className="max-sm:sr-only">{open ? '도우미 닫기' : 'AI 도우미'}</span>
           </button>
           <AccountMenu />
         </div>

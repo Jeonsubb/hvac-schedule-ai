@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -17,7 +17,7 @@ import {
   Check,
 } from 'lucide-react'
 import { apiSend, invalidateAll, useApi } from '../lib/api'
-import { useMeta } from '../lib/context'
+import { useDay, useMeta } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import { Link } from 'react-router-dom'
 import type { Adjustment, DataSource, Meta, TierCheck, TierDay, TierPlan, TierRoomRow, TierRun, TierRuns, Verdict } from '../lib/types'
@@ -27,6 +27,7 @@ import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } f
 import { BRAND, HATCH, NowLine, PillChip, ROOM_TYPE_TONE, RoomTypeIcon, TimePills, pct } from '../components/Gantt'
 import { ORIGIN_META, SourceIcon, sourceMeta } from '../components/dataSources'
 import AgentDebate from '../components/AgentDebate'
+import AgentOptimize from '../components/AgentOptimize'
 import { AgentAvatar } from '../components/Characters'
 import { Button, Card, CardHeader, Disclosure, DisclosureList, Empty, ErrorBox, Figure, PageHeader, PageSkeleton, Segmented, Spinner, btnCls, inputBase, toast } from '../components/ui'
 import ChangeResponse from '../components/ChangeResponse'
@@ -70,7 +71,20 @@ export default function Plan() {
   const [params, setParams] = useSearchParams()
   const tier = (Number(params.get('tier')) || 3) as TierN
   const t: TierN = tier === 1 || tier === 2 || tier === 3 ? tier : 3
-  const date = params.get('date')
+  // one reference date for every screen: a ?date= link sets it, then the top bar owns it
+  const day = useDay()
+  const linked = params.get('date')
+  useEffect(() => {
+    if (!linked) return
+    if (/^\d{4}-\d{2}-\d{2}$/.test(linked) && linked !== day.date) day.setDate(linked)
+    const p = new URLSearchParams(params)
+    p.delete('date')
+    setParams(p, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked])
+  const date = linked ?? day.date ?? null
+  // the agent negotiation is the page; the 1·2·3차 tier checks stay one switch away (and behind ?tier= links)
+  const view: 'agents' | 'tiers' = params.get('tier') || params.get('view') === 'tiers' ? 'tiers' : 'agents'
   const debateOpen = params.get('debate') === '1'
   // the plan is computed when the operator asks (RunGate); until then nothing is fetched or shown
   const runs = useApi<TierRuns>('/api/plan/runs', { maxAgeMs: 10_000 })
@@ -92,6 +106,28 @@ export default function Plan() {
 
   const anchor = date ?? plan?.period.start ?? meta?.now.date ?? isoDate(new Date())
   const { user } = useAuth()
+  const viewSwitch = (
+    <Segmented
+      label="화면"
+      value={view}
+      onChange={(v) => set({ view: v === 'tiers' ? 'tiers' : null, tier: null, debate: null })}
+      options={[
+        { value: 'agents', label: 'AI 협의' },
+        { value: 'tiers', label: '단계별 계획 검증' },
+      ]}
+    />
+  )
+  if (user?.applied !== false && view === 'agents')
+    return (
+      <div>
+        <PageHeader
+          title="AI 최적화"
+          desc="비용·쾌적 두 Agent가 설정온도를 협의하고, 물리 시뮬레이터가 검증한 결과를 같은 조건의 협의 전후로 비교합니다."
+          right={viewSwitch}
+        />
+        {meta ? <AgentOptimize date={anchor} meta={meta} /> : <PageSkeleton label="불러오는 중…" />}
+      </div>
+    )
   if (user?.applied === false)
     return (
       <div>
@@ -114,10 +150,11 @@ export default function Plan() {
   return (
     <div>
       <PageHeader
-        title="AI 스케줄링"
-        desc="1차 월간 계획을 2차 주간, 3차 일일 데이터로 다시 검증하고, 맞지 않으면 조정합니다."
+        title="AI 최적화 · 단계별 계획 검증"
+        desc="1차 월간 계획을 2차 주간, 3차 일일 데이터로 다시 검증하고, 맞지 않으면 조정합니다. 이 검증에는 LLM 호출이 없습니다."
         right={
           <>
+            {viewSwitch}
             <label className="sr-only" htmlFor="plan-date">
               기준 날짜
             </label>
@@ -129,7 +166,11 @@ export default function Plan() {
               value={anchor}
               min={meta?.semester.start}
               max={meta?.semester.end}
-              onChange={(e) => set({ date: e.target.value || null })}
+              onChange={(e) => {
+                if (!e.target.value) return
+                day.setDate(e.target.value)
+                set({ date: null })
+              }}
             />
           </>
         }
@@ -170,7 +211,7 @@ export default function Plan() {
           ) : null}
           {tr.err && <ErrorBox title="다시 계산하지 못했습니다" error={tr.err} />}
           <div data-tour="plan-summary" className="reveal">
-            <SummaryRow plan={plan} run={ran} onRerun={tr.start} rerunning={tr.running} onDebate={t === 1 ? undefined : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} />
+            <SummaryRow plan={plan} run={ran} onRerun={tr.start} rerunning={tr.running} onDebate={t === 1 ? undefined : t === 3 ? () => set({ view: null, tier: null, debate: null }) : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} toAgents={t === 3} />
           </div>
           {ran?.scenarios && ran.scenarios.scenarios?.length > 0 && <ScenarioCard r={ran.scenarios} />}
           {t === 3 && <ChangeResponse />}
@@ -201,7 +242,7 @@ export default function Plan() {
               </Disclosure>
             </DisclosureList>
           </div>
-          {t !== 1 && debateOpen && (
+          {t === 2 && debateOpen && (
             <section id="debate" data-tour="plan-debate" className="scroll-mt-24">
               <AgentDebate tier={t as 2 | 3} date={anchor} mode={plan.mode} onChanged={() => invalidateAll()} />
             </section>
@@ -253,6 +294,7 @@ function SummaryRow({
   rerunning,
   onDebate,
   debateOpen,
+  toAgents = false,
 }: {
   plan: TierPlan
   run?: TierRun
@@ -260,6 +302,7 @@ function SummaryRow({
   rerunning?: boolean
   onDebate?: () => void
   debateOpen: boolean
+  toAgents?: boolean
 }) {
   const s = plan.summary
   const counts = { ok: 0, adjust: 0, review: 0 }
@@ -293,9 +336,9 @@ function SummaryRow({
                   <AgentAvatar agent="occupant" size={32} className="ring-2 ring-white" />
                 </span>
                 <MessagesSquare size={16} aria-hidden />
-                {debateOpen ? '에이전트 협의 닫기' : '에이전트 협의 열기'}
+                {toAgents ? 'AI 협의 화면으로' : debateOpen ? '에이전트 협의 닫기' : '에이전트 협의 열기'}
               </button>
-              <span className="text-[13.5px] text-ink-3">관리자 온디(요금·전력)와 사용자 온디(쾌적)가 설정온도를 두고 협의합니다.</span>
+              <span className="text-[13.5px] text-ink-3">비용 Agent와 쾌적 Agent가 설정온도를 두고 협의합니다. 켜고 끄는 시각은 엔진이 계산합니다.</span>
             </div>
           )}
         </div>

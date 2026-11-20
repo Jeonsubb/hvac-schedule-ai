@@ -614,6 +614,36 @@ def latest_negotiation(tier: int = 3, date: str | None = None):
     return res
 
 
+@app.get("/api/negotiate/compare")
+def negotiation_compare(date: str | None = None):
+    """Before/after of the latest daily negotiation: both ON/OFF plans, energy, comfort, and whether the
+    timetable/weather/rules it was computed from are still the current ones. state='none' when never negotiated."""
+    from . import agents, planning
+
+    d = _date(date) if date else planning.plan_date()
+    res = agents.compare(d)
+    if not res:
+        return {"date": d.isoformat(), "state": "none", "mode": planning.mode()["mode"],
+                "current_inputs": agents.inputs_of(d, service.Ctx())}
+    return res
+
+
+@app.get("/api/iaq/{d}")
+def day_iaq(d: str):
+    """Estimated CO2 and head count per room (15-minute steps): computed from expected people and the
+    ventilation plan, not measured by a sensor."""
+    from . import planning
+
+    dd = _date(d)
+    ctx = service.Ctx()
+    day = service.get_day(dd, ctx)
+    rooms = {}
+    for r in config.ROOMS:
+        q = planning.room_iaq(dd, r, ctx, day)
+        rooms[r] = {"co2": q["co2"], "people": q["people"]}
+    return {"date": dd.isoformat(), "step_min": 15, "source": "estimated", "co2_max": planning.policy()["co2_max"], "rooms": rooms}
+
+
 # ---------------------------------------------------------------- simulation lab (sandbox)
 
 @app.post("/api/lab/run")

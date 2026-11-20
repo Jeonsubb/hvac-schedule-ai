@@ -12,10 +12,10 @@ import { cx } from '../lib/format'
 export type AgentKey = 'building' | 'occupant' | 'arbiter' | 'simulator'
 
 export const AGENT_META: Record<AgentKey, { name: string; role: string; color: string; bg: string; ink: string; tint: string }> = {
-  building: { name: '관리자 온디', role: '관리자 에이전트 · 에너지와 요금', color: '#3d6fb6', bg: '#e9f0fa', ink: '#24508f', tint: '#b9d0f5' },
-  occupant: { name: '사용자 온디', role: '건물 이용자 · 쾌적', color: '#e8894f', bg: '#fdf0e7', ink: '#a8521f', tint: '#f8c9a6' },
+  building: { name: '비용 Agent · 관리자 온디', role: '비용 Agent · 에너지와 요금', color: '#3d6fb6', bg: '#e9f0fa', ink: '#24508f', tint: '#b9d0f5' },
+  occupant: { name: '쾌적 Agent · 사용자 온디', role: '쾌적 Agent · 수업 중 쾌적', color: '#e8894f', bg: '#fdf0e7', ink: '#a8521f', tint: '#f8c9a6' },
   simulator: { name: '시뮬레이터', role: '열모델로 제안 검증', color: '#14a673', bg: '#e6f5ee', ink: '#0d7f5a', tint: '#e6f5ee' },
-  arbiter: { name: '판정', role: '두 안의 합의 정리', color: '#6250d6', bg: '#efedfb', ink: '#4a3aa7', tint: '#efedfb' },
+  arbiter: { name: '판정 (결정적 규칙)', role: '두 안의 합의 정리 · LLM 아님', color: '#6250d6', bg: '#efedfb', ink: '#4a3aa7', tint: '#efedfb' },
 }
 
 /** One Ondy, tinted for its side. Shows the face (cropped from the mascot drawing) inside a disc with a thin ring in the side's colour. */

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   BookOpen,
   Upload,
@@ -19,7 +19,7 @@ import {
   HelpCircle,
 } from 'lucide-react'
 import { ApiError, apiSend, invalidateAll, pollJob, useApi } from '../lib/api'
-import { useMeta } from '../lib/context'
+import { useDay, useMeta } from '../lib/context'
 import type { AuditRec, Course, EventDraft, EventRec, EventResult, ImportPreview, ImportResponse, StrategyKey } from '../lib/types'
 import { EVENT_TYPE, ROOM_ORDER, STRATEGY, WEEKDAY } from '../lib/constants'
 import { EventCheckPanel, eventBody, useEventCheck } from '../components/EventCheck'
@@ -484,7 +484,15 @@ function ImportTab() {
             )}
             {committed ? (
               <Note tone="good" icon={<CheckCircle2 size={15} aria-hidden />}>
-                반영했습니다. 주간 강의 {committed.weekly}개, 일회성 일정 {committed.dated}개로 운전 계획을 다시 계산했습니다.
+                반영했습니다. 주간 강의 {committed.weekly}개, 일회성 일정 {committed.dated}개로 기본 운전계획을 다시 계산했습니다. AI 협의는 아직 실행하지 않았습니다.
+                <span className="mt-2 flex flex-wrap gap-2">
+                  <Link to="/plan" className={btnCls('primary', 'sm')}>
+                    <Sparkles size={14} aria-hidden /> AI 협의로 개선안 검토
+                  </Link>
+                  <Link to="/" className={btnCls('secondary', 'sm')}>
+                    운영 현황 타임라인에서 보기
+                  </Link>
+                </span>
               </Note>
             ) : (
               <div className="flex items-center justify-between gap-3 border-t border-line pt-4">
@@ -1065,6 +1073,7 @@ export function EventForm({
 export function BeforeAfter({ r }: { r: EventResult }) {
   const b = r.before
   const a = r.after
+  const { setDate } = useDay()
   const keys: StrategyKey[] = ['ai', 'rule', 'manual', 'fixed']
   return (
     <div className="fade-in space-y-4">
@@ -1075,8 +1084,19 @@ export function BeforeAfter({ r }: { r: EventResult }) {
       </Note>
       <div className="grid grid-cols-3 gap-2">
         <CmpCell label="강의·일정" before={`${b.sessions}건`} after={`${a.sessions}건`} changed={a.sessions !== b.sessions} />
-        <CmpCell label="AI 전력량" before={`${fmtKwh(b.strategies.ai.kwh)}`} after={`${fmtKwh(a.strategies.ai.kwh)} kWh`} changed />
-        <CmpCell label="AI 쾌적" before={fmtPct(b.strategies.ai.comfort_pct)} after={fmtPct(a.strategies.ai.comfort_pct)} changed={b.strategies.ai.comfort_pct !== a.strategies.ai.comfort_pct} />
+        <CmpCell label="예측 제어 예상 전력량" before={`${fmtKwh(b.strategies.ai.kwh)}`} after={`${fmtKwh(a.strategies.ai.kwh)} kWh`} changed />
+        <CmpCell label="수업 중 쾌적 범위" before={fmtPct(b.strategies.ai.comfort_pct)} after={fmtPct(a.strategies.ai.comfort_pct)} changed={b.strategies.ai.comfort_pct !== a.strategies.ai.comfort_pct} />
+      </div>
+      <p className="text-[13px] leading-[1.55] text-ink-3">
+        일정이 늘거나 줄어서 생긴 예상 소비량 변화입니다(시뮬레이션). 절감 효과가 아니며, 수업이 추가되면 소비량이 늘 수 있습니다. 기본 운전계획만 다시 계산했고 AI 협의는 아직 실행하지 않았습니다.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link to={`/plan?date=${r.event.date}`} className={btnCls('primary', 'md')}>
+          <Sparkles size={15} aria-hidden /> AI 협의로 개선안 검토
+        </Link>
+        <Link to={`/?room=${r.event.new_room ?? r.event.room ?? ''}`} onClick={() => setDate(r.event.date)} className={btnCls('secondary', 'md')}>
+          운영 현황 타임라인에서 보기
+        </Link>
       </div>
       <Disclosure variant="inline" title="운전 방식별 변화 보기">
         <table className="tnum w-full text-[14px]">
@@ -1098,7 +1118,7 @@ export function BeforeAfter({ r }: { r: EventResult }) {
                   </td>
                   <td className="py-2 text-right text-ink-2">{fmtKwh(b.strategies[k].kwh)} kWh</td>
                   <td className="py-2 text-right font-medium">{fmtKwh(a.strategies[k].kwh)} kWh</td>
-                  <td className={cx('py-2 text-right font-semibold', d > 0.005 ? 'text-crit-ink' : d < -0.005 ? 'text-good-ink' : 'text-ink-3')}>
+                  <td className={cx('py-2 text-right font-semibold', Math.abs(d) > 0.005 ? 'text-ink' : 'text-ink-3')}>
                     {d > 0 ? '+' : d < 0 ? '−' : ''}
                     {fmtKwh(Math.abs(d))}
                   </td>
@@ -1108,7 +1128,7 @@ export function BeforeAfter({ r }: { r: EventResult }) {
           </tbody>
         </table>
         <p className="mt-2 text-[13px] text-ink-3">
-          같은 일정이 생겨도 AI 예측 제어는 {STRATEGY.fixed.label}보다 {fmtKwh(a.strategies.fixed.kwh - a.strategies.ai.kwh)} kWh 적게 씁니다.
+          등록 후 기준으로 예측 제어의 예상 소비량은 {STRATEGY.fixed.label}보다 {fmtKwh(a.strategies.fixed.kwh - a.strategies.ai.kwh)} kWh 적습니다(같은 시간표·날씨, 시뮬레이션).
         </p>
       </Disclosure>
     </div>

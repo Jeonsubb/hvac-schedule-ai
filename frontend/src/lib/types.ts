@@ -793,6 +793,17 @@ export interface AgentTurn {
   proposal: Record<string, RoomSetpoint>
   eval?: NegotiationEval
   accepts?: boolean
+  /** simulator runs the agent itself asked for before it answered (engine numbers) */
+  sims?: AgentSim[]
+}
+
+export interface AgentSim {
+  why: string
+  /** rooms whose setpoint differs from the current plan */
+  changed: Record<string, number>
+  kwh: number
+  cost_krw: number
+  pmv_mean: number | null
 }
 
 export interface Negotiation {
@@ -1003,4 +1014,96 @@ export interface Policy {
   orient: Record<string, string>
   /** arbiter: won per PMV unit per room per day */
   comfort_won?: number
+}
+
+// ---------------------------------------------------------------- AI 협의 전후 비교 (같은 날짜·시간표·예보·초기 조건)
+
+/** One room of a predictive-control day computed with a given set of setpoints (simulation, not measured). */
+export interface PlanViewRoom {
+  plan: Interval[]
+  plan_minutes: number
+  kwh: number
+  pmv: number | null
+  class_min: number
+  out_band_min: number
+  sp_heat: number
+  sp_cool: number
+  /** predicted indoor temperature, 5-minute steps (288) */
+  ta: number[] | null
+}
+
+export interface PlanView {
+  kwh: number
+  cost_krw: number
+  comfort_pct: number | null
+  pmv_mean: number | null
+  plan_minutes: number
+  class_min: number
+  out_band_min: number
+  comfort_band?: [number, number]
+  rooms: Record<string, PlanViewRoom>
+}
+
+/** What a negotiation was computed from. Two results are comparable only when day_fp is the same. */
+export interface NegInputs {
+  day_fp: string
+  schedule: string
+  weather: string
+  settings: string
+  sessions: number
+  events: number
+  weather_src?: string | null
+  engine?: string
+}
+
+export interface NegAdjustment {
+  id: string
+  title: string
+  status: 'pending' | 'applied' | 'rejected'
+  rooms: string[]
+  change: { sp_heat?: number; sp_cool?: number }
+  auto_ok?: boolean
+  impact?: Adjustment['impact']
+  reason?: string
+  decided_at?: string | null
+  decided_by?: string | null
+}
+
+export type NegState = 'none' | 'no_change' | 'pending' | 'applied' | 'rejected' | 'partial'
+
+/** GET /api/negotiate/compare — state 'none' carries only date, mode and current_inputs. */
+export interface NegCompare {
+  date: string
+  state: NegState
+  mode: OpModeKey
+  current_inputs: NegInputs
+  created_at?: string
+  /** true: both agents answered through Bedrock. false: rule-based fallback */
+  ai?: boolean
+  season?: 'heat' | 'cool'
+  key?: 'sp_heat' | 'sp_cool'
+  summary?: string
+  agreed?: boolean
+  rounds?: number
+  base_sp?: Record<string, number>
+  final_sp?: Record<string, number>
+  baseline?: Omit<NegotiationEval, 'rooms'>
+  final?: Omit<NegotiationEval, 'rooms'>
+  before?: PlanView | null
+  after?: PlanView | null
+  inputs?: NegInputs | null
+  /** null: negotiated before inputs were recorded (cannot be verified) */
+  same_conditions?: boolean | null
+  changed?: string[]
+  adjustments?: NegAdjustment[]
+  feedback_sources?: { simulated: number; real: number } | null
+  provenance?: Record<string, string> | null
+}
+
+/** GET /api/iaq/{date} — estimated from expected people and the ventilation plan, not a sensor. */
+export interface Iaq {
+  date: string
+  step_min: number
+  co2_max: number
+  rooms: Record<string, { co2: number[]; people: number[] }>
 }
