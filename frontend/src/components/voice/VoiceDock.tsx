@@ -13,17 +13,17 @@ export default function VoiceDock() {
   const line =
     v.phase === 'listening' ? v.transcript || '네, 말씀하세요' : v.phase === 'thinking' ? `“${v.userText}” 확인하는 중…` : v.phase === 'speaking' ? v.say : ''
   return (
-    <div className="fixed bottom-5 left-5 z-30 flex max-w-[calc(100vw-40px)] items-end gap-2">
+    <div className={cx('flex max-w-[calc(100vw-32px)] items-end gap-2 lg:bottom-4 lg:left-5', active ? 'fixed bottom-3 left-4 z-40' : 'relative mx-4 mb-4 z-10 lg:fixed lg:mx-0 lg:mb-0 lg:z-20')}>
       <div
         className={cx(
-          'flex items-center rounded-full border border-line bg-surface text-ink shadow-[var(--seed-shadow-s2)] transition-[padding] duration-300',
+          'flex items-center rounded-full border border-line bg-surface text-ink transition-[padding] duration-150 ease-out',
           active ? 'pr-4' : 'pr-0',
         )}
       >
         <button
           type="button"
           onClick={v.wake}
-          className="relative h-14 w-14 shrink-0 rounded-full"
+          className="relative h-11 w-11 shrink-0 rounded-full transition-colors duration-150 hover:bg-hover active:bg-well"
           aria-label={v.phase === 'listening' ? '듣기 멈추기' : '온디 부르기'}
           title={v.micOn ? (v.wakeOn ? '“온디”라고 부르거나 눌러서 말하기' : '눌러서 말하기') : '눌러서 마이크 켜고 말하기'}
         >
@@ -43,7 +43,7 @@ export default function VoiceDock() {
       {!active && (v.cards.length > 0 || v.say) && (
         <Link
           to="/"
-          className="ond-press mb-2 inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-semibold text-ink shadow-[var(--seed-shadow-s2)] hover:bg-hover"
+          className="ond-press mb-0.5 inline-flex h-10 items-center gap-1.5 rounded-[8px] border border-line bg-surface px-3 text-[12px] font-medium text-ink-2 hover:bg-hover hover:text-ink"
         >
           <HomeIcon size={14} aria-hidden /> 온디{v.cards.length > 0 ? ` · 카드 ${v.cards.length}` : ''}
         </Link>
