@@ -19,6 +19,13 @@ log = logging.getLogger(__name__)
 
 DEFAULTS = {"email": "", "enabled": False, "approvals": True, "checks": True,
             "failures": True, "completed": False}
+# Confirmation mails per day for the whole building. The settings screen has no key
+# (sign-in is still a mock), so this keeps the topic from being used to mail strangers.
+DAILY_ADDRESS_CHANGES = 5
+
+
+class LimitExceeded(Exception):
+    pass
 
 
 def settings() -> dict:
@@ -57,6 +64,11 @@ def save_settings(patch: dict) -> dict:
     if new["enabled"] and not new.get("subscription_arn"):
         # Each recipient has a filter so previous addresses cannot receive the
         # current building's messages after the operator changes the address.
+        from . import service
+
+        day = service.now_kst().strftime("%Y%m%d")
+        if get_store().incr("ratelimit", f"notification_subscribe|{day}", "n") > DAILY_ADDRESS_CHANGES:
+            raise LimitExceeded("오늘은 수신 주소를 더 바꿀 수 없습니다. 내일 다시 시도하세요.")
         recipient = hashlib.sha256(new["email"].encode()).hexdigest()
         result = _sns().subscribe(TopicArn=topic, Protocol="email", Endpoint=new["email"],
                                  ReturnSubscriptionArn=True,
@@ -71,7 +83,7 @@ def public_settings(refresh: bool = False) -> dict:
     email = cfg["email"]
     status = "disabled" if not cfg["enabled"] else "pending"
     if cfg["enabled"] and cfg.get("subscription_arn"):
-        if refresh:
+        if refresh and not cfg.get("confirmed"):
             attrs = _sns().get_subscription_attributes(SubscriptionArn=cfg["subscription_arn"])["Attributes"]
             cfg["confirmed"] = attrs.get("PendingConfirmation") == "false"
             get_store().put_item("building_notification", "active", cfg)

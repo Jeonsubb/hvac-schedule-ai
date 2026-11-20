@@ -100,20 +100,28 @@ def test_review_checks_deduped_per_period(mail):
     assert notifications.inspection_checks([{**checks[0], "verdict": "ok"}], "2026-11-22") == "ignored"
 
 
-def test_subscription_api_requires_operator_key(mail, monkeypatch):
+def test_subscription_api_needs_no_key_and_caps_confirmation_mails(mail, monkeypatch):
     from fastapi.testclient import TestClient
     from app import main
 
-    monkeypatch.setattr(main, "OPERATOR_KEY", "test-operator")
+    _, calls, sns = mail
     monkeypatch.setattr(main, "ORIGIN_SECRET", None)
     monkeypatch.setattr(main, "_rate_limit", lambda *a: None)
+    monkeypatch.setattr(sns, "get_subscription_attributes", lambda **kw: {"Attributes": {"PendingConfirmation": "true"}})
     client = TestClient(main.app)
-    body = {"email": "new@example.com", "enabled": True}
-    assert client.put("/api/building/notifications", json=body).status_code == 403
-    assert client.post("/api/building/notifications/verify").status_code == 403
-    response = client.put("/api/building/notifications", json=body, headers={"x-operator-key": "test-operator"})
+    response = client.put("/api/building/notifications", json={"email": "new@example.com", "enabled": True})
     assert response.status_code == 200
     assert response.json()["status"] == "pending"
+    assert client.get("/api/building/notifications").json()["status"] == "pending"
+    # the manager clicks the link: the next read picks it up without any button
+    monkeypatch.setattr(sns, "get_subscription_attributes", lambda **kw: {"Attributes": {"PendingConfirmation": "false"}})
+    assert client.get("/api/building/notifications").json()["status"] == "confirmed"
+    for i in range(notifications.DAILY_ADDRESS_CHANGES - 1):
+        assert client.put("/api/building/notifications", json={"email": f"m{i}@example.com"}).status_code == 200
+    assert client.put("/api/building/notifications", json={"email": "over@example.com"}).status_code == 429
+    assert len([c for c in calls if c.get("Protocol") == "email"]) == notifications.DAILY_ADDRESS_CHANGES
+    # turning categories on or off sends no mail, so it is not capped
+    assert client.put("/api/building/notifications", json={"completed": False}).status_code == 200
 
 
 def test_publish_failure_is_nonfatal_and_can_retry(mail):

@@ -481,38 +481,33 @@ def get_building():
 
 
 @app.get("/api/building/notifications")
-def notification_settings():
+def notification_settings(request: Request):
     from . import notifications
 
-    return notifications.public_settings()
+    _rate_limit(request, "notification_status", 30)
+    try:
+        # While the address is unconfirmed, ask SNS on every read so the screen flips to
+        # "receiving" soon after the manager clicks the link in the confirmation mail.
+        return notifications.public_settings(refresh=True)
+    except Exception:
+        return notifications.public_settings()
 
 
 @app.put("/api/building/notifications")
 def save_notification_settings(request: Request, body: dict = Body(...)):
     from . import notifications
 
-    if not OPERATOR_KEY or request.headers.get("x-operator-key") != OPERATOR_KEY:
-        raise HTTPException(403, "알림 수신자를 변경하려면 운영자 키가 필요합니다.")
+    # No operator key, like approvals and building edits: the (mock) sign-in is the gate.
+    # Abuse is bounded by this per-IP limit and the daily cap on confirmation mails.
     _rate_limit(request, "notification_settings", 3)
     try:
         return notifications.save_settings(body)
+    except notifications.LimitExceeded as e:
+        raise HTTPException(429, str(e)) from e
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     except Exception as e:
         raise HTTPException(503, "확인 메일을 요청하지 못했습니다. 잠시 뒤 다시 시도하세요.") from e
-
-
-@app.post("/api/building/notifications/verify")
-def verify_notification_settings(request: Request):
-    from . import notifications
-
-    if not OPERATOR_KEY or request.headers.get("x-operator-key") != OPERATOR_KEY:
-        raise HTTPException(403, "운영자 키가 필요합니다.")
-    _rate_limit(request, "notification_verify", 5)
-    try:
-        return notifications.public_settings(refresh=True)
-    except Exception as e:
-        raise HTTPException(503, "이메일 인증 상태를 확인하지 못했습니다.") from e
 
 
 @app.put("/api/building")
