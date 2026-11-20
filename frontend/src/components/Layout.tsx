@@ -90,8 +90,8 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const building = meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'
   const row = (on: boolean) =>
     cx(
-      'ond-press flex h-9 items-center gap-2.5 rounded-[8px] px-3 text-[14px] leading-none transition-colors duration-150',
-      on ? 'bg-brand-bg/70 font-semibold text-brand-ink' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
+      'nav-row ond-press relative flex h-9 items-center gap-2.5 rounded-[7px] px-3 text-[14px] leading-none transition-colors duration-200',
+      on ? 'is-on bg-[#eef0f3] font-semibold text-ink' : 'font-medium text-ink-2 hover:bg-[#f1f2f4] hover:text-ink',
     )
   return (
     <aside
@@ -129,11 +129,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
                     title={`${g.label}: ${g.desc}`}
                     aria-current={on ? 'page' : undefined}
                     className={cx(
-                      'ond-press flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2.5 text-[11px] leading-none whitespace-nowrap transition-colors duration-150',
-                      on ? 'bg-brand-bg/70 font-semibold text-brand-ink' : 'font-medium text-ink-3 hover:bg-hover hover:text-ink',
+                      'ond-press flex flex-col items-center gap-1.5 rounded-[8px] px-1 py-2.5 text-[11px] leading-none whitespace-nowrap transition-colors duration-200',
+                      on ? 'bg-[#eef0f3] font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[#f1f2f4] hover:text-ink',
                     )}
                   >
-                    <g.icon size={20} strokeWidth={on ? 2.2 : 1.8} className={on ? 'text-brand' : undefined} aria-hidden />
+                    <g.icon size={20} strokeWidth={on ? 2.2 : 1.8} aria-hidden />
                     {g.label}
                   </NavLink>
                 </li>
@@ -144,13 +144,13 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           NAV_GROUPS.map((g) =>
             g.tabs.length === 1 ? (
               <NavLink key={g.to} to={g.to} end={g.to === '/'} title={g.desc} className={cx(row(active === g), 'mt-1')}>
-                <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-brand' : 'text-ink-3'} aria-hidden />
+                <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-ink' : 'text-ink-3'} aria-hidden />
                 {g.label}
               </NavLink>
             ) : (
               <div key={g.to} className="mt-5 first:mt-1" role="group" aria-label={g.label}>
                 <div className="mb-1 flex items-center gap-2.5 px-3 text-[12px] font-semibold tracking-[0.01em] text-ink-3" title={g.desc}>
-                  <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-brand' : 'text-ink-4'} aria-hidden />
+                  <g.icon size={18} strokeWidth={active === g ? 2.2 : 1.8} className={active === g ? 'text-ink' : 'text-ink-4'} aria-hidden />
                   {g.label}
                 </div>
                 <ul className="space-y-0.5">
@@ -482,7 +482,7 @@ function MobileNav() {
             className={({ isActive }) =>
               cx(
                 'flex shrink-0 items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
-                isActive ? 'bg-brand-bg/70 font-semibold text-brand-ink' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
+                isActive ? 'bg-[#eef0f3] font-semibold text-ink' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
               )
             }
           >
@@ -544,7 +544,7 @@ export default function Layout() {
       return !c
     })
   return (
-    <div className={cx('min-h-full lg:flex', loc.pathname === '/overview' ? 'bg-surface' : 'bg-canvas')}>
+    <div className="min-h-full bg-surface lg:flex">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>

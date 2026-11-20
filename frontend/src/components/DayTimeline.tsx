@@ -246,7 +246,6 @@ export default function DayTimeline({
           <span className="tnum w-11 shrink-0 text-right font-semibold text-ink">{fmtMin(minute)}</span>
         </label>
       </div>
-      <p className="mt-2 text-[11px] text-ink-3">{planLabel} · 시뮬레이션 계획 · 강의실을 선택하면 상세정보가 표시됩니다.</p>
     </div>
   )
 }

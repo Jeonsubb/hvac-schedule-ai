@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Copy, ExternalLink, MessageSquarePlus, QrCode, Send, Users, Building2, CalendarDays, CalendarRange } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Copy, ExternalLink, MessageSquarePlus, QrCode, Send } from 'lucide-react'
 import { apiSend, invalidate, useApi } from '../lib/api'
 import type { Feedback, FeedbackSummary } from '../lib/types'
 import { ROOM_ORDER } from '../lib/constants'
@@ -23,7 +23,6 @@ import {
   btnCls,
   inputCls,
   toast,
-  More,
 } from '../components/ui'
 
 const HOURS = Array.from({ length: 15 }, (_, i) => i + 8) // 08–22
@@ -40,21 +39,37 @@ function safe(s: FeedbackSummary | undefined): FeedbackSummary | undefined {
 
 function answer(s: FeedbackSummary): string {
   const n = s.items.length
-  if (!n) return `최근 ${s.days}일 동안 들어온 의견이 없습니다. 강의실 QR 링크를 붙여 재실자 의견을 받아 보세요.`
+  if (!n) return `최근 ${s.days}일 의견 없음`
+  const sim = s.items.filter((f) => f.source === 'simulated').length
+  const origin = sim === n ? `실제 의견 없음 · 시뮬레이션 ${n}건` : sim ? `실제 ${n - sim}건 · 시뮬레이션 ${sim}건` : `실제 의견 ${n}건`
   const rooms = Object.entries(s.by_room).filter(([, v]) => v.n > 0)
   const cold = rooms.reduce((a, [, v]) => a + v.cold, 0)
   const hot = rooms.reduce((a, [, v]) => a + v.hot, 0)
   const top = [...rooms].sort((a, b) => b[1].n - a[1].n)[0]
-  const lean = cold > hot ? `춥다는 쪽 의견이 ${cold}건으로 많고` : hot > cold ? `덥다는 쪽 의견이 ${hot}건으로 많고` : '춥다·덥다 의견이 비슷하고'
-  return `최근 ${s.days}일 의견 ${n}건 중 ${lean}, ${top ? `${top[0]}호(${top[1].n}건)에 가장 많이 몰렸습니다` : '특정 강의실에 몰리지 않았습니다'}. 의견은 다음 2차·3차 스케줄과 에이전트 협의에 반영됩니다.`
+  const lean = cold > hot ? '춥다는 의견 많음' : hot > cold ? '덥다는 의견 많음' : '춥다·덥다 비슷'
+  return `최근 ${s.days}일 · ${origin} · ${lean}${top ? ` · ${top[0]}호 집중` : ''}`
+}
+
+/** "추움", "서늘", "적당"… — one word for a mean vote (the number carries the detail). */
+function shortWord(mean: number | null): string {
+  return meanWord(mean).replace('하다는 의견', '').replace('다는 의견', '').replace('대체로 ', '')
+}
+
+/** Where the shown votes come from, in one short line (simulated votes are never presented as real). */
+function sourceLine(s: FeedbackSummary): string {
+  const n = s.items.length
+  const sim = s.items.filter((f) => f.source === 'simulated').length
+  if (!n) return '의견 없음'
+  return sim === n ? `시뮬레이션 의견 ${n}건 · 실제 의견 없음` : `실제 ${n - sim}건 · 시뮬레이션 ${sim}건`
 }
 
 function VoteScale({ mean }: { mean: number | null }) {
   // -3..+3 track with a marker at the mean
   const pos = mean == null ? null : ((Math.max(-3, Math.min(3, mean)) + 3) / 6) * 100
   return (
-    <div className="relative mt-3 h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${VOTES[0].color}, ${VOTES[3].color} 50%, ${VOTES[6].color})` }} aria-hidden>
-      {pos != null && <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-ink shadow" style={{ left: `${pos}%` }} />}
+    <div className="relative mt-3 h-1 rounded-full bg-[#e9ebee]" aria-hidden>
+      <span className="absolute top-1/2 left-1/2 h-2.5 w-px -translate-y-1/2 bg-ink-4" />
+      {pos != null && <span className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${pos}%`, background: mean != null ? voteColor(mean) : undefined, boxShadow: '0 0 0 2px white' }} />}
     </div>
   )
 }
@@ -72,22 +87,22 @@ function RoomTiles({ s, sel, onSel }: { s: FeedbackSummary; sel: string | null; 
             aria-pressed={on}
             onClick={() => onSel(on ? null : r)}
             className={cx(
-              'rounded-[14px] border p-4 text-left transition-[border-color,box-shadow,background-color] duration-150',
-              on ? 'border-brand shadow-[0_0_0_1px_var(--color-brand)]' : 'border-line hover:border-ink-4',
+              'rounded-[10px] border p-4 text-left transition-[border-color,box-shadow,background-color] duration-200',
+              on ? 'border-ink shadow-[0_0_0_1px_var(--color-ink)]' : 'border-line hover:border-line-strong hover:bg-[#fafafb]',
             )}
-            style={{ background: v?.n ? `color-mix(in srgb, ${voteColor(v.mean)} 35%, white)` : undefined }}
           >
             <div className="flex items-baseline justify-between">
-              <span className="tnum text-[17px] font-[650] text-ink">{r}호</span>
-              <span className="tnum text-[13px] text-ink-2">{v?.n ?? 0}건</span>
+              <span className="tnum text-[16px] font-semibold text-ink">{r}호</span>
+              <span className="tnum text-[13px] text-ink-3">{v?.n ?? 0}건</span>
             </div>
-            <div className="mt-1 text-[13.5px] font-medium text-ink-2">{v?.n ? `${meanWord(v.mean)} ${signed(v.mean)}` : '의견 없음'}</div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="tnum text-[24px] leading-none font-semibold tracking-[-0.02em] text-ink">{v?.n ? signed(v.mean) : '—'}</span>
+              <span className="text-[14px] text-ink-2">{v?.n ? shortWord(v.mean) : ''}</span>
+            </div>
             <VoteScale mean={v?.n ? v.mean : null} />
             {v?.n ? (
-              <div className="tnum mt-2.5 flex gap-3 text-[12.5px] text-ink-2">
-                <span>추움 {v.cold}</span>
-                <span>더움 {v.hot}</span>
-                <span>답답 {v.stuffy}</span>
+              <div className="tnum mt-2 text-[13px] text-ink-3">
+                {[['추움', v.cold], ['더움', v.hot], ['답답', v.stuffy]].filter(([, n]) => Number(n) > 0).map(([k, n]) => `${k} ${n}`).join(' · ') || '—'}
               </div>
             ) : null}
           </button>
@@ -185,7 +200,7 @@ function OperatorForm({ defaultRoom, onSent }: { defaultRoom: string | null; onS
     setErr(null)
     try {
       await apiSend('POST', '/api/feedback', { room, vote, tags, text: text.trim(), source: 'operator' })
-      toast(`${room}호 의견을 등록했습니다. 다음 검증에 반영됩니다.`)
+      toast(`${room}호 의견 등록`)
       setText('')
       setTags([])
       onSent()
@@ -260,7 +275,6 @@ function LinkList() {
   }
   return (
     <div>
-      <More className="mb-3"><p>강의실 문 옆에 QR 코드로 붙여 두면 재실자가 로그인 없이 바로 의견을 보냅니다. 이름이나 학번은 받지 않습니다.</p></More>
       <ul className="grid gap-2 sm:grid-cols-2">
         {ROOM_ORDER.map((r) => {
           const url = `${base}/feedback?room=${r}`
@@ -281,46 +295,6 @@ function LinkList() {
         })}
       </ul>
     </div>
-  )
-}
-
-function HowItFeeds() {
-  const rows = [
-    {
-      icon: CalendarRange,
-      title: '2차 · 주간 조정',
-      body: '지난 7일 의견이 2건 이상 몰린 강의실은 정책 온도 범위 안에서 설정온도 조정안을 만들고, 시뮬레이터로 전력 변화를 계산합니다.',
-    },
-    {
-      icon: CalendarDays,
-      title: '3차 · 일일 검증',
-      body: '오늘 들어온 의견은 그 강의실의 다음 수업 설정온도와 환기 단계(답답함은 CO₂ 기준과 함께)에 반영합니다.',
-    },
-    {
-      icon: Users,
-      title: '사용자 온디',
-      body: '의견을 근거로 쾌적을 대변합니다. 관리자 온디는 요금과 정부 지침을 근거로 비용을 대변하고, 두 제안을 시뮬레이터로 검증합니다.',
-    },
-    {
-      icon: Building2,
-      title: '운전 모드',
-      body: '자동 운전 모드에서는 합의된 조정이 바로 반영되고, 추천 모드에서는 상단의 승인 대기에서 담당자가 승인해야 반영됩니다.',
-    },
-  ]
-  return (
-    <ul className="grid gap-4 sm:grid-cols-2">
-      {rows.map((r) => (
-        <li key={r.title} className="flex items-start gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-brand-bg text-brand" aria-hidden>
-            <r.icon size={16} />
-          </span>
-          <div>
-            <div className="text-[14.5px] font-semibold text-ink">{r.title}</div>
-            <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-2">{r.body}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -377,7 +351,7 @@ export default function Comfort() {
         <Card data-tour="comfort-rooms">
           <CardHeader
             title="강의실별 체감"
-            sub="재실자·운영자 의견의 평균입니다. -3은 춥다, 0은 적당하다, +3은 덥다입니다. 강의실을 누르면 아래 목록과 시간대 표가 그 강의실만 보여 줍니다."
+            sub={sourceLine(s)}
             right={
               sel ? (
                 <Button size="sm" variant="ghost" onClick={() => setParam('room', null)}>
@@ -402,7 +376,7 @@ export default function Comfort() {
               right={q.loading ? <Spinner size={14} /> : undefined}
             />
             {items.length === 0 ? (
-              <Empty title="의견이 없습니다" desc="재실자 QR 링크를 붙이거나 오른쪽 양식으로 전화·메일 문의를 등록하세요." icon={<MessageSquarePlus size={18} />} />
+              <Empty title="의견 없음" icon={<MessageSquarePlus size={18} />} />
             ) : (
               <>
                 <ul className="divide-y divide-line">
@@ -420,22 +394,12 @@ export default function Comfort() {
           </Card>
           <div className="space-y-6">
             <Card data-tour="comfort-form">
-              <CardHeader title="운영자가 받은 의견 등록" sub="전화·메일·민원 게시판으로 들어온 불편도 같은 형식으로 남기면 스케줄 판단에 쓰입니다." />
+              <CardHeader title="의견 등록" />
               <OperatorForm key={sel ?? 'all'} defaultRoom={sel} onSent={reloadAll} />
             </Card>
             <DisclosureList>
-              <Disclosure title="재실자 의견 링크(QR)" icon={<QrCode size={16} aria-hidden />} summary="강의실 10개">
+              <Disclosure title="QR 의견 링크" icon={<QrCode size={16} aria-hidden />}>
                 <LinkList />
-              </Disclosure>
-              <Disclosure title="의견이 스케줄에 반영되는 방식" icon={<Users size={16} aria-hidden />}>
-                <HowItFeeds />
-                <p className="mt-4 text-[13.5px] text-ink-3">
-                  조정안과 근거는{' '}
-                  <Link to="/plan" className="font-medium text-brand-ink underline-offset-4 hover:underline">
-                    AI 스케줄링
-                  </Link>
-                  에서 확인합니다.
-                </p>
               </Disclosure>
             </DisclosureList>
           </div>

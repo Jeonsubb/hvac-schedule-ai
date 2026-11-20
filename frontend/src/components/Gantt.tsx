@@ -303,26 +303,26 @@ export default function Gantt({
                   type="button"
                   onClick={() => onRoomClick?.(room)}
                   className={cx(
-                    'flex h-full w-full items-center gap-2.5 rounded-[12px] border bg-surface text-left transition-[box-shadow,border-color] duration-150',
-                    compact ? 'px-2' : 'px-3',
-                    sel ? 'border-transparent shadow-[0_0_0_2px_var(--color-brand)]' : 'border-line',
-                    onRoomClick ? 'cursor-pointer hover:border-ink-4' : 'cursor-default',
+                    'flex h-full w-full items-center gap-2.5 rounded-[8px] text-left transition-colors duration-200',
+                    compact ? 'px-2' : 'px-2.5',
+                    sel && 'bg-[#eef0f3]',
+                    onRoomClick ? cx('cursor-pointer', !sel && 'hover:bg-[#f4f5f7]') : 'cursor-default',
                   )}
                   title={onRoomClick ? `${room}호 ${rm.type_label}, ${STRATEGY[primary].short} ${fmtKwh(sp?.rooms?.[room]?.kwh ?? 0)} kWh. 눌러서 상세 보기` : undefined}
                   aria-label={onRoomClick ? `${room}호 상세 보기` : undefined}
                 >
                   {!compact && (
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]" style={{ background: tone.bg, color: tone.ink }}>
+                    <span className="flex h-8 w-6 shrink-0 items-center justify-center" style={{ color: tone.ink }}>
                       <RoomTypeIcon type={rm.type} />
                     </span>
                   )}
                   <span className="min-w-0 leading-tight">
-                    <span className={cx('tnum block font-bold text-ink', compact ? 'text-[13px]' : 'text-[14px]')}>
+                    <span className={cx('tnum block font-semibold text-ink', compact ? 'text-[13px]' : 'text-[15px]')}>
                       {room}
                       {!compact && '호'}
                     </span>
                     {!compact && (
-                      <span className="mt-0.5 block truncate text-[12.5px] text-ink-3">
+                      <span className="mt-0.5 block truncate text-[13px] text-ink-3">
                         {rm.type_label} · 수업 {sessions.length}
                       </span>
                     )}

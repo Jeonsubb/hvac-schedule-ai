@@ -132,7 +132,7 @@ export default function ModeSwitch() {
 
   return (
     <div data-tour="mode" className="hidden items-center gap-2 md:flex">
-      <div className="inline-flex rounded-full bg-well p-1" role="radiogroup" aria-label="운전 모드">
+      <div className="inline-flex gap-0.5 rounded-[9px] border border-line bg-surface p-[3px]" role="radiogroup" aria-label="운전 모드">
         {opts.map((o) => {
           const on = m.mode === o.key
           return (
@@ -145,11 +145,11 @@ export default function ModeSwitch() {
               disabled={saving}
               onClick={() => set(o.key)}
               className={cx(
-                'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] whitespace-nowrap transition-[background-color,color,box-shadow] duration-200',
-                on ? 'bg-surface font-semibold text-ink shadow-[0_1px_2px_rgb(12_14_19/0.1),0_0_0_1px_rgb(12_14_19/0.06)]' : 'font-medium text-ink-3 hover:text-ink',
+                'inline-flex h-8 items-center gap-1.5 rounded-[6px] px-3 text-[14px] whitespace-nowrap transition-[background-color,color] duration-200',
+                on ? 'bg-[#eef0f3] font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[#f6f7f8] hover:text-ink',
               )}
             >
-              <o.icon size={14} className={on ? (o.key === 'auto' ? 'text-brand' : 'text-ink-2') : undefined} aria-hidden />
+              <o.icon size={14} aria-hidden />
               <span className="hidden 2xl:inline">{o.label}</span>
               <span className="2xl:hidden">{o.key === 'auto' ? '자동' : '추천'}</span>
             </button>

@@ -652,3 +652,53 @@ body {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ polish (white, line-based language)
+ * Badges are a dot and a word; the selected nav item carries a thin ink rule; every interactive row
+ * answers hover/focus in about 180ms and respects reduced motion. */
+.badge-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: none;
+}
+.nav-row.is-on::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-ink);
+}
+.nav-row svg { transition: transform 180ms var(--ease-out, ease); }
+.nav-row:hover svg { transform: translateX(1px); }
+:where(button, a, [role='button'], [role='radio'], [role='tab'], summary):focus-visible {
+  outline: 2px solid var(--color-focus, #2f6fde);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-row svg { transition: none; }
+  .nav-row:hover svg { transform: none; }
+}
+
+/* AI 최적화: three steps in one white flow, divided by rules */
+.plan-flow { border-top: 1px solid var(--color-line); }
+.plan-step { padding: 28px 0 30px; border-bottom: 1px solid var(--color-line); }
+.plan-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 36px; }
+.plan-kpis > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.plan-kpis span { font-size: 14px; color: var(--color-ink-3); }
+.plan-kpis strong { font-size: 46px; line-height: 1.05; font-weight: 600; letter-spacing: -0.04em; color: var(--color-ink); white-space: nowrap; }
+.plan-kpis strong small { margin-left: 6px; font-size: 18px; font-weight: 500; letter-spacing: 0; color: var(--color-ink-3); }
+.plan-kpis em { font-size: 14px; font-style: normal; color: var(--color-ink-2); overflow-wrap: anywhere; }
+.plan-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0; border-top: 1px solid var(--color-line); }
+.plan-split > div { padding: 20px 28px 4px 0; }
+.plan-split > div + div { padding-left: 28px; border-left: 1px solid var(--color-line); }
+@media (max-width: 900px) {
+  .plan-kpis { grid-template-columns: 1fr; }
+  .plan-split { grid-template-columns: 1fr; }
+  .plan-split > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--color-line); }
+}

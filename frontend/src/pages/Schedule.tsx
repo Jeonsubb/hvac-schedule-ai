@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, Sun, AlertTriangle, Timer, CalendarDays, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Sun, AlertTriangle, Timer, CalendarDays } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
 import type { Day, DaySummary, StrategyKey, Summary } from '../lib/types'
@@ -63,10 +63,9 @@ export default function Schedule() {
     <div>
       <PageHeader
         title="스케줄 타임라인"
-        desc="날짜를 고르면 그날 강의와 냉난방 운전을 강의실별로 맞춰 봅니다."
         right={
           <Link to={`/plan?tier=3&date=${date}`} className={btnCls('secondary')}>
-            <Sparkles size={15} className="text-brand" aria-hidden /> 이 날 AI 3차 검증 보기
+            3차 검증 보기
           </Link>
         }
       />
@@ -94,13 +93,10 @@ export default function Schedule() {
               {ds?.holiday && <Badge tone="crit">{ds.holiday}</Badge>}
               {ds && !ds.workday && !ds.holiday && <Badge>주말</Badge>}
             </h2>
-            <p className="mt-1 text-[13.5px] text-ink-3">
-              {ds ? `수업 ${ds.sessions}건${ds.events ? `, 이벤트 ${ds.events}건` : ''}을 기준으로 실제 가동을 맞춰 봅니다.` : '강의와 실제 가동을 강의실별로 맞춰 봅니다.'}
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isToday && (
-              <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-good-bg px-3 text-[13px] font-semibold text-good-ink">
+              <span className="inline-flex h-9 items-center gap-1.5 px-1 text-[14px] font-semibold text-good-ink">
                 <span className="inline-block h-2 w-2 rounded-full bg-good" aria-hidden /> 오늘
               </span>
             )}
@@ -251,7 +247,7 @@ function MonthCalendar({
           </IconButton>
         </div>
         <div className="flex items-center gap-2 text-[13px] text-ink-3" aria-label="칸 색: 고정 스케줄 대비 AI 절감률">
-          <span>고정 대비 AI 절감</span>
+          <span>고정 대비</span>
           <span className="tnum">50%</span>
           <span className="flex gap-0.5" aria-hidden>
             {[...SAVE_STEPS].reverse().map((s, i) => (
@@ -323,10 +319,11 @@ function MonthCalendar({
           )
         })}
       </div>
-      <p className="mt-4 text-[13px] text-ink-3">
-        회색 숫자는 예보로 계산한 예상,{' '}
-        <AlertTriangle size={12} color="#d03b3b" strokeWidth={2.6} className="inline align-[-1px]" aria-hidden />
-        는 확인이 필요한 강의가 있던 날입니다.
+      <p className="mt-4 flex items-center gap-3 text-[12px] text-ink-3">
+        <span>회색 = 예상</span>
+        <span className="inline-flex items-center gap-1">
+          <AlertTriangle size={11} color="#d03b3b" strokeWidth={2.6} aria-hidden /> 확인 필요
+        </span>
       </p>
     </Card>
   )
@@ -375,15 +372,15 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
         {isFuture && <Badge tone="info">예상</Badge>}
       </div>
       <p className="mt-1 text-[13.5px] text-ink-3">
-        {ds.sessions > 0 ? `강의 ${ds.sessions}건${ds.events ? `, 이벤트 ${ds.events}건` : ''}` : (ds.holiday ?? (ds.workday ? '강의 없음' : '주말'))}, 외기 {ds.t_min.toFixed(1)}~{ds.t_max.toFixed(1)}℃
+        {ds.sessions > 0 ? `강의 ${ds.sessions}${ds.events ? ` · 일정 ${ds.events}` : ''}` : (ds.holiday ?? (ds.workday ? '강의 없음' : '주말'))} · {ds.t_min.toFixed(1)}~{ds.t_max.toFixed(1)}℃
       </p>
       <div className="mt-6 flex flex-wrap gap-x-10 gap-y-5">
         <Figure label="AI 전력" value={fmtKwh(ai.kwh)} unit="kWh" accent={STRATEGY.ai.color} />
-        <Figure label="고정 스케줄 대비" value={sv != null ? `−${sv.toFixed(0)}` : '–'} unit={sv != null ? '%' : undefined} />
-        <Figure label="강의 중 쾌적" value={ai.comfort_pct != null ? ai.comfort_pct.toFixed(1) : '–'} unit={ai.comfort_pct != null ? '%' : undefined} />
+        <Figure label="고정 대비" value={sv != null ? `−${sv.toFixed(0)}` : '–'} unit={sv != null ? '%' : undefined} />
+        <Figure label="쾌적 유지" value={ai.comfort_pct != null ? ai.comfort_pct.toFixed(1) : '–'} unit={ai.comfort_pct != null ? '%' : undefined} />
       </div>
       <div className="mt-8">
-        <div className="mb-3 text-[14px] font-semibold text-ink">하루 전력: AI 운전과 이전 운영</div>
+        <div className="mb-3 text-[14px] font-semibold text-ink">하루 전력</div>
         <ul className="space-y-3" aria-label="AI 운전과 이전 운영의 하루 전력량">
           {(['ai', 'fixed'] as StrategyKey[]).map((k) => {
             const v = ds.strategies[k].kwh
@@ -400,7 +397,7 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
           })}
         </ul>
       </div>
-      <Disclosure variant="inline" className="mt-auto pt-6" title="운전 방식 4가지 비교와 시간대별 전력 보기">
+      <Disclosure variant="inline" className="mt-auto pt-6" title="운전 방식 비교">
         <table className="tnum w-full text-[14px]">
           <thead>
             <tr className="text-[13px] text-ink-3">

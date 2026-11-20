@@ -209,19 +209,19 @@ export function WaterfallLegend() {
     <>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: STRATEGY.fixed.color }} aria-hidden />
-        고정 스케줄
+        고정
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: STRATEGY.rule.color }} aria-hidden />
-        규칙이 줄인 몫
+        규칙
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: STRATEGY.ai.color }} aria-hidden />
-        AI 기능이 줄인 몫
+        AI 기능
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: 'rgba(20,166,115,0.16)', boxShadow: `inset 0 0 0 1.5px ${STRATEGY.ai.color}` }} aria-hidden />
-        AI가 더 쓴 몫(쾌적 확보)
+        추가 사용(쾌적)
       </span>
     </>
   )

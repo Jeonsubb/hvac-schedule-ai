@@ -7,7 +7,7 @@ import type { Day, Summary } from '../lib/types'
 import { CHART, ROOM_ORDER, STATUS_COLOR, splitCounts, statusInfo } from '../lib/constants'
 import { cx, fmtDateK, fmtDateShort, fmtNum, fmtPct } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
-import { Badge, Card, ChartCard, Disclosure, DisclosureList, Empty, ErrorBox, IconButton, LegendItem, Loading, PageHeader, PageSkeleton, Popover, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
+import { Badge, ChartCard, Disclosure, DisclosureList, Empty, ErrorBox, IconButton, LegendItem, Loading, PageHeader, PageSkeleton, Popover, StatusBadge, btnCls, inputBase, tbl } from '../components/ui'
 import type { ValidationSession } from '../lib/types'
 import RoomDrawer from '../components/RoomDrawer'
 
@@ -177,13 +177,13 @@ export default function Validation() {
         }
       />
 
-      <div data-tour="val-main" className="grid grid-cols-1 gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <Card pad={false} className="self-start">
-          <div className="px-5 pt-5 pb-3">
-            <h2 className="text-[17px] font-[650] text-ink">이상이 있었던 날</h2>
+      <div data-tour="val-main" className="grid grid-cols-1 gap-8 border-t border-line pt-6 xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-0">
+        <section className="self-start xl:border-r xl:border-line xl:pr-5">
+          <div className="px-3 pb-3">
+            <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-ink">이상이 있었던 날</h2>
             <p className="mt-0.5 text-[13px] text-ink-3">{issueDays.length}일, 최근 날짜부터</p>
           </div>
-          <ul className="thin-scroll max-h-[452px] overflow-y-auto px-3 pb-3">
+          <ul className="thin-scroll max-h-[452px] overflow-y-auto pb-3">
             {issueDays.map((d) => {
               const c = splitCounts(d)
               const on = d.date === date
@@ -194,16 +194,16 @@ export default function Validation() {
                     onClick={() => setDate(d.date)}
                     aria-pressed={on}
                     className={cx(
-                      'flex h-11 w-full items-center justify-between gap-2 rounded-[10px] px-3 text-left text-[14px] transition-colors duration-150',
-                      on ? 'bg-ink text-white' : 'text-ink hover:bg-hover',
+                      'relative flex h-11 w-full items-center justify-between gap-2 rounded-[7px] px-3 text-left text-[15px] transition-colors duration-200',
+                      on ? 'bg-[#eef0f3] font-semibold text-ink' : 'text-ink hover:bg-[#f4f5f7]',
                     )}
                   >
                     <span className="font-medium">{fmtDateK(d.date)}</span>
-                    <span className={cx('tnum flex items-center gap-2 text-[13px]', on ? 'text-white/85' : 'text-ink-3')}>
+                    <span className="tnum flex items-center gap-2 text-[13px] font-medium text-ink-3">
                       {c.review > 0 && (
-                        <span className={cx('inline-flex items-center gap-1 font-semibold', on ? 'text-white' : 'text-crit-ink')}>
+                        <span className="inline-flex items-center gap-1 font-semibold text-crit-ink">
                           <span className="inline-block h-1.5 w-1.5 rounded-full bg-crit" aria-hidden />
-                          확인 {c.review}
+                          확인 필요 {c.review}
                         </span>
                       )}
                       {c.auto > 0 && <span>조치 {c.auto}</span>}
@@ -213,16 +213,16 @@ export default function Validation() {
               )
             })}
           </ul>
-        </Card>
+        </section>
 
-        <Card pad={false} className="self-start">
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
+        <section className="min-w-0 self-start xl:pl-8">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div className="min-w-0">
-              <h2 className="flex flex-wrap items-center gap-2.5 text-[17px] font-[650] text-ink">
+              <h2 className="flex flex-wrap items-center gap-2.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">
                 {fmtDateK(date)}
                 {date > today && <Badge tone="info">예상</Badge>}
               </h2>
-              <p className="tnum mt-0.5 text-[13.5px] text-ink-3">
+              <p className="tnum mt-1 text-[14px] text-ink-3">
                 {V ? `강의 ${V.total}건, 정합성 ${fmtPct(V.match_rate)}, 자동 조치 ${V.auto_actions}건` : '불러오는 중…'}
               </p>
             </div>
@@ -260,7 +260,7 @@ export default function Validation() {
               </Link>
             </div>
           </div>
-          <div className="px-7 pt-5 pb-7">
+          <div className="pt-5 pb-7">
             {day.error ? (
               <ErrorBox error={day.error} onRetry={day.reload} />
             ) : !V ? (
@@ -273,7 +273,7 @@ export default function Validation() {
             ) : (
               <div className={cx('transition-opacity duration-200', day.loading && 'opacity-60')}>
                 {issues.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-[12px] bg-good-bg px-4 py-3 text-[14px] font-medium text-good-ink">
+                  <div className="flex items-center gap-2 border-y border-line py-3.5 text-[15px] text-ink-2">
                     <StatusBadge group="normal" label="모두 정상" /> 이 날 강의 {inRoom.length}건이 모두 계획대로 운전됐습니다.
                   </div>
                 ) : (
@@ -292,7 +292,7 @@ export default function Validation() {
               </div>
             )}
           </div>
-        </Card>
+        </section>
       </div>
 
       <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
@@ -353,13 +353,13 @@ function SessionTable({ rows, lo, hi, onOpen }: { rows: ValidationSession[]; lo:
             return (
               <tr
                 key={v.session}
-                className={cx(tbl.tr, 'cursor-pointer align-top transition-colors hover:bg-well')}
+                className={cx(tbl.tr, 'cursor-pointer align-top transition-colors duration-200 hover:bg-[#f7f8f9] focus-visible:bg-[#f4f5f7]')}
                 onClick={() => onOpen(v.room)}
                 tabIndex={0}
                 aria-label={`${v.room}호 ${v.title} ${info.label}, 상세 보기`}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(v.room))}
               >
-                <td className="px-3.5 py-3 font-semibold text-ink">{v.room}</td>
+                <td className="px-3.5 py-3.5 font-semibold text-ink">{v.room}</td>
                 <td className="px-3.5 py-3">
                   <div className="font-medium text-ink">{v.title}</div>
                   <div className="tnum text-[13px] text-ink-3">
@@ -369,7 +369,7 @@ function SessionTable({ rows, lo, hi, onOpen }: { rows: ValidationSession[]; lo:
                 <td className="px-3.5 py-3">
                   <StatusBadge group={info.group} label={info.label} />
                   {v.notes.map((n, i) => (
-                    <div key={i} className="mt-1 max-w-[420px] text-[13px] text-ink-2">
+                    <div key={i} className="mt-1 max-w-[440px] text-[14px] text-ink-2">
                       {n}
                     </div>
                   ))}

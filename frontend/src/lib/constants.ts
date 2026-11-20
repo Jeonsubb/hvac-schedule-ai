@@ -75,7 +75,7 @@ export function statusInfo(s: string): { label: string; group: StatusGroup } {
 
 export const GROUP_META: Record<StatusGroup, { label: string; color: string; ink: string; bg: string; icon: string }> = {
   normal: { label: '정상', color: STATUS_COLOR.good, ink: '#0a6b0a', bg: '#eaf6ea', icon: '#0ca30c' },
-  auto: { label: '자동 조치', color: STATUS_COLOR.warn, ink: '#8a5a00', bg: '#fff4dc', icon: '#c98500' },
+  auto: { label: '자동 조치', color: STATUS_COLOR.warn, ink: '#3f4650', bg: '#fff4dc', icon: '#7a828c' },
   review: { label: '확인 필요', color: STATUS_COLOR.crit, ink: '#a12a2a', bg: '#fdeeee', icon: '#d03b3b' },
 }
 
