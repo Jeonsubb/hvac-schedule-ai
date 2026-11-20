@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="46 81 341 269" width="341" height="269">
+  <defs>
+    <radialGradient id="b" cx="42%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#fffdfb"/>
+      <stop offset="1" stop-color="#f3eeea"/>
+    </radialGradient>
+  </defs>
+  <g stroke="#4a4442" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <!-- sparkle -->
+    <path d="M308 96 L302 124 M342 120 L322 138 M354 160 L328 162" fill="none" stroke="#8b827d" stroke-width="11"/>
+    <!-- lounging body: head left, body stretched to the right -->
+    <path fill="url(#b)" d="M66 300 C50 248 76 178 146 168 C214 158 262 204 262 252
+      C290 248 330 248 352 262 C374 276 372 304 350 314 C320 330 230 334 160 334
+      C112 334 76 330 66 300 Z"/>
+    <!-- front arm resting -->
+    <path fill="url(#b)" d="M150 334 C132 334 120 320 128 306 C136 292 166 288 190 296 C208 302 208 324 192 332 C180 336 166 334 150 334 Z"/>
+    <!-- raised foot -->
+    <path fill="url(#b)" d="M318 262 C318 238 338 222 356 228 C374 234 376 258 362 272 C350 282 330 280 318 262 Z"/>
+  </g>
+  <!-- face: content closed eyes -->
+  <path d="M110 238 Q122 250 134 238 M168 234 Q180 246 192 234" fill="none" stroke="#4a4442" stroke-width="8.5" stroke-linecap="round"/>
+  <path d="M140 262 Q151 272 162 261" fill="none" stroke="#4a4442" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="100" cy="262" rx="15" ry="9.5" fill="#f6c3b2" opacity="0.85"/>
+  <ellipse cx="204" cy="258" rx="15" ry="9.5" fill="#f6c3b2" opacity="0.85"/>
+</svg>

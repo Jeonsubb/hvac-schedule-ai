@@ -1,0 +1,874 @@
+/* ON:D — /welcome brand story. Scoped under .ond-root; the app's tokens are untouched. */
+
+.ond-root {
+  --ond-bg: #ffffff;
+  --ond-ink: #0c0e13;
+  --ond-ink-2: #4b515d;
+  --ond-ink-3: #8a909b;
+  --ond-line: rgba(12, 14, 19, 0.1);
+  --ond-accent: #2f6fde;
+  --ond-accent-ink: #1f56b8;
+  --ond-accent-soft: #e8f0fd;
+  --ond-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--ond-bg);
+  color: var(--ond-ink);
+  -webkit-font-smoothing: antialiased;
+  touch-action: none; /* swipes step the story; taps and clicks still work */
+}
+.ond-root ::selection {
+  background: rgba(47, 111, 222, 0.18);
+}
+
+/* ---------- header ---------- */
+.ond-header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+  padding: 0 clamp(16px, 3vw, 48px);
+  pointer-events: none;
+}
+.ond-header > * {
+  pointer-events: auto;
+}
+.ond-brandlink {
+  border-radius: 8px;
+  color: var(--ond-ink);
+  text-decoration: none;
+}
+.ond-brandmark {
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.ond-brandmark span {
+  color: var(--ond-accent);
+  margin: 0 0.02em;
+}
+.ond-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- buttons ---------- */
+.ond-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ond-ink);
+  text-decoration: none;
+  transition:
+    background-color 0.25s var(--ond-ease),
+    border-color 0.25s var(--ond-ease),
+    color 0.25s var(--ond-ease);
+}
+.ond-btn:focus-visible,
+.ond-brandlink:focus-visible,
+.ond-nav button:focus-visible {
+  outline: 2px solid var(--ond-accent);
+  outline-offset: 3px;
+}
+.ond-btn-ghost:hover {
+  background: rgba(12, 14, 19, 0.05);
+}
+.ond-btn-line {
+  border: 1px solid rgba(12, 14, 19, 0.2);
+}
+.ond-btn-line:hover {
+  border-color: rgba(12, 14, 19, 0.5);
+}
+.ond-btn-primary {
+  height: 56px;
+  padding: 0 28px;
+  font-size: 17px;
+  background: var(--ond-ink);
+  color: #ffffff;
+}
+.ond-btn-primary:hover {
+  background: #2a2e37;
+}
+.ond-cta-row .ond-btn-line {
+  height: 56px;
+  padding: 0 26px;
+  font-size: 17px;
+}
+
+/* ---------- stage ---------- */
+.ond-stage {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ond-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 60% 50% at 62% 60%, rgba(12, 14, 19, 0.035), transparent 70%),
+    #ffffff;
+}
+.ond-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* mask reveal lines */
+.ond-mask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.ond-line {
+  display: block;
+  will-change: transform;
+}
+
+/* ---------- building ---------- */
+.ond-blayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.ond-bfit {
+  /* centred absolutely: grid/flex centring drifts once the footprint is wider than the screen */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -150px 0 0 -390px;
+  width: 780px;
+  height: 300px;
+  perspective: 2600px;
+  perspective-origin: 50% 30%;
+  scale: 1;
+}
+.ond-bcam,
+.ond-bspin,
+.ond-fl {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.ond-bcam,
+.ond-fl {
+  will-change: transform;
+}
+.ond-ground {
+  position: absolute;
+  left: -620px;
+  top: -560px;
+  width: 2020px;
+  height: 1420px;
+  transform: translateZ(-2px);
+  background-image:
+    linear-gradient(rgba(12, 14, 19, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12, 14, 19, 0.06) 1px, transparent 1px);
+  background-size: 52px 52px;
+  -webkit-mask-image: radial-gradient(ellipse 45% 45% at 50% 50%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 45% 45% at 50% 50%, #000 30%, transparent 75%);
+}
+.ond-slab {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, #ffffff, transparent 60%),
+    #f1f2f4;
+  box-shadow: inset 0 0 0 1px rgba(12, 14, 19, 0.14);
+}
+.ond-slab-tag {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ond-ink-3);
+}
+.ond-slab.is-plan .ond-slab-tag {
+  bottom: auto;
+  top: 16px;
+  font-size: 22px;
+  color: var(--ond-ink-2);
+}
+.ond-zone {
+  position: absolute;
+  border: 1px solid rgba(12, 14, 19, 0.08);
+}
+.ond-corridor {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 14px;
+  background: rgba(12, 14, 19, 0.035);
+  font-size: 12px;
+  color: var(--ond-ink-3);
+}
+.ond-room,
+.ond-space {
+  position: absolute;
+  border: 1.5px solid rgba(12, 14, 19, 0.16);
+  background: #ffffff;
+}
+.ond-space {
+  border-style: dashed;
+  border-color: rgba(12, 14, 19, 0.12);
+  background: transparent;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--ond-ink-3);
+}
+.ond-room-heat {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #cfe0fb, #8fb3f0);
+  opacity: 0;
+}
+.ond-room-num {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ond-ink);
+}
+.ond-room-class {
+  position: absolute;
+  left: 10px;
+  right: 8px;
+  bottom: 10px;
+  font-size: 11.5px;
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--ond-ink);
+  word-break: keep-all;
+}
+
+/* facades stand up from the slab edges */
+.ond-fac {
+  position: absolute;
+}
+.ond-fac-front {
+  left: 0;
+  top: 300px;
+  width: 780px;
+  height: 58px;
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+  background: linear-gradient(0deg, #e3e6eb, #eef0f3);
+  box-shadow: inset 0 1px 0 rgba(12, 14, 19, 0.16);
+}
+.ond-fac-side {
+  left: 0;
+  top: 0;
+  width: 58px;
+  height: 300px;
+  transform-origin: 0 50%;
+  transform: rotateY(-90deg);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 22px, rgba(12, 14, 19, 0.07) 22px 23px),
+    #d8dce3;
+}
+.ond-win {
+  position: absolute;
+  top: 12px;
+  bottom: 10px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.7) 0 1px, transparent 1px 18px),
+    #c4cad4;
+  box-shadow: inset 0 0 0 1px rgba(12, 14, 19, 0.08);
+}
+.ond-win-lit {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.45) 0 1px, transparent 1px 18px),
+    linear-gradient(180deg, #bcd3f8, #6f9be9);
+}
+.ond-roof {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(58px);
+  background:
+    linear-gradient(135deg, #ffffff, transparent 65%),
+    #eceef1;
+  box-shadow: inset 0 0 0 1px rgba(12, 14, 19, 0.14);
+}
+
+/* ---------- scene 1 ---------- */
+.ond-s1 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 16px 6vh;
+}
+.ond-logo {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  font-size: clamp(88px, min(17vw, 30vh), 330px);
+  line-height: 0.86;
+  font-weight: 800;
+  letter-spacing: -0.065em;
+}
+.ond-logo-part {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0 0.02em 0.06em;
+  will-change: transform, opacity;
+}
+.ond-logo-in {
+  display: inline-block;
+}
+.ond-logo-colon {
+  color: var(--ond-accent);
+  margin: 0 -0.01em;
+}
+.ond-slogan {
+  margin: clamp(28px, 4vh, 48px) 0 0;
+  font-size: clamp(22px, min(2.4vw, 4.4vh), 44px);
+  line-height: 1.28;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.ond-desc {
+  margin: 18px 0 0;
+  font-size: clamp(15px, 1.05vw, 19px);
+  color: var(--ond-ink-2);
+  letter-spacing: -0.01em;
+}
+.ond-hint {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+}
+.ond-hint span {
+  width: 1px;
+  height: 44px;
+  background: linear-gradient(180deg, transparent, var(--ond-ink-3));
+}
+
+/* ---------- shared headings ---------- */
+.ond-eyebrow {
+  margin: 0 0 18px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ond-accent-ink);
+  white-space: pre;
+  letter-spacing: 0.02em;
+}
+.ond-h2 {
+  margin: 0;
+  font-size: clamp(30px, min(3.6vw, 6.4vh), 68px);
+  line-height: 1.14;
+  font-weight: 700;
+  letter-spacing: -0.028em;
+}
+
+/* ---------- scene 2: schedule ---------- */
+.ond-s2 {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: center;
+  gap: clamp(18px, 4vh, 56px);
+  padding: clamp(76px, 10vh, 104px) clamp(16px, 6vw, 120px) clamp(60px, 8vh, 84px);
+}
+.ond-s2-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+}
+.ond-caps {
+  position: relative;
+  min-width: min(480px, 42vw);
+  min-height: 3.4em;
+  font-size: clamp(14px, min(1.05vw, 2vh), 19px);
+  line-height: 1.6;
+  color: var(--ond-ink-2);
+}
+.ond-cap {
+  position: absolute;
+  inset: auto 0 0 0;
+  margin: 0;
+  word-break: keep-all;
+}
+.ond-tt {
+  position: relative;
+  align-self: start;
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+}
+.ond-tt-axis {
+  position: relative;
+  height: 28px;
+  margin-left: 76px;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.ond-tt-axis span {
+  position: absolute;
+  top: 0;
+  translate: -50% 0;
+}
+.ond-tt-rows {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+.ond-tt-row {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: center;
+  height: clamp(24px, calc((100vh - 400px) / 11), 48px);
+}
+.ond-tt-room {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ond-ink);
+  font-variant-numeric: tabular-nums;
+}
+.ond-tt-track {
+  position: relative;
+  height: 100%;
+  border-top: 1px solid var(--ond-line);
+}
+.ond-tt-empty {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+}
+.ond-block {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 10px;
+  border: 1px solid rgba(12, 14, 19, 0.12);
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #343a46;
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.ond-block span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ond-cursor-lane {
+  position: absolute;
+  inset: -34px 0 -8px 76px;
+  pointer-events: none;
+}
+.ond-cursor {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.ond-cursor-line {
+  position: absolute;
+  left: 0;
+  top: 30px;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--ond-accent);
+}
+.ond-cursor-time {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--ond-accent);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- scene 3 ---------- */
+.ond-s3 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: min(520px, 38vw);
+  padding: 96px 0 72px clamp(16px, 6vw, 120px);
+  inset: 0 auto 0 0;
+}
+.ond-steps {
+  display: grid;
+  gap: clamp(12px, 2.4vh, 22px);
+  margin: clamp(20px, 4vh, 48px) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.ond-step {
+  position: relative;
+  padding-left: 44px;
+  counter-increment: step;
+}
+.ond-step::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ond-accent-ink);
+  font-variant-numeric: tabular-nums;
+}
+.ond-step strong {
+  display: block;
+  font-size: clamp(18px, 1.25vw, 22px);
+  font-weight: 700;
+  letter-spacing: -0.012em;
+}
+.ond-step span {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(14.5px, 0.95vw, 17px);
+  line-height: 1.6;
+  color: var(--ond-ink-2);
+  word-break: keep-all;
+}
+.ond-track {
+  margin-top: clamp(28px, 4.5vh, 44px);
+  padding-left: 44px;
+}
+.ond-track-bar {
+  height: 3px;
+  background: rgba(12, 14, 19, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ond-track-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(47, 111, 222, 0.3), var(--ond-accent));
+  transform-origin: 0 50%;
+}
+.ond-track-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+}
+.ond-note {
+  margin: 26px 0 0 44px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ond-ink-3);
+  word-break: keep-all;
+}
+
+/* ---------- scene 4 ---------- */
+.ond-s4 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px clamp(40px, 6vh, 80px);
+  text-align: center;
+}
+.ond-s4::before {
+  content: '';
+  position: absolute;
+  inset: 45% 0 0 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.88) 45%, #ffffff);
+  pointer-events: none;
+}
+.ond-final {
+  margin: 0;
+  font-size: clamp(40px, min(5.4vw, 9vh), 104px);
+  line-height: 1.1;
+  font-weight: 750;
+  letter-spacing: -0.032em;
+}
+.ond-cta {
+  margin-top: clamp(20px, 3vh, 36px);
+}
+.ond-cta-sub {
+  margin: 0;
+  font-size: clamp(15px, 1.05vw, 18px);
+  color: var(--ond-ink-2);
+  word-break: keep-all;
+}
+.ond-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+.ond-foot {
+  margin: clamp(20px, 3vh, 32px) 0 0;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+}
+
+/* ---------- Ondy (mascot): one per scene, anchored to the layout ---------- */
+.ond-ondy {
+  display: block;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+}
+/* scene 2: closes the caption row on the right edge of the timetable */
+.ond-caps-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(16px, 2vw, 32px);
+}
+.ond-ondy-schedule {
+  flex: none;
+  width: clamp(84px, min(7.5vw, 13vh), 132px);
+}
+/* scene 3: stands at the foot of the opened building */
+.ond-guide {
+  position: absolute;
+  z-index: 2;
+  right: clamp(16px, 5vw, 96px);
+  bottom: clamp(64px, 10vh, 120px);
+  width: clamp(96px, min(9vw, 16vh), 156px);
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+.ond-guide .ond-ondy {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  translate: -50% 0;
+}
+.ond-ondy-hvac {
+  width: 92%;
+}
+.ond-ondy-comfort {
+  width: 118%;
+}
+/* scene 4: the host, standing beside the closing line */
+.ond-s4-body {
+  position: relative;
+}
+.ond-ondy-main {
+  position: absolute;
+  left: 100%;
+  bottom: clamp(36px, 6vh, 64px);
+  margin-left: clamp(20px, 3vw, 64px);
+  width: clamp(130px, min(13vw, 24vh), 230px);
+}
+
+/* ---------- scene index ---------- */
+.ond-nav {
+  position: absolute;
+  z-index: 3;
+  right: clamp(16px, 3vw, 48px);
+  bottom: 30px;
+  display: flex;
+  gap: 4px;
+}
+.ond-nav button {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ond-ink-3);
+  cursor: pointer;
+  transition:
+    color 0.4s var(--ond-ease),
+    background-color 0.25s var(--ond-ease);
+}
+.ond-nav button:hover {
+  background: rgba(12, 14, 19, 0.05);
+}
+.ond-nav button span {
+  font-variant-numeric: tabular-nums;
+}
+.ond-nav button[data-active] {
+  color: var(--ond-ink);
+  font-weight: 650;
+}
+.ond-nav button[data-active] span {
+  color: var(--ond-accent-ink);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1440px) {
+  .ond-bfit {
+    scale: 0.86;
+  }
+}
+@media (max-width: 1180px) {
+  .ond-bfit {
+    scale: 0.72;
+  }
+}
+@media (max-width: 1023px) {
+  .ond-s3 {
+    inset: 0;
+    width: auto;
+    justify-content: flex-start;
+    padding: 92px 16px 0;
+  }
+  .ond-s3 .ond-steps {
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .ond-s3 .ond-step span,
+  .ond-note {
+    display: none;
+  }
+  .ond-track {
+    margin-top: 18px;
+  }
+  .ond-s2-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .ond-caps {
+    min-width: 0;
+    width: 100%;
+    min-height: 5em;
+  }
+  .ond-cap {
+    position: absolute;
+    inset: 0 0 auto 0;
+  }
+  .ond-ondy-main {
+    position: static;
+    margin: 0 auto 10px;
+    width: clamp(84px, 14vh, 120px);
+  }
+  .ond-caps-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .ond-guide {
+    right: 16px;
+    bottom: 56px;
+    width: 88px;
+  }
+  .ond-nav {
+    left: 50%;
+    right: auto;
+    translate: -50% 0;
+    bottom: 12px;
+  }
+  .ond-nav button {
+    font-size: 0;
+    gap: 0;
+    padding: 10px 6px;
+  }
+  .ond-nav button span {
+    display: block;
+    width: 18px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(12, 14, 19, 0.18);
+    font-size: 0;
+  }
+  .ond-nav button[data-active] span {
+    background: var(--ond-ink);
+  }
+  .ond-s4 {
+    padding-bottom: 56px;
+  }
+}
+@media (max-width: 767px) {
+  .ond-bfit {
+    scale: 0.46;
+  }
+  .ond-header {
+    height: 60px;
+  }
+  .ond-header .ond-btn {
+    height: 38px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+  .ond-block span {
+    display: none;
+  }
+  .ond-tt-row {
+    grid-template-columns: 44px 1fr;
+    height: 30px;
+  }
+  .ond-tt-axis {
+    margin-left: 44px;
+    font-size: 11px;
+  }
+  .ond-tt-axis span:nth-child(even) {
+    display: none;
+  }
+  .ond-cursor-lane {
+    left: 44px;
+  }
+  .ond-tt-room {
+    font-size: 13px;
+  }
+  .ond-s2 {
+    padding-top: 84px;
+    gap: 64px;
+  }
+  .ond-btn-primary,
+  .ond-cta-row .ond-btn-line {
+    height: 50px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 420px) {
+  .ond-bfit {
+    scale: 0.4;
+  }
+}
+@media (max-height: 760px) and (min-width: 1024px) {
+  .ond-bfit {
+    scale: 0.7;
+  }
+}

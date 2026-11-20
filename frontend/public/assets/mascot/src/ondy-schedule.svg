@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="37 55 347 347" width="347" height="347">
+  <defs>
+    <radialGradient id="b" cx="42%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#fffdfb"/>
+      <stop offset="1" stop-color="#f3eeea"/>
+    </radialGradient>
+  </defs>
+  <g stroke="#4a4442" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <!-- sparkle -->
+    <path d="M296 70 L290 98 M330 92 L312 112 M344 132 L320 136" fill="none" stroke="#8b827d" stroke-width="11"/>
+    <!-- head peeking over the board -->
+    <path fill="url(#b)" d="M100 236 C92 168 138 112 206 110 C274 108 322 160 314 236 Z"/>
+  </g>
+  <ellipse cx="178" cy="176" rx="9" ry="11.5" fill="#4a4442"/>
+  <ellipse cx="238" cy="174" rx="9" ry="11.5" fill="#4a4442"/>
+  <path d="M194 196 Q208 210 222 195" fill="none" stroke="#4a4442" stroke-width="8.5" stroke-linecap="round"/>
+  <ellipse cx="156" cy="202" rx="17" ry="10.5" fill="#f6c3b2" opacity="0.85"/>
+  <ellipse cx="260" cy="199" rx="17" ry="10.5" fill="#f6c3b2" opacity="0.85"/>
+  <g stroke="#4a4442" stroke-width="11" stroke-linejoin="round" stroke-linecap="round">
+    <!-- calendar board -->
+    <rect x="52" y="236" width="316" height="150" rx="26" fill="#f7f8fa"/>
+    <path d="M58 278 H362" fill="none" stroke-width="8" stroke="#c9ced6"/>
+    <!-- hands gripping the top edge -->
+    <path fill="url(#b)" d="M112 250 C102 250 96 240 100 230 C106 214 130 210 146 220 C154 226 154 240 146 248 C138 254 124 252 112 250 Z"/>
+    <path fill="url(#b)" d="M308 250 C318 250 324 240 320 230 C314 214 290 210 274 220 C266 226 266 240 274 248 C282 254 296 252 308 250 Z"/>
+  </g>
+  <!-- day cells -->
+  <g>
+    <rect x="94" y="298" width="46" height="26" rx="5" fill="#dfe3e9"/>
+    <rect x="154" y="298" width="46" height="26" rx="5" fill="#dfe3e9"/>
+    <rect x="214" y="298" width="46" height="26" rx="5" fill="#b9c9dc"/>
+    <rect x="274" y="298" width="46" height="26" rx="5" fill="#b9c9dc"/>
+    <rect x="94" y="336" width="46" height="26" rx="5" fill="#dfe3e9"/>
+    <rect x="154" y="336" width="46" height="26" rx="5" fill="#b9c9dc"/>
+    <rect x="214" y="336" width="46" height="26" rx="5" fill="#dfe3e9"/>
+    <rect x="274" y="336" width="46" height="26" rx="5" fill="#dfe3e9"/>
+  </g>
+</svg>
