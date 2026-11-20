@@ -1,0 +1,39 @@
+.agent-stage { margin: 24px 0 0 38px; }
+.agent-stage-status { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 24px; font-size: 13px; color: var(--color-ink-3); text-align: center; }
+.agent-stage-pair { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; max-width: 920px; margin: 18px auto 0; }
+.agent-stage-side { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.agent-stage-bubble { position: relative; width: 100%; padding: 15px 18px; border: 1px solid var(--color-line); border-radius: 16px; background: var(--agent-bg); transition: border-color .25s, box-shadow .25s; animation: agent-bubble-in .3s ease-out; }
+.agent-stage-bubble::after { content: ''; position: absolute; bottom: -7px; left: calc(50% - 7px); width: 12px; height: 12px; background: var(--agent-bg); border-right: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); transform: rotate(45deg); }
+.agent-stage-turn { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--agent-ink); }
+.agent-stage-bubble p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; min-height: 66px; margin-top: 6px; font-size: 14px; line-height: 22px; color: var(--color-ink-2); overflow-wrap: anywhere; }
+.agent-stage-character { position: relative; width: 156px; height: 184px; margin-top: 14px; transform-origin: center bottom; }
+.agent-stage-body, .agent-stage-spark { position: absolute; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
+.agent-stage-spark { opacity: 0; }
+.agent-stage-name { margin-top: 6px; font-size: 14px; font-weight: 650; color: var(--agent-ink); text-align: center; }
+.agent-stage-role { margin-top: 3px; font-size: 12px; color: var(--color-ink-3); text-align: center; }
+.agent-stage-exchange { position: absolute; left: calc(50% - 18px); top: 48%; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; color: var(--color-ink-4); }
+.agent-stage-verdict { margin-top: 18px; text-align: center; font-size: 12px; color: var(--color-ink-3); }
+.is-speaking .agent-stage-character { animation: agent-speaking 1.15s ease-in-out infinite; }
+.is-speaking .agent-stage-spark { animation: agent-spark 1.6s ease-in-out infinite; }
+.is-speaking .agent-stage-bubble { border-color: var(--agent-color); box-shadow: 0 0 0 2px var(--agent-bg); }
+.agent-stage-dots { display: flex; gap: 4px; height: 6px; margin-top: 8px; }
+.agent-stage-dots i { width: 4px; height: 4px; border-radius: 50%; background: var(--agent-color); animation: agent-dot 1s ease-in-out infinite; }
+.agent-stage-dots i:nth-child(2) { animation-delay: .16s; }
+.agent-stage-dots i:nth-child(3) { animation-delay: .32s; }
+@keyframes agent-speaking { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-6px) rotate(1deg); } }
+@keyframes agent-spark { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+@keyframes agent-dot { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+@keyframes agent-bubble-in { from { opacity: .5; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 640px) {
+  .agent-stage { margin-left: 0; }
+  .agent-stage-pair { gap: 26px; }
+  .agent-stage-character { width: 115px; height: 140px; }
+  .agent-stage-bubble { padding: 12px; }
+  .agent-stage-bubble p { min-height: 84px; -webkit-line-clamp: 4; font-size: 13px; line-height: 21px; }
+  .agent-stage-name { font-size: 12px; }
+  .agent-stage-exchange { width: 22px; left: calc(50% - 11px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-stage *, .agent-stage *::after { animation: none !important; transition: none !important; }
+  .is-speaking .agent-stage-spark { opacity: 1; }
+}

@@ -2,14 +2,13 @@ import { Cpu, Scale } from 'lucide-react'
 import { cx } from '../lib/format'
 
 /**
- * Agent characters: two Ondys (the ON:D mascot from /welcome), told apart by colour only.
- * - building agent (관리자 온디): blue, argues for energy and cost.
- * - occupant agent (사용자 온디): orange, argues for comfort.
- * Same drawing for both: the mascot PNG multiplied onto a tinted disc, so the near-white body takes
- * the tint and the dark outline stays dark.
+ * The supplied bunny represents cost; the cat represents comfort.
+ * Face crops are shared by the conversation, timeline and simulation lab.
  */
 
 export type AgentKey = 'building' | 'occupant' | 'arbiter' | 'simulator'
+
+export const AGENT_CHARACTER = { building: 'bunny', occupant: 'cat' } as const
 
 export const AGENT_META: Record<AgentKey, { name: string; role: string; color: string; bg: string; ink: string; tint: string }> = {
   building: { name: '비용 Agent · 관리자 온디', role: '비용 Agent · 에너지와 요금', color: '#3d6fb6', bg: '#e9f0fa', ink: '#24508f', tint: '#b9d0f5' },
@@ -18,7 +17,7 @@ export const AGENT_META: Record<AgentKey, { name: string; role: string; color: s
   arbiter: { name: '판정 (결정적 규칙)', role: '두 안의 합의 정리 · LLM 아님', color: '#6250d6', bg: '#efedfb', ink: '#4a3aa7', tint: '#efedfb' },
 }
 
-/** One Ondy, tinted for its side. Shows the face (cropped from the mascot drawing) inside a disc with a thin ring in the side's colour. */
+/** Supplied character face inside the participant's colour ring. */
 export function OndyAgent({ side, size = 48, className, title }: { side: 'building' | 'occupant'; size?: number; className?: string; title?: string }) {
   const m = AGENT_META[side]
   const ring = Math.max(1.5, size / 26)
@@ -30,11 +29,10 @@ export function OndyAgent({ side, size = 48, className, title }: { side: 'buildi
       style={{ width: size, height: size, background: m.tint, boxShadow: `inset 0 0 0 ${ring}px ${m.color}` }}
     >
       <img
-        src="/assets/mascot/ondy-main.png"
+        src={`/assets/agents/${AGENT_CHARACTER[side]}-face.webp`}
         alt=""
         draggable={false}
-        className="absolute max-w-none select-none mix-blend-multiply"
-        style={{ width: size * 1.72, left: -size * 0.3, top: -size * 0.1 }}
+        className="h-full w-full select-none object-contain"
       />
     </span>
   )

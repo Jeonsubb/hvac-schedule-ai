@@ -5,6 +5,7 @@ import type { AgentTrace, AgentTurn, Negotiation, NegotiationEval, NegotiationJo
 import { ROOM_ORDER } from '../lib/constants'
 import { cx, fmtDateK, fmtKwh, fmtWon } from '../lib/format'
 import { AGENT_META, AgentAvatar, type AgentKey } from './Characters'
+import AgentStage from './AgentStage'
 import { BRAND, HATCH, PillChip } from './Gantt'
 import { SourceIcon, sourceMeta } from './dataSources'
 import { Card, ErrorBox, Loading, Note, Spinner, More} from './ui'
@@ -142,7 +143,9 @@ export default function AgentDebate({ tier, date, mode, onChanged }: { tier: 2 |
         </div>
       </div>
 
-      <VersusBanner neg={neg} running={running} turns={turns} />
+      <div className="mx-7 mb-6">
+        <AgentStage turns={turns} running={running} phase={phase} completed={!!neg} failed={!!error} fallback={neg?.ai === false} />
+      </div>
 
       <div className="space-y-6 px-7 pb-7">
         {error && <ErrorBox title="협의를 끝내지 못했습니다" error={error} onRetry={start} />}
@@ -177,61 +180,6 @@ export function DebateEvidence({ turns, baseline, season, running, agreed }: { t
     <div className="space-y-6">
       <DebateTimeline turns={list} running={running} agreed={agreed} selected={selected} onSelect={setSelected} />
       <Conversation turns={list} baseline={baseline} season={season} running={running} selected={selected} />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------- banner
-
-function VersusBanner({ neg, running, turns }: { neg: Negotiation | null; running: boolean; turns: AgentTurn[] }) {
-  const last = turns[turns.length - 1]
-  const speaking: AgentKey | null = running ? (last?.agent === 'building' ? 'occupant' : 'building') : null
-  const base = neg?.baseline
-  const fin = neg?.final?.eval
-  return (
-    <div className="mx-7 my-5 grid grid-cols-1 items-center gap-4 rounded-[18px] border border-line bg-[linear-gradient(90deg,#eef4fc_0%,#fbfcfd_50%,#fdf3ec_100%)] px-5 py-5 md:grid-cols-[1fr_auto_1fr]">
-      <AgentCard agent="building" goal="요금·전력 최소화, 정부 온도 지침 준수" speaking={speaking === 'building'} />
-      <div className="flex flex-col items-center gap-1.5 text-center">
-        <span className="rounded-full bg-surface px-3 py-1 text-[12.5px] font-bold tracking-[0.04em] text-ink-3 shadow-[0_0_0_1px_var(--color-line)]">VS</span>
-        {base && fin ? (
-          <div className="tnum text-[13px] leading-relaxed text-ink-2">
-            <div>
-              전력 {fmtKwh(base.kwh)} → <b className="text-ink">{fmtKwh(fin.kwh)}</b> kWh
-            </div>
-            <div>
-              체감 {fmtPmv(base.pmv_mean)} → <b className="text-ink">{fmtPmv(fin.pmv_mean)}</b>
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-[180px] text-[12.5px] text-ink-3">같은 데이터, 다른 목표</div>
-        )}
-      </div>
-      <AgentCard agent="occupant" goal="체감 쾌적(PMV −0.5~+0.5) 유지, 의견 반영" speaking={speaking === 'occupant'} align="right" />
-    </div>
-  )
-}
-
-function AgentCard({ agent, goal, speaking, align = 'left' }: { agent: 'building' | 'occupant'; goal: string; speaking: boolean; align?: 'left' | 'right' }) {
-  const m = AGENT_META[agent]
-  return (
-    <div className={cx('flex items-center gap-4', align === 'right' && 'md:flex-row-reverse md:text-right')}>
-      <span className="relative rounded-full">
-        <AgentAvatar agent={agent} size={76} />
-        {speaking && (
-          <span className="absolute -top-1 -right-1 inline-flex h-6 items-center gap-0.5 rounded-full bg-surface px-1.5 shadow-[0_2px_8px_rgb(20_32_51/0.18)]" aria-label="발언 준비 중">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: m.color, animationDelay: `${i * 160}ms` }} />
-            ))}
-          </span>
-        )}
-      </span>
-      <div className="min-w-0">
-        <div className="text-[18px] font-bold tracking-[-0.01em]" style={{ color: m.ink }}>
-          {m.name}
-        </div>
-        <div className="text-[13px] font-medium text-ink-2">{m.role}</div>
-        <div className="mt-0.5 text-[12.5px] text-ink-3">{goal}</div>
-      </div>
     </div>
   )
 }

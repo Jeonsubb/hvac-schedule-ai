@@ -9,6 +9,7 @@ import { NEG_STATE, changedLabel, mergeIntervals, samePlan, signed } from '../li
 import EChart, { axisCommon, type EChartsOption } from './EChart'
 import DayTimeline from './DayTimeline'
 import { DebateEvidence } from './AgentDebate'
+import AgentStage from './AgentStage'
 import { Badge, Button, Disclosure, DisclosureList, ErrorBox, Note, Skeleton, Spinner, btnCls, toast } from './ui'
 
 /**
@@ -27,6 +28,8 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
   const modeQ = useApi<OpMode>('/api/mode', { maxAgeMs: 20_000 })
   const D = dayQ.data?.date === date ? dayQ.data : undefined
   const cmp = cmpQ.data?.date === date ? cmpQ.data : undefined
+  const historyQ = useApi<Negotiation>(cmp && cmp.state !== 'none' ? `/api/negotiate/latest?tier=3&date=${date}` : null, { maxAgeMs: 5_000 })
+  const history = historyQ.data?.date === date && historyQ.data?.created_at === cmp?.created_at ? historyQ.data : undefined
 
   const [running, setRunning] = useState(false)
   const [phase, setPhase] = useState<string | null>(null)
@@ -74,6 +77,7 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
         { intervalMs: 1200, timeoutMs: 300_000, signal: ac.signal },
       )
       if (job.status === 'error' || !job.result) throw new Error(job.error || '협의가 끝나지 않았습니다.')
+      setLiveTurns(job.result.turns)
       // the result is stored: re-read it from the server (comparison, adjustments, the day itself)
       setRanAt(job.result.created_at)
       scrollTo.current = job.result.created_at
@@ -162,6 +166,7 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
         <p className="mt-1.5 pl-[38px] text-[14px] text-ink-3">
           {fmtDateK(date)} · 설정온도만 협의 · {mode === 'auto' ? '0.5℃ 이내 자동 적용' : '승인 후 적용'}
         </p>
+        <AgentStage turns={running ? liveTurns : history?.turns ?? liveTurns} running={running} phase={phase} completed={has} failed={!!error} fallback={has && cmp?.ai === false} />
         {noClass && <Note tone="warn">수업 없음 · 협의 대상 없음</Note>}
         {running && (
           <div className="mt-4 ml-[38px] border-l-2 border-brand pl-4" role="status" aria-live="polite">
