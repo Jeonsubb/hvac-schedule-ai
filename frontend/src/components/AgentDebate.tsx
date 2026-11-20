@@ -168,6 +168,19 @@ export default function AgentDebate({ tier, date, mode, onChanged }: { tier: 2 |
   )
 }
 
+/** The recorded exchange as evidence: who said what in which round, the data each turn cited, and the simulator's check. */
+export function DebateEvidence({ turns, baseline, season, running, agreed }: { turns: AgentTurn[]; baseline: NegotiationEval | undefined; season: 'heat' | 'cool'; running: boolean; agreed: boolean }) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const list = normTurns(turns)
+  if (!list.length) return null
+  return (
+    <div className="space-y-6">
+      <DebateTimeline turns={list} running={running} agreed={agreed} selected={selected} onSelect={setSelected} />
+      <Conversation turns={list} baseline={baseline} season={season} running={running} selected={selected} />
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------- banner
 
 function VersusBanner({ neg, running, turns }: { neg: Negotiation | null; running: boolean; turns: AgentTurn[] }) {
@@ -273,10 +286,10 @@ function DebateTimeline({
   const cols = running ? rounds + 1 : Math.max(rounds, 2)
   const current = running ? (turns.length ? rounds + (turns[turns.length - 1].agent === 'occupant' ? 1 : 0) : 1) : null
   const lanes: { key: Lane; title: string; sub: string }[] = [
-    { key: 'building', title: '관리자 온디', sub: '관리자 에이전트' },
-    { key: 'occupant', title: '사용자 온디', sub: '건물 이용자' },
-    { key: 'simulator', title: '시뮬레이터', sub: '열모델 검증' },
-    { key: 'arbiter', title: '판정', sub: '합의 정리' },
+    { key: 'building', title: '비용 Agent', sub: '관리자 온디 · Bedrock' },
+    { key: 'occupant', title: '쾌적 Agent', sub: '사용자 온디 · Bedrock' },
+    { key: 'simulator', title: '시뮬레이터', sub: '물리 모델 검증' },
+    { key: 'arbiter', title: '판정', sub: '결정적 규칙 (LLM 아님)' },
   ]
   const seen: Record<string, number> = {}
   const cells: Record<string, { idx: number; label: string; chip: string; dot: string }[]> = {}
@@ -447,6 +460,26 @@ function TurnBubble({ t, baseline, season, highlight, animate }: { t: AgentTurn;
         {t.stance && <div className={cx('mt-1.5 text-[16px] leading-snug font-semibold text-ink', right && 'text-right')}>{t.stance}</div>}
         {t.message && <p className="mt-1.5 text-[14.5px] leading-[1.65] whitespace-pre-line text-ink-2">{t.message}</p>}
 
+        {t.sims && t.sims.length > 0 && (
+          <div className="mt-3 rounded-[12px] bg-white/80 px-3.5 py-2.5">
+            <div className="text-[12.5px] font-semibold text-ink-3">답하기 전에 시뮬레이터를 직접 {t.sims.length}회 실행</div>
+            <ol className="mt-1.5 space-y-1.5">
+              {t.sims.map((s, i) => (
+                <li key={i} className="text-[13px] leading-snug text-ink-2">
+                  <span className="tnum mr-1.5 font-semibold" style={{ color: m.ink }}>
+                    {i + 1}
+                  </span>
+                  {s.why}
+                  <span className="tnum ml-1.5 font-semibold whitespace-nowrap text-ink">
+                    → {fmtKwh(s.kwh)} kWh · {fmtWon(s.cost_krw)}
+                    {s.pmv_mean != null ? ` · PMV ${s.pmv_mean.toFixed(2)}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         {t.trace.length > 0 && <DataHops trace={t.trace} color={m.color} animate={animate} />}
 
         {diffs.length > 0 && (
@@ -497,7 +530,7 @@ function EvalStrip({ e, base }: { e: NegotiationEval; base: NegotiationEval | un
         </span>
         {e.complaints_addressed > 0 && (
           <span>
-            <span className="text-ink-3">반영한 의견 </span>
+            <span className="text-ink-3">반영한 의견(가상 포함) </span>
             <b className="text-ink">{e.complaints_addressed}건</b>
           </span>
         )}

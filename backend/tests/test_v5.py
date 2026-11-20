@@ -198,3 +198,40 @@ def test_change_response_previews(client):
     n = client.post("/api/respond/preview", json={"kind": "noshow", "date": "2026-11-18"}).json()
     assert n["rooms"][0]["after"]["on_min"] <= n["rooms"][0]["before"]["on_min"]  # a vacancy stop never lengthens the run
     assert client.post("/api/respond/preview", json={"kind": "nope"}).status_code == 400
+
+
+def test_negotiation_compare_same_conditions(client):
+    """Before/after of a negotiation: same numbers as the negotiation itself, comparable only while the
+    day's timetable/weather/rules are unchanged, and the operating plan moves only on approval."""
+    from app import agents, planning, service
+
+    d = date(2026, 11, 17)
+    assert client.get(f"/api/negotiate/compare?date={d}").json()["state"] == "none"
+    planning.set_mode("recommend")
+    res = agents.negotiate(3, d, use_ai=False)
+    assert res["ai"] is False and res["feedback_sources"]["simulated"] > 0  # seeded votes are counted apart from real ones
+    assert "sensor" not in agents.SOURCES and "nowcast" not in agents.SOURCES
+    assert "가상 의견" in agents.dossier_text(agents.build_dossier(3, d, service.Ctx()))
+    c = client.get(f"/api/negotiate/compare?date={d}").json()
+    assert c["same_conditions"] is True and c["ai"] is False
+    assert c["before"]["kwh"] == res["baseline"]["kwh"] and c["after"]["kwh"] == res["final"]["eval"]["kwh"]
+    assert c["before"]["pmv_mean"] == res["baseline"]["pmv_mean"]
+    ai_kwh = lambda: round(service.get_day(d)["strategies"]["ai"]["kwh"], 2)  # noqa: E731
+    if c["adjustments"]:
+        assert c["state"] == "pending" and ai_kwh() == c["before"]["kwh"]  # a recommendation changes nothing
+        for a in c["adjustments"]:
+            client.post(f"/api/adjustments/{a['id']}/approve")
+        c2 = client.get(f"/api/negotiate/compare?date={d}").json()
+        assert c2["state"] == "applied" and c2["same_conditions"] is True
+        assert ai_kwh() == c2["after"]["kwh"]  # the operating plan is now the negotiated one
+        # a second run never reuses a decided adjustment's id
+        again = agents.negotiate(3, d, use_ai=False)
+        assert not set(again["adjustment_ids"]) & {a["id"] for a in c["adjustments"]}
+    # the timetable changes: the stored result is no longer comparable
+    ev = client.post("/api/events", json={"type": "add", "date": d.isoformat(), "room": "406", "start": "19:00", "end": "20:30",
+                                          "title": "특강", "expected_people": 30})
+    assert ev.status_code == 200
+    c3 = client.get(f"/api/negotiate/compare?date={d}").json()
+    assert c3["same_conditions"] is False and "schedule" in c3["changed"]
+    q = client.get(f"/api/iaq/{d}").json()
+    assert len(q["rooms"]["406"]["co2"]) == 96 and q["source"] == "estimated"
