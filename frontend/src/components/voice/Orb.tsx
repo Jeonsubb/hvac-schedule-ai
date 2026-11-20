@@ -121,7 +121,7 @@ export default function Orb({
       ctx.clearRect(0, 0, w, h)
       const cx = w / 2
       const cy = h / 2
-      const R = Math.min(w, h) * 0.34 * cur.radius * (1 + level * cur.react * 0.12)
+      const R = Math.min(w, h) * 0.38 * cur.radius * (1 + level * cur.react * 0.12)
       const [cr, cg, cb] = cur.color
 
       // soft halo that swells with the voice

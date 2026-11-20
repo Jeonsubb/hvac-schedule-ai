@@ -118,14 +118,14 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={cx('grid flex-1 items-center gap-8 pt-8', hasCards ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,480px)]' : '')}>
+        <div className={cx('grid flex-1 items-center gap-8 pt-2', hasCards ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,480px)]' : '')}>
           <section className="flex min-w-0 flex-col items-center text-center" aria-label="온디와 대화">
             <button
               type="button"
               onClick={v.wake}
               className={cx(
                 'group relative aspect-square shrink-0 cursor-pointer rounded-full transition-[width] duration-500 ease-[var(--ease-out)] focus-visible:outline-offset-[-12px]',
-                hasCards ? 'w-[min(38vh,340px,80vw)]' : 'w-[min(42vh,420px,86vw)]',
+                hasCards ? 'w-[min(46vh,440px,84vw)]' : 'w-[min(52vh,540px,90vw)]',
               )}
               aria-label={v.phase === 'listening' ? '듣기 멈추기' : '온디 부르기'}
               title="눌러서 말하기 (Space)"
@@ -133,7 +133,7 @@ export default function Home() {
               <Orb phase={v.phase} sample={v.sample} className="pointer-events-none absolute inset-[-12%] h-[124%] w-[124%]" />
             </button>
 
-            <div className="relative z-10 mt-5 flex min-h-[132px] w-full max-w-[720px] flex-col items-center">
+            <div className="relative z-10 mt-1 flex min-h-[120px] w-full max-w-[720px] flex-col items-center">
               <div className="flex items-center gap-2 text-[12.5px] font-semibold tracking-[0.02em] text-ink-3" role="status" aria-live="polite">
                 <span
                   className={cx(
