@@ -1,294 +1,521 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { AgentAvatar } from '../components/Characters'
-import {
-  Building2,
-  CalendarClock,
-  CalendarRange,
-  CalendarDays,
-  CloudSun,
-  Users,
-  Wind,
-  MessageSquareWarning,
-  PlugZap,
-  ShieldCheck,
-  Bot,
-  Hand,
-  ArrowRight,
-  Scale,
-} from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import gsap from 'gsap'
+import { Observer } from 'gsap/Observer'
 import { useAuth } from '../lib/auth'
-import { btnCls } from '../components/ui'
-import { PublicHeader } from '../components/PublicShell'
-import { cx } from '../lib/format'
+import Building, { FH, FLOORS } from '../components/welcome/Building'
+import { DAY_END, DAY_START, FOCUS, FOCUS_HOUR, MONDAY, ROOM_COUNT, SESSION_COUNT, fmtHour } from '../components/welcome/data'
+import '../components/welcome/welcome.css'
 
-const PROBLEMS = [
-  {
-    icon: CalendarClock,
-    title: '일정은 매일 바뀌는데 스케줄은 고정입니다',
-    body: '휴강·보강·행사·예약이 생겨도 중앙 제어는 정해진 시간에 켜고 끕니다. 빈 강의실과 빈 매장이 냉난방됩니다.',
-  },
-  {
-    icon: CloudSun,
-    title: '날씨와 재실 인원을 운전에 반영하지 못합니다',
-    body: '추운 아침에는 늦게 켜서 춥고, 사람이 적은 날에도 같은 출력으로 돌립니다. 비용과 쾌적이 함께 나빠집니다.',
-  },
-  {
-    icon: MessageSquareWarning,
-    title: '민원은 쌓이는데 판단 근거가 없습니다',
-    body: '"춥다", "답답하다"는 문의가 올 때마다 담당자가 감으로 설정을 바꿉니다. 바꾼 결과가 비용에 어떤 영향을 줬는지 남지 않습니다.',
-  },
-]
+gsap.registerPlugin(Observer)
 
-const STEPS = [
-  { icon: PlugZap, title: '데이터 수집', body: '중앙 제어 PC, 시간표·예약, 기상청 예보, CO₂·재실 센서, 재실자 의견을 한곳에 모읍니다.' },
-  { icon: CalendarRange, title: '1차 · 월간 계획', body: '학사일정과 시간표, 평년 기온으로 한 달 운전 계획과 예상 요금을 만듭니다.' },
-  { icon: CalendarDays, title: '2차 · 주간 조정', body: '주간 예보, 행사, 지난주 재실 밀도와 의견으로 설정온도와 환기 단계를 조정합니다.' },
-  { icon: ShieldCheck, title: '3차 · 일일 검증', body: '매일 새로 들어온 실황·센서·민원으로 오늘 계획이 여전히 맞는지 정합성을 검증합니다.' },
-  { icon: Bot, title: '자동 운전 또는 추천', body: '자동 운전 모드는 바로 반영하고, 추천 모드는 담당자가 승인한 조정만 반영합니다.' },
-]
+const SPAN = DAY_END - DAY_START
+const FOCUS_COUNT = Object.keys(FOCUS).length
+const IDLE_COUNT = ROOM_COUNT - FOCUS_COUNT
+const SCENES = ['브랜드', '스케줄', '공간 준비', '완성']
 
-const DATA = [
-  { icon: CalendarClock, label: '시간표·예약·행사' },
-  { icon: CloudSun, label: '기상청 예보·실황' },
-  { icon: Building2, label: '중앙 제어 PC(BMS)' },
-  { icon: Wind, label: 'CO₂ 센서' },
-  { icon: Users, label: '재실 밀도' },
-  { icon: MessageSquareWarning, label: '재실자 의견' },
-]
+const ACCENT = '#2f6fde'
+const INK_SOFT = 'rgba(12,14,19,0.16)'
+const INK_STRONG = 'rgba(12,14,19,0.6)'
 
-/** A small picture of the idea: schedules in, AI in the middle, an operating plan out. */
-function HeroVisual() {
-  const lectures = [
-    [6, 22],
-    [30, 52],
-    [64, 86],
-  ]
-  const events = [
-    [20, 36],
-    [58, 70],
-  ]
-  const plan = [
-    [4, 23],
-    [28, 53],
-    [62, 87],
-  ]
-  const lane = (items: number[][], cls: string) => (
-    <div className="relative h-7 rounded-[8px] bg-well">
-      {items.map(([a, b], i) => (
-        <span key={i} className={cx('absolute top-1 bottom-1 rounded-[6px]', cls)} style={{ left: `${a}%`, width: `${b - a}%` }} />
-      ))}
-    </div>
-  )
+/** Deterministic scatter for the timetable blocks (same on every visit and every replay). */
+const jitter = (i: number, k: number) => {
+  const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453
+  return v - Math.floor(v) - 0.5
+}
+
+function Lines({ lines, className }: { lines: string[]; className?: string }) {
   return (
-    <div className="rounded-[20px] border border-line bg-surface p-6 shadow-[0_24px_64px_rgb(20_32_51/0.08)]">
-      <div className="space-y-4">
-        <div>
-          <div className="mb-1.5 text-[13px] font-medium text-ink-3">강의 시간표</div>
-          {lane(lectures, 'bg-[#c9dbf7]')}
-        </div>
-        <div>
-          <div className="mb-1.5 text-[13px] font-medium text-ink-3">예약·행사 정보</div>
-          {lane(events, 'bg-event-bg ring-1 ring-inset ring-[#d6d0f5]')}
-        </div>
-      </div>
-      <div className="my-5 flex items-center justify-center gap-3">
-        <span className="h-px flex-1 bg-line" aria-hidden />
-        <span className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-[14px] font-semibold text-white">
-          <Bot size={16} aria-hidden /> AI 일정 분석
+    <>
+      {lines.map((l) => (
+        <span key={l} className={`ond-mask ${className ?? ''}`}>
+          <span className="ond-line">{l}</span>
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[13px] text-ink-2">
-          <CloudSun size={14} aria-hidden /> 날씨 반영
-        </span>
-        <span className="h-px flex-1 bg-line" aria-hidden />
-      </div>
-      <div>
-        <div className="mb-1.5 flex items-center justify-between text-[13px] font-medium text-ink-3">
-          <span>AI가 만든 운전 스케줄</span>
-          <span className="text-brand-ink">일정이 바뀌면 다시 계산</span>
-        </div>
-        <div className="relative h-16 rounded-[10px] bg-well">
-          {plan.map(([a, b], i) => (
-            <span
-              key={i}
-              className="absolute bottom-2 h-10 rounded-t-[6px] border-x-2 border-t-2 border-brand bg-brand-bg"
-              style={{ left: `${a}%`, width: `${b - a}%` }}
-            />
-          ))}
-          <span className="absolute right-2 bottom-2 left-2 h-0.5 bg-brand/40" aria-hidden />
-        </div>
-      </div>
-    </div>
+      ))}
+    </>
   )
 }
 
+/**
+ * /welcome — ON:D brand story. The page does not scroll: one wheel notch, swipe or key press
+ * plays the timeline to the next stop, so each step lands as a composed frame.
+ */
 export default function Welcome() {
   const { user } = useAuth()
+  const root = useRef<HTMLDivElement>(null)
+  const goScene = useRef<(scene: number) => void>(() => {})
+
+  useLayoutEffect(() => {
+    const el = root.current
+    if (!el) return
+    const html = document.documentElement
+    const prev = { bg: html.style.backgroundColor, body: document.body.style.backgroundColor, ob: html.style.overscrollBehavior }
+    html.style.backgroundColor = '#ffffff'
+    document.body.style.backgroundColor = '#ffffff'
+    html.style.overscrollBehavior = 'none'
+
+    const mm = gsap.matchMedia()
+    mm.add(
+      { reduce: '(prefers-reduced-motion: reduce)', motion: '(prefers-reduced-motion: no-preference)' },
+      (c) => {
+        const reduce = !!c.conditions?.reduce
+        const q = gsap.utils.selector(el)
+        // Under reduced motion, keep only opacity/colour changes: no travel, scale, rotation or wipes.
+        const MOVE = ['x', 'y', 'z', 'xPercent', 'yPercent', 'scale', 'scaleX', 'rotation', 'rotationX', 'rotationY', 'clipPath']
+        const v = (vars: gsap.TweenVars): gsap.TweenVars => {
+          if (!reduce) return vars
+          const out = { ...vars }
+          for (const k of MOVE) delete (out as Record<string, unknown>)[k]
+          return out
+        }
+        const cam = q('.ond-bcam')[0]
+        const spin = q('.ond-bspin')[0]
+        const fl = (f: number) => q(`.ond-fl[data-floor="${f}"]`)[0]
+        const leaves = (f: number) => q(`.ond-leaf[data-floor="${f}"]`)
+        const plans = q('.ond-fac-front[data-floor="3"], .ond-fac-front[data-floor="4"], .ond-fac-side[data-floor="3"], .ond-fac-side[data-floor="4"]')
+        const focusHeat = q('.ond-room[data-focus] .ond-room-heat')
+        const focusRoom = q('.ond-room[data-focus]')
+        const idleRoom = q('.ond-room:not([data-focus])')
+        const blocks = q('.ond-block')
+        const focusBlocks = q('.ond-block[data-focus]')
+        const otherBlocks = q('.ond-block:not([data-focus])')
+        const cursor = q('.ond-cursor')[0]
+        const cursorLabel = q('.ond-cursor-time')[0]
+        const navItems = q('.ond-nav button')
+        const wide = () => window.innerWidth >= 1024
+
+        // ---- initial state -------------------------------------------------------------
+        gsap.set(spin, { rotation: -38 })
+        gsap.set(cam, { rotationX: 62, scale: 0.84, y: 150, x: 0 })
+        FLOORS.forEach((f) => gsap.set(fl(f), { z: (f - 1) * FH }))
+        gsap.set('.ond-blayer', { opacity: 0.55 })
+        gsap.set(['.ond-s2', '.ond-s3', '.ond-s4', '.ond-brandmark'], { autoAlpha: 0 })
+        gsap.set(q('.ond-s2 .ond-line, .ond-s3 .ond-line, .ond-s4 .ond-line'), reduce ? { opacity: 0 } : { yPercent: 112 })
+        gsap.set(q('.ond-cap-b'), { autoAlpha: 0 })
+        gsap.set(q('.ond-step'), { opacity: 0.3 })
+        gsap.set(q('.ond-track-fill'), reduce ? { opacity: 0 } : { scaleX: 0 })
+        gsap.set(q('.ond-cta'), reduce ? { opacity: 0 } : { opacity: 0, y: 18 })
+        gsap.set(focusHeat, { opacity: 0 })
+        gsap.set(q('.ond-win-lit'), { opacity: 0 })
+        gsap.set(plans, { clipPath: 'inset(0% 0% 0% 0%)' })
+        gsap.set(q('.ond-ondy'), reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.92, transformOrigin: '50% 100%' })
+        // Ondy appears once per scene, after the copy has landed, and never loops.
+        const pop = () => v({ opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'back.out(1.6)' })
+        const drop = () => v({ opacity: 0, y: 10, scale: 0.94, duration: 0.25, ease: 'power2.in' })
+        blocks.forEach((b, i) =>
+          gsap.set(b, reduce ? { opacity: 0 } : { opacity: 0, x: jitter(i, 1) * 260, y: jitter(i, 2) * 220, rotation: jitter(i, 3) * 24 }),
+        )
+
+        // first paint: the wordmark rises out of its mask
+        if (!reduce) {
+          // fromTo, not from: a StrictMode re-run must never read a half-finished state as the end value
+          gsap.fromTo(q('.ond-logo-in'), { yPercent: 108 }, { yPercent: 0, duration: 1.3, ease: 'expo.out', stagger: 0.09, delay: 0.1 })
+          gsap.fromTo(q('.ond-s1 .ond-line'), { yPercent: 112 }, { yPercent: 0, duration: 1.1, ease: 'expo.out', stagger: 0.08, delay: 0.45 })
+          gsap.fromTo(q('.ond-hint'), { opacity: 0 }, { opacity: 1, duration: 1, delay: 1.1 })
+        }
+
+        const time = { t: DAY_START }
+        const setTime = () => {
+          const pct = ((time.t - DAY_START) / SPAN) * 100
+          cursor.style.transform = `translate3d(${pct}%,0,0)`
+          cursorLabel.textContent = fmtHour(Math.round(time.t * 4) / 4)
+        }
+        setTime()
+
+        const tl = gsap.timeline({ paused: true, defaults: { ease: 'none' } })
+
+        // ---- Scene 1 → out: the wordmark splits and the building recedes ---------------
+        tl.to(q('.ond-logo-on'), v({ xPercent: -38, opacity: 0, duration: 1.1, ease: 'power2.in' }), 0)
+          .to(q('.ond-logo-d'), v({ xPercent: 60, opacity: 0, duration: 1.1, ease: 'power2.in' }), 0)
+          .to(q('.ond-logo-colon'), v({ scale: 0.2, opacity: 0, duration: 0.7, ease: 'power2.in' }), 0.05)
+          .to(q('.ond-s1 .ond-line'), v({ yPercent: -112, opacity: 0, duration: 0.55, stagger: 0.06, ease: 'power2.in' }), 0)
+          .to(q('.ond-hint'), { opacity: 0, duration: 0.3 }, 0)
+          .to('.ond-blayer', { opacity: 0.12, duration: 1 }, 0.1)
+          .to(cam, v({ scale: 0.7, y: 220, duration: 1.2, ease: 'power1.inOut' }), 0)
+          .to('.ond-brandmark', { autoAlpha: 1, duration: 0.4 }, 0.8)
+          .set('.ond-s1', { autoAlpha: 0 }, 1.15)
+
+        // ---- Scene 2: the schedule assembles, then a cursor sweeps the day ----------------
+        tl.to('.ond-s2', { autoAlpha: 1, duration: 0.25 }, 1.0)
+          .to(q('.ond-s2 .ond-line'), v({ yPercent: 0, opacity: 1, duration: 0.6, stagger: 0.07, ease: 'power3.out' }), 1.05)
+          .to(blocks, v({ x: 0, y: 0, rotation: 0, opacity: 1, duration: 0.8, ease: 'power3.out', stagger: { each: 0.012, from: 'random' } }), 1.2)
+          .to(time, { t: DAY_END - 0.5, duration: 1.0, ease: 'power1.inOut', onUpdate: setTime }, 2.45)
+          .to(time, { t: FOCUS_HOUR, duration: 0.4, ease: 'power2.inOut', onUpdate: setTime }, 3.45)
+          .to(q('.ond-cap-a'), { autoAlpha: 0, duration: 0.2 }, 3.5)
+          .to(otherBlocks, { opacity: 0.25, duration: 0.3 }, 3.6)
+          .to(focusBlocks, { backgroundColor: ACCENT, color: '#ffffff', borderColor: ACCENT, duration: 0.3 }, 3.6)
+          .to(q('.ond-cap-b'), { autoAlpha: 1, duration: 0.3 }, 3.65)
+          .to(q('.ond-ondy-schedule'), pop(), 1.6)
+
+        // ---- Scene 2 → 3: the schedule tips over into the floor plan --------------------
+        const S2_OUT = 3.95
+        tl.to(q('.ond-tt'), v({ rotationX: 58, y: 120, scale: 0.86, opacity: 0, transformPerspective: 1400, duration: 0.9, ease: 'power2.in' }), S2_OUT)
+          .to(q('.ond-s2-head'), v({ y: -30, opacity: 0, duration: 0.5, ease: 'power2.in' }), S2_OUT)
+          .set('.ond-s2', { autoAlpha: 0 }, S2_OUT + 0.9)
+
+        // Building poses shared by both motion modes.
+        const camPlan = { x: () => (wide() ? window.innerWidth * 0.2 : 0), y: () => (wide() ? window.innerHeight * 0.1 : window.innerHeight * 0.36), scale: () => 0.8 * Math.min(1, window.innerHeight / 1000), rotationX: 50 }
+        // on short screens lift the building further so it clears the closing line
+        const camEnd = { x: 0, y: () => -window.innerHeight * 0.07 - Math.max(0, 900 - window.innerHeight) * 0.3, scale: 0.62, rotationX: 58 }
+        const apart: Record<number, number> = { 5: 4 * FH + 460, 4: 3 * FH + 230, 3: 2 * FH, 2: FH - 110, 1: -180 }
+        const dim = [...leaves(2), ...leaves(1)]
+
+        // ---- Scene 3: floors separate, the walls slice away, the booked spaces prepare ------
+        const EX = S2_OUT + 0.95
+        if (reduce) {
+          // no travel: cut to the opened building while it is faded out, then fade it in
+          tl.to('.ond-blayer', { opacity: 0, duration: 0.15 }, S2_OUT - 0.1)
+            .set(cam, camPlan, S2_OUT + 0.05)
+          FLOORS.forEach((f) => tl.set(fl(f), { z: apart[f] }, S2_OUT + 0.05))
+          tl.set(leaves(5), { opacity: 0 }, S2_OUT + 0.05)
+            .set(dim, { opacity: 0.25 }, S2_OUT + 0.05)
+            .set(plans, { opacity: 0 }, S2_OUT + 0.05)
+            .to('.ond-blayer', { opacity: 1, duration: 0.7 }, S2_OUT + 0.15)
+        } else {
+          tl.to('.ond-blayer', { opacity: 1, duration: 0.7 }, S2_OUT + 0.15)
+            .to(cam, { ...camPlan, duration: 1.1, ease: 'power2.inOut' }, S2_OUT + 0.05)
+          FLOORS.forEach((f) => tl.to(fl(f), { z: apart[f], duration: 1, ease: 'power2.inOut' }, EX))
+          tl.to(leaves(5), { opacity: 0, duration: 0.6 }, EX + 0.2)
+            .to(dim, { opacity: 0.25, duration: 0.8 }, EX + 0.1)
+            .to(plans, { clipPath: 'inset(0% 0% 100% 0%)', duration: 0.8, ease: 'power2.inOut', stagger: 0.06 }, EX + 0.15)
+        }
+        tl.to('.ond-s3', { autoAlpha: 1, duration: 0.2 }, EX + 0.2)
+          .to(q('.ond-s3 .ond-line'), v({ yPercent: 0, opacity: 1, duration: 0.6, stagger: 0.06, ease: 'power3.out' }), EX + 0.25)
+          .to(q('.ond-step[data-step="1"]'), { opacity: 1, duration: 0.3 }, EX + 0.5)
+
+        const PREP = EX + 1.1
+        tl.to(q('.ond-step[data-step="1"]'), { opacity: 0.3, duration: 0.3 }, PREP)
+          .to(q('.ond-step[data-step="2"]'), { opacity: 1, duration: 0.3 }, PREP)
+          .to(q('.ond-track-fill'), reduce ? { opacity: 0.6, duration: 0.8 } : { scaleX: 0.66, duration: 0.8, ease: 'power1.inOut' }, PREP + 0.05)
+          .to(focusHeat, { opacity: 0.55, duration: 0.8, stagger: 0.07 }, PREP + 0.1)
+          .to(q('.ond-track-fill'), reduce ? { opacity: 1, duration: 0.3 } : { scaleX: 1, duration: 0.3 }, PREP + 0.95)
+          .to(focusHeat, { opacity: 0.92, duration: 0.3 }, PREP + 0.95)
+          .to(focusRoom, { borderColor: ACCENT, duration: 0.3 }, PREP + 0.95)
+          .to(q('.ond-ondy-hvac'), pop(), EX + 0.55)
+          // the moment the spaces are in use: preparing → comfortable
+          .to(q('.ond-ondy-hvac'), drop(), PREP + 0.95)
+          .to(q('.ond-ondy-comfort'), pop(), PREP + 1.1)
+
+        const IDLE = PREP + 1.4
+        tl.to(q('.ond-step[data-step="2"]'), { opacity: 0.3, duration: 0.3 }, IDLE)
+          .to(q('.ond-step[data-step="3"]'), { opacity: 1, duration: 0.3 }, IDLE)
+          .to(idleRoom, { borderColor: INK_STRONG, duration: 0.35 }, IDLE)
+
+        // ---- Scene 4: the building closes up again and the system is whole --------------
+        const FIN = IDLE + 0.5
+        tl.to('.ond-s3', { autoAlpha: 0, duration: 0.4 }, FIN)
+          .to(q('.ond-ondy-comfort'), drop(), FIN)
+          .to(idleRoom, { borderColor: INK_SOFT, duration: 0.3 }, FIN)
+        if (reduce) {
+          tl.to('.ond-blayer', { opacity: 0, duration: 0.3 }, FIN)
+            .set(cam, camEnd, FIN + 0.32)
+            .set(spin, { rotation: -30 }, FIN + 0.32)
+          FLOORS.forEach((f) => tl.set(fl(f), { z: (f - 1) * FH }, FIN + 0.32))
+          tl.set([...leaves(5), ...dim], { opacity: 1 }, FIN + 0.32)
+            .set(plans, { opacity: 1 }, FIN + 0.32)
+            .to('.ond-blayer', { opacity: 1, duration: 0.5 }, FIN + 0.4)
+        } else {
+          FLOORS.forEach((f) => tl.to(fl(f), { z: (f - 1) * FH, duration: 1.1, ease: 'power3.inOut' }, FIN + 0.05))
+          tl.to([...leaves(5), ...dim], { opacity: 1, duration: 0.8 }, FIN + 0.2)
+            .to(plans, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.8, ease: 'power2.inOut' }, FIN + 0.35)
+            .to(cam, { ...camEnd, duration: 1.3, ease: 'power2.inOut' }, FIN)
+            .to(spin, { rotation: -30, duration: 1.6, ease: 'power1.inOut' }, FIN)
+        }
+        tl.to(q('.ond-win-lit'), { opacity: 1, duration: 0.5, stagger: 0.05 }, FIN + 0.9)
+          .to('.ond-s4', { autoAlpha: 1, duration: 0.2 }, FIN + 0.9)
+          .to(q('.ond-s4 .ond-line'), v({ yPercent: 0, opacity: 1, duration: 0.7, stagger: 0.12, ease: 'power3.out' }), FIN + 0.95)
+          .to(q('.ond-cta'), v({ opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }), FIN + 1.45)
+          .to(q('.ond-ondy-main'), pop(), FIN + 1.55)
+
+        // ---- stops: one gesture plays to the next composed frame ----------------------------
+        //   brand · schedule laid out · 09:00 focus · building opened · spaces prepared · idle spaces · final
+        const STOPS = [0, 2.4, S2_OUT, EX + 0.95, IDLE - 0.05, FIN - 0.05, tl.duration()]
+        const SCENE_OF = [0, 1, 1, 2, 2, 2, 3]
+        const FIRST_STOP = [0, 1, 3, 6]
+        let cur = 0
+        let busy = false
+        let readyAt = 0
+
+        const mark = (i: number) => {
+          const s = SCENE_OF[i]
+          navItems.forEach((b, k) => b.toggleAttribute('data-active', k === s))
+          el.setAttribute('data-stop', String(i))
+        }
+        const go = (i: number) => {
+          const next = gsap.utils.clamp(0, STOPS.length - 1, i)
+          if (next === cur || busy || performance.now() < readyAt) return
+          const dist = Math.abs(STOPS[next] - tl.time())
+          cur = next
+          busy = true
+          mark(next)
+          tl.tweenTo(STOPS[next], {
+            duration: reduce ? 0.6 : gsap.utils.clamp(0.9, 2, dist * 0.72),
+            ease: 'power1.inOut',
+            onComplete: () => {
+              busy = false
+              readyAt = performance.now() + 380 // swallow trackpad momentum after landing
+            },
+          })
+        }
+        goScene.current = (scene: number) => {
+          readyAt = 0
+          go(FIRST_STOP[scene])
+        }
+        mark(0)
+
+        const obs = Observer.create({
+          target: window,
+          type: 'wheel,touch',
+          wheelSpeed: -1,
+          tolerance: 12,
+          preventDefault: true,
+          onUp: () => go(cur + 1),
+          onDown: () => go(cur - 1),
+        })
+        const onKey = (e: KeyboardEvent) => {
+          const t = e.target as HTMLElement | null
+          if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+          const map: Record<string, number> = { ArrowDown: 1, PageDown: 1, ' ': 1, ArrowUp: -1, PageUp: -1 }
+          if (e.key in map) {
+            e.preventDefault()
+            go(cur + (e.shiftKey && e.key === ' ' ? -1 : map[e.key]))
+          } else if (e.key === 'Home') go(0)
+          else if (e.key === 'End') go(STOPS.length - 1)
+        }
+        window.addEventListener('keydown', onKey)
+
+        // function-based poses depend on the viewport: re-record them from the start state
+        let rz = 0
+        const onResize = () => {
+          clearTimeout(rz)
+          rz = window.setTimeout(() => {
+            const t = tl.time()
+            tl.time(0).invalidate().time(t)
+          }, 150)
+        }
+        window.addEventListener('resize', onResize)
+
+        return () => {
+          obs.kill()
+          window.removeEventListener('keydown', onKey)
+          window.removeEventListener('resize', onResize)
+          clearTimeout(rz)
+          goScene.current = () => {}
+        }
+      },
+    )
+
+    return () => {
+      mm.revert()
+      html.style.backgroundColor = prev.bg
+      document.body.style.backgroundColor = prev.body
+      html.style.overscrollBehavior = prev.ob
+    }
+  }, [])
+
   if (user?.onboarded) return <Navigate to="/" replace />
+
+  const primaryTo = user ? '/setup' : '/signup'
+  const primaryLabel = user ? '건물 설정 이어 하기' : '내 건물 연결하기'
+
   return (
-    <div className="min-h-full bg-surface">
-      <PublicHeader
-        right={
-          user ? (
-            <Link to="/setup" className={btnCls('primary', 'md')}>
+    <div ref={root} className="ond-root">
+      <header className="ond-header">
+        <Link to="/welcome" className="ond-brandlink" aria-label="ON:D 소개 처음으로" onClick={() => goScene.current(0)}>
+          <span className="ond-brandmark" translate="no">
+            ON<span>:</span>D
+          </span>
+        </Link>
+        <nav className="ond-header-actions" aria-label="계정">
+          {user ? (
+            <Link to="/setup" className="ond-btn ond-btn-ghost">
               건물 설정 이어 하기
             </Link>
           ) : (
             <>
-              <Link to="/login" className={btnCls('ghost', 'md')}>
+              <Link to="/login" className="ond-btn ond-btn-ghost">
                 로그인
               </Link>
-              <Link to="/signup" className={btnCls('primary', 'md')}>
-                무료로 시작하기
+              <Link to="/signup" className="ond-btn ond-btn-line">
+                시작하기
               </Link>
             </>
-          )
-        }
-      />
+          )}
+        </nav>
+      </header>
 
-      <main>
-        {/* hero */}
-        <section className="mx-auto grid max-w-[1200px] items-center gap-12 px-6 pt-12 pb-20 lg:grid-cols-[1.05fr_1fr] lg:pt-20">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-brand-bg px-3 py-1 text-[13px] font-semibold text-brand-ink">
-              건물 운영자를 위한 냉난방 자동 운전 AI
+      <section className="ond-stage" aria-label="ON:D 소개">
+        <div className="ond-bg" aria-hidden />
+        <div className="ond-blayer">
+          <Building />
+        </div>
+
+        {/* Scene 1 — brand */}
+        <div className="ond-scene ond-s1">
+          <h1 className="ond-logo" aria-label="ON:D">
+            <span className="ond-logo-part ond-logo-on">
+              <span className="ond-logo-in">ON</span>
             </span>
-            <h1 className="balance mt-5 text-[44px] leading-[1.12] font-bold tracking-[-0.035em] text-ink max-sm:text-[34px]">
-              일정이 바뀌면,
-              <br />
-              냉난방도 바로 다시 계산합니다.
-            </h1>
-            <p className="pretty mt-5 max-w-[34em] text-[18px] leading-[1.6] text-ink-2">
-              학교·쇼핑몰·호텔처럼 운영 일정이 자주 바뀌는 건물은 고정 스케줄로 효율적인 냉난방이 어렵습니다. ThermoPlan은 일정·날씨·재실·CO₂·민원 데이터로 비용은 최소로, 쾌적은 그대로 유지하는 운전 계획을 만들고 직접 운전하거나 추천합니다.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to={user ? '/setup' : '/signup'} className={btnCls('primary', 'md', 'h-12 px-6 text-[15px]')}>
-                내 건물 연결하기 <ArrowRight size={16} aria-hidden />
-              </Link>
-              <Link to="/login" state={{ demo: true }} className={btnCls('secondary', 'md', 'h-12 px-6 text-[15px]')}>
-                부산대 IT관 데모 보기
-              </Link>
-            </div>
-            <ul className="mt-10 flex flex-wrap gap-2" aria-label="수집하는 데이터">
-              {DATA.map((d) => (
-                <li key={d.label} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[13px] text-ink-2">
-                  <d.icon size={14} className="text-ink-3" aria-hidden />
-                  {d.label}
-                </li>
-              ))}
-            </ul>
+            <span className="ond-logo-part ond-logo-colon">
+              <span className="ond-logo-in">:</span>
+            </span>
+            <span className="ond-logo-part ond-logo-d">
+              <span className="ond-logo-in">D</span>
+            </span>
+          </h1>
+          <p className="ond-slogan">
+            <Lines lines={['사람이 오기 전,', '공간을 먼저 준비합니다']} />
+          </p>
+          <p className="ond-desc">
+            <Lines lines={['스케줄 기반 스마트 HVAC 최적화 서비스']} />
+          </p>
+          <div className="ond-hint" aria-hidden>
+            <span />
+            스크롤
           </div>
-          <HeroVisual />
-        </section>
+        </div>
 
-        {/* problem */}
-        <section className="bg-paper py-20">
-          <div className="mx-auto max-w-[1200px] px-6">
-            <h2 className="text-[28px] font-bold tracking-[-0.025em] text-ink">왜 고정 스케줄로는 안 되나요</h2>
-            <p className="mt-2 max-w-[60ch] text-[16px] text-ink-2">현장에서 시설 담당자가 매일 겪는 세 가지 문제에서 출발했습니다.</p>
-            <div className="mt-10 grid gap-5 md:grid-cols-3">
-              {PROBLEMS.map((p) => (
-                <article key={p.title} className="rounded-[16px] border border-line bg-surface p-6">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-brand-bg text-brand" aria-hidden>
-                    <p.icon size={20} />
-                  </span>
-                  <h3 className="mt-5 text-[17px] leading-snug font-[650] text-ink">{p.title}</h3>
-                  <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{p.body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* how */}
-        <section className="py-20">
-          <div className="mx-auto max-w-[1200px] px-6">
-            <h2 className="text-[28px] font-bold tracking-[-0.025em] text-ink">어떻게 동작하나요</h2>
-            <p className="mt-2 max-w-[64ch] text-[16px] text-ink-2">
-              계획은 세 번 만들고, 매번 새로 들어온 데이터와 맞는지 정합성을 검증합니다. 숫자는 열모델 시뮬레이터가 계산하고, 생성형 AI는 해석과 협의를 맡습니다.
-            </p>
-            <ol className="mt-10 grid gap-4 md:grid-cols-5">
-              {STEPS.map((s, i) => (
-                <li key={s.title} className="relative rounded-[16px] border border-line bg-surface p-5">
-                  <div className="flex items-center gap-2">
-                    <span className="tnum flex h-7 w-7 items-center justify-center rounded-full bg-ink text-[13px] font-semibold text-white">{i + 1}</span>
-                    <s.icon size={18} className="text-brand" aria-hidden />
-                  </div>
-                  <h3 className="mt-4 text-[16px] font-[650] text-ink">{s.title}</h3>
-                  <p className="mt-1.5 text-[14px] leading-relaxed text-ink-2">{s.body}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* agents */}
-        <section className="bg-paper py-20">
-          <div className="mx-auto grid max-w-[1200px] items-center gap-10 px-6 lg:grid-cols-2">
+        {/* Scene 2 — schedule */}
+        <div className="ond-scene ond-s2">
+          <div className="ond-s2-head">
             <div>
-              <h2 className="text-[28px] font-bold tracking-[-0.025em] text-ink">비용과 쾌적은 두 에이전트가 협의합니다</h2>
-              <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-                전기요금을 줄이면 누군가는 춥고, 쾌적을 높이면 요금이 오릅니다. ThermoPlan은 이 균형을 한쪽이 정하지 않게 두 에이전트에게 맡깁니다. 두 제안은 같은 날씨·같은 일정에서 시뮬레이터로 검증하고, 근거와 함께 합의안만 운전에 반영합니다.
+              <p className="ond-eyebrow">
+                <Lines lines={['01  Schedule']} />
+              </p>
+              <h2 className="ond-h2">
+                <Lines lines={['같은 건물,', '공간마다 다른 하루']} />
+              </h2>
+            </div>
+            <div className="ond-caps-wrap">
+            <div className="ond-caps">
+              <p className="ond-cap ond-cap-a">
+                강의실·회의실·객실·매장은 쓰이는 시간이 저마다 다릅니다.
+                <br />
+                예시 데이터: 부산대 IT관 3·4층 공간 {ROOM_COUNT}곳의 월요일 일정 {SESSION_COUNT}건.
+              </p>
+              <p className="ond-cap ond-cap-b">
+                {fmtHour(FOCUS_HOUR)}에 일정이 시작되는 공간은 {FOCUS_COUNT}곳.
+                <br />
+                나머지 {IDLE_COUNT}곳은 아직 비어 있습니다.
               </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <article className="rounded-[16px] border border-line bg-surface p-6">
-                <span aria-hidden>
-                  <AgentAvatar agent="occupant" size={64} />
-                </span>
-                <h3 className="mt-4 text-[17px] font-[650] text-ink">사용자 에이전트</h3>
-                <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink-2">재실자 의견과 체감 쾌적도(PMV), CO₂를 근거로 쾌적을 대변합니다.</p>
-              </article>
-              <article className="rounded-[16px] border border-line bg-surface p-6">
-                <span aria-hidden>
-                  <AgentAvatar agent="building" size={64} />
-                </span>
-                <h3 className="mt-4 text-[17px] font-[650] text-ink">관리자 에이전트 북항이</h3>
-                <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink-2">전기요금, 전력 피크, 정부 냉난방 지침을 근거로 비용을 대변합니다.</p>
-              </article>
-              <article className="flex items-start gap-3 rounded-[16px] border border-line bg-surface p-5 sm:col-span-2">
-                <Scale size={20} className="mt-0.5 shrink-0 text-brand" aria-hidden />
-                <p className="text-[14.5px] leading-relaxed text-ink-2">
-                  담당자는 결론만 받는 것이 아니라, 에이전트가 어떤 데이터를 보고 왜 그렇게 판단했는지 근거를 확인할 수 있습니다.
-                </p>
-              </article>
+            <img className="ond-ondy ond-ondy-schedule" src="/assets/mascot/ondy-schedule.png" alt="" aria-hidden width={694} height={694} />
             </div>
           </div>
-        </section>
-
-        {/* modes */}
-        <section className="py-20">
-          <div className="mx-auto max-w-[1200px] px-6">
-            <h2 className="text-[28px] font-bold tracking-[-0.025em] text-ink">맡기는 정도는 직접 고릅니다</h2>
-            <div className="mt-8 grid gap-5 md:grid-cols-2">
-              <article className="rounded-[16px] border border-line bg-surface p-6">
-                <div className="flex items-center gap-2 text-[17px] font-[650] text-ink">
-                  <Bot size={19} className="text-brand" aria-hidden /> 자동 운전 모드
-                </div>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-2">AI 조정안을 바로 중앙 제어기에 반영하고, 모든 명령과 근거를 기록으로 남깁니다.</p>
-              </article>
-              <article className="rounded-[16px] border border-line bg-surface p-6">
-                <div className="flex items-center gap-2 text-[17px] font-[650] text-ink">
-                  <Hand size={19} className="text-brand" aria-hidden /> 추천 모드
-                </div>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-2">AI는 조정안과 예상 효과만 제안하고, 담당자가 승인한 것만 반영합니다. 처음 도입할 때 권합니다.</p>
-              </article>
+          <div className="ond-tt" role="img" aria-label={`예시 건물 공간 ${ROOM_COUNT}곳의 월요일 일정`}>
+            <div className="ond-tt-axis">
+              {Array.from({ length: SPAN / 2 + 1 }, (_, i) => DAY_START + i * 2).map((t) => (
+                <span key={t} style={{ left: `${((t - DAY_START) / SPAN) * 100}%` }}>
+                  {fmtHour(t)}
+                </span>
+              ))}
             </div>
-            <div className="mt-14 flex flex-col items-center gap-4 rounded-[20px] bg-ink px-6 py-12 text-center">
-              <h2 className="text-[26px] font-bold tracking-[-0.025em] text-white">건물 하나로 시작해 보세요</h2>
-              <p className="max-w-[48ch] text-[16px] text-[#c4cede]">중앙 제어 PC 주소만 있으면 연결부터 첫 월간 계획까지 10분 안에 끝납니다.</p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Link to={user ? '/setup' : '/signup'} className={cx(btnCls('secondary', 'md', 'h-12 px-6 text-[15px]'), 'border-white')}>
-                  내 건물 연결하기
-                </Link>
-                <Link to="/login" state={{ demo: true }} className="inline-flex h-12 items-center rounded-[10px] px-6 text-[15px] font-medium text-white hover:bg-white/10">
-                  데모 계정으로 로그인
-                </Link>
+            <div className="ond-tt-rows">
+              {MONDAY.map((r) => (
+                <div key={r.room} className="ond-tt-row">
+                  <span className="ond-tt-room">{r.room}</span>
+                  <div className="ond-tt-track">
+                    {r.sessions.length === 0 && <span className="ond-tt-empty">일정 없음</span>}
+                    {r.sessions.map((x) => (
+                      <span
+                        key={`${x.start}-${x.name}`}
+                        className="ond-block"
+                        data-focus={x.start === FOCUS_HOUR ? '1' : undefined}
+                        style={{ left: `${((x.start - DAY_START) / SPAN) * 100}%`, width: `${((x.end - x.start) / SPAN) * 100}%` }}
+                      >
+                        <span>{x.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="ond-cursor-lane" aria-hidden>
+                <div className="ond-cursor">
+                  <span className="ond-cursor-line" />
+                  <span className="ond-cursor-time">08:00</span>
+                </div>
               </div>
             </div>
           </div>
-        </section>
-      </main>
-      <footer className="border-t border-line py-8 text-center text-[13px] text-ink-3">ThermoPlan은 2026 AWS x PNU AI 해커톤 과제 3 출품작입니다.</footer>
+        </div>
+
+        {/* Scene 3 — schedule meets space */}
+        <div className="ond-scene ond-s3">
+          <p className="ond-eyebrow">
+            <Lines lines={['02  Intelligent HVAC']} />
+          </p>
+          <h2 className="ond-h2">
+            <Lines lines={['일정이 곧', '운전 계획이 됩니다']} />
+          </h2>
+          <ol className="ond-steps">
+            <li className="ond-step" data-step="1">
+              <strong>층을 열어 공간을 봅니다</strong>
+              <span>층마다 공간을 펼치고, 그 위에 일정을 겹칩니다.</span>
+            </li>
+            <li className="ond-step" data-step="2">
+              <strong>사람이 오기 전에 준비합니다</strong>
+              <span>
+                {fmtHour(FOCUS_HOUR)} 일정이 있는 {FOCUS_COUNT}곳만 미리 냉난방을 켭니다. 켜는 시각은 날씨와 실내 온도를 보고 정합니다.
+              </span>
+            </li>
+            <li className="ond-step" data-step="3">
+              <strong>비어 있으면 켜지 않습니다</strong>
+              <span>같은 시각 일정이 없는 {IDLE_COUNT}곳은 꺼진 채로 둡니다.</span>
+            </li>
+          </ol>
+          <div className="ond-track" aria-hidden>
+            <div className="ond-track-bar">
+              <span className="ond-track-fill" />
+            </div>
+            <div className="ond-track-labels">
+              <span>꺼짐</span>
+              <span>사용 전 준비</span>
+              <span>{fmtHour(FOCUS_HOUR)} 사용 시작</span>
+            </div>
+          </div>
+          <p className="ond-note">예시는 부산대 IT관 강의실입니다. 배치는 도식이며, 운전은 열모델 시뮬레이션으로 계산합니다.</p>
+        </div>
+
+        {/* Ondy stands beside the opened building while it prepares the rooms */}
+        <div className="ond-guide" aria-hidden>
+          <img className="ond-ondy ond-ondy-hvac" src="/assets/mascot/ondy-hvac.png" alt="" width={652} height={732} />
+          <img className="ond-ondy ond-ondy-comfort" src="/assets/mascot/ondy-comfort.png" alt="" width={682} height={538} />
+        </div>
+
+        {/* Scene 4 — final reveal */}
+        <div className="ond-scene ond-s4">
+          <div className="ond-s4-body">
+          <img className="ond-ondy ond-ondy-main" src="/assets/mascot/ondy-main.png" alt="" aria-hidden width={676} height={724} />
+          <h2 className="ond-final">
+            <Lines lines={['필요한 시간에,', '필요한 공간만.']} />
+          </h2>
+          <div className="ond-cta">
+            <p className="ond-cta-sub">학교·오피스·호텔·쇼핑몰, 일정이 있는 건물이라면 어디든.</p>
+            <div className="ond-cta-row">
+              <Link to={primaryTo} className="ond-btn ond-btn-primary">
+                {primaryLabel} <ArrowRight size={18} aria-hidden />
+              </Link>
+              <Link to="/login" state={{ demo: true }} className="ond-btn ond-btn-line">
+                부산대 IT관 데모 보기
+              </Link>
+            </div>
+            <p className="ond-foot">
+              <span translate="no">ON:D</span> · 2026 AWS x PNU AI 해커톤 과제 3 출품작
+            </p>
+          </div>
+          </div>
+        </div>
+
+        <nav className="ond-nav" aria-label="소개 장면">
+          {SCENES.map((s, i) => (
+            <button key={s} type="button" onClick={() => goScene.current(i)} data-active={i === 0 ? '' : undefined}>
+              <span>{String(i + 1).padStart(2, '0')}</span>
+              {s}
+            </button>
+          ))}
+        </nav>
+      </section>
     </div>
   )
 }
