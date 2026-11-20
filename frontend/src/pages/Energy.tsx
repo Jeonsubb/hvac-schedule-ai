@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MoveRight, Sparkles, Printer, Info, CalendarDays, TrendingDown, ScatterChart as ScatterIcon, ListChecks, ArrowLeftRight } from 'lucide-react'
+import { MoveRight, Sparkles, Printer, CalendarDays, TrendingDown, ScatterChart as ScatterIcon, ListChecks, ArrowLeftRight } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApi } from '../lib/api'
 import { useMeta, useCopilot } from '../lib/context'
@@ -19,7 +19,6 @@ import {
   Loading,
   PageHeader,
   PageSkeleton,
-  Popover,
   Segmented,
   Skeleton,
   Spinner,
@@ -137,105 +136,85 @@ function Hero({
   const r30 = A?.variants.rule30
   const ai = A?.variants.ai
   const vs30 = r30 && ai ? pctSaving(r30.kwh, ai.kwh) : null
+  const sameComfort = r30 && ai && vs30 != null && (
+    <div className="space-y-3">
+      <p className="text-[13.5px]">규칙 기반을 강의 30분 전에 켜도록 앞당겨 AI와 쾌적도를 맞춘 뒤, 같은 기간의 전력을 비교했습니다. 더 좋은 쪽을 굵게 표시합니다.</p>
+      <table className="tnum w-full text-[13.5px]">
+        <thead>
+          <tr className="text-[13px] text-ink-3">
+            <th className="py-1 text-left font-medium">같은 기간</th>
+            <th className="py-1 text-right font-medium">규칙 30분 전</th>
+            <th className="py-1 text-right font-medium">AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(
+            [
+              ['전력', `${fmtNum(r30.kwh, 1)} kWh`, `${fmtNum(ai.kwh, 1)} kWh`, ai.kwh <= r30.kwh],
+              ['강의 중 쾌적 유지율', fmtPct(r30.comfort_pct, 2), fmtPct(ai.comfort_pct, 2), (ai.comfort_pct ?? 0) >= (r30.comfort_pct ?? 0)],
+              [COLD_START.label, `${fmtNum(r30.cold_starts)}회`, `${fmtNum(ai.cold_starts)}회`, ai.cold_starts <= r30.cold_starts],
+              ['불쾌 누적', `${fmtNum(r30.discomfort_dm)} ℃·분`, `${fmtNum(ai.discomfort_dm)} ℃·분`, ai.discomfort_dm <= r30.discomfort_dm],
+            ] as [string, string, string, boolean][]
+          ).map(([k, a, b, aiBetter]) => (
+            <tr key={k} className="border-t border-line">
+              <th className="py-1.5 text-left font-medium text-ink-2" title={k === COLD_START.label ? COLD_START.desc : undefined}>
+                {k}
+              </th>
+              <td className={cx('py-1.5 text-right', aiBetter ? 'text-ink-2' : 'font-semibold text-ink')}>{a}</td>
+              <td className={cx('py-1.5 text-right', aiBetter ? 'font-semibold text-ink' : 'text-ink-2')}>{b}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="rounded-[10px] bg-well px-3 py-2.5 text-[13.5px]">
+        {T.rule.kwh < T.ai.kwh
+          ? `10분 전에 켜는 규칙은 AI보다 ${fmtNum(T.ai.kwh - T.rule.kwh, 1)} kWh 적게 쓰지만, 강의 ${fmtNum(cold.rule)}건이 쾌적하지 않은 교실에서 시작합니다(AI ${fmtNum(cold.ai)}건).`
+          : `10분 전에 켜는 규칙보다도 ${fmtPct(vsRule)} 적게 쓰면서, 쾌적하지 않게 시작한 강의를 ${fmtNum(cold.rule)}건에서 ${fmtNum(cold.ai)}건으로 줄였습니다.`}
+      </p>
+    </div>
+  )
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 px-8 pt-8 pb-7">
       <div className="min-w-0">
-        {r30 && ai && vs30 != null ? (
-          <Popover
-            label="같은 쾌적도 비교의 근거"
-            width={440}
-            buttonClassName="group -m-3 block rounded-[14px] p-3 text-left transition-colors hover:bg-hover"
-            button={
-              <>
-                <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
-                  <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
-                  같은 쾌적도의 규칙 기반(30분 전 가동) 대비
-                  {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
-                  <Info size={14} className="text-ink-4 transition-colors group-hover:text-ink-2" aria-hidden />
-                </span>
-                <span className="mt-2 flex items-baseline gap-1.5">
-                  <span className="tnum text-[64px] leading-none font-[650] tracking-[-0.035em] text-ink">
-                    {vs30 >= 0 ? '−' : '+'}
-                    {Math.abs(vs30).toFixed(1)}
-                  </span>
-                  <span className="text-[26px] font-semibold text-ink-3">%</span>
-                </span>
-                <span className="tnum mt-3 block text-[15px] text-ink-2">
-                  규칙 {fmtNum(r30.kwh, 1)} kWh → AI <b className="font-semibold text-ink">{fmtNum(ai.kwh, 1)} kWh</b>
-                </span>
-              </>
-            }
-          >
-            <div className="space-y-3">
-              <p className="text-[13.5px]">규칙 기반을 강의 30분 전에 켜도록 앞당겨 AI와 쾌적도를 맞춘 뒤, 같은 기간의 전력을 비교했습니다. 더 좋은 쪽을 굵게 표시합니다.</p>
-              <table className="tnum w-full text-[13.5px]">
-                <thead>
-                  <tr className="text-[13px] text-ink-3">
-                    <th className="py-1 text-left font-medium">같은 기간</th>
-                    <th className="py-1 text-right font-medium">규칙 30분 전</th>
-                    <th className="py-1 text-right font-medium">AI</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(
-                    [
-                      ['강의 중 쾌적 유지율', fmtPct(r30.comfort_pct, 2), fmtPct(ai.comfort_pct, 2), (ai.comfort_pct ?? 0) >= (r30.comfort_pct ?? 0)],
-                      [COLD_START.label, `${fmtNum(r30.cold_starts)}회`, `${fmtNum(ai.cold_starts)}회`, ai.cold_starts <= r30.cold_starts],
-                      ['불쾌 누적', `${fmtNum(r30.discomfort_dm)} ℃·분`, `${fmtNum(ai.discomfort_dm)} ℃·분`, ai.discomfort_dm <= r30.discomfort_dm],
-                    ] as [string, string, string, boolean][]
-                  ).map(([k, a, b, aiBetter]) => (
-                    <tr key={k} className="border-t border-line">
-                      <th className="py-1.5 text-left font-medium text-ink-2" title={k === COLD_START.label ? COLD_START.desc : undefined}>
-                        {k}
-                      </th>
-                      <td className={cx('py-1.5 text-right', aiBetter ? 'text-ink-2' : 'font-semibold text-ink')}>{a}</td>
-                      <td className={cx('py-1.5 text-right', aiBetter ? 'font-semibold text-ink' : 'text-ink-2')}>{b}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="rounded-[10px] bg-well px-3 py-2.5 text-[13.5px]">
-                {T.rule.kwh < T.ai.kwh
-                  ? `10분 전에 켜는 규칙은 AI보다 ${fmtNum(T.ai.kwh - T.rule.kwh, 1)} kWh 적게 쓰지만, 강의 ${fmtNum(cold.rule)}건이 쾌적하지 않은 교실에서 시작합니다(AI ${fmtNum(cold.ai)}건).`
-                  : `10분 전에 켜는 규칙보다도 ${fmtPct(vsRule)} 적게 쓰면서, 쾌적하지 않게 시작한 강의를 ${fmtNum(cold.rule)}건에서 ${fmtNum(cold.ai)}건으로 줄였습니다.`}
-              </p>
-            </div>
-          </Popover>
-        ) : (
-          <div className="space-y-3" role="status">
-            <div className="flex items-center gap-2 text-[14px] text-ink-2">
-              {computing && <Spinner size={15} />}
-              {computing ? '같은 쾌적도의 규칙 기반과 비교하는 시뮬레이션을 계산하는 중…' : '같은 쾌적도 비교 결과를 불러오지 못했습니다. 아래 기능별 분석의 다시 시도를 눌러 보세요.'}
-            </div>
-            {computing && (
-              <>
-                <Skeleton className="h-[64px] w-[240px]" />
-                <Skeleton className="h-[20px] w-[320px]" />
-              </>
-            )}
-          </div>
-        )}
+        <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
+          이전 운영(중앙 제어 고정 스케줄) 대비 전력
+          {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
+        </span>
+        <span className="mt-2 flex items-baseline gap-1.5">
+          <span className="tnum text-[64px] leading-none font-[650] tracking-[-0.035em] text-ink">−{vsFixed.toFixed(1)}</span>
+          <span className="text-[26px] font-semibold text-ink-3">%</span>
+        </span>
+        <span className="tnum mt-3 block text-[15px] text-ink-2">
+          이전 운영 {fmtNum(T.fixed.kwh)} kWh → AI <b className="font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b> · 아낀 요금 <b className="font-semibold text-ink">{fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원</b> (시뮬레이션)
+        </span>
       </div>
       <div className="flex flex-wrap gap-x-12 gap-y-5 pb-1">
+        {sameComfort ? (
+          <Figure
+            label="같은 쾌적도의 규칙 기반 대비"
+            value={`${vs30! >= 0 ? '−' : '+'}${Math.abs(vs30!).toFixed(1)}`}
+            unit="%"
+            sub={`규칙 30분 전 ${fmtNum(r30!.kwh, 1)} → AI ${fmtNum(ai!.kwh, 1)} kWh`}
+            infoTitle="같은 쾌적도 비교의 근거"
+            info={sameComfort}
+          />
+        ) : (
+          <div className="min-w-[200px]" role="status">
+            <div className="flex items-center gap-2 text-[13px] font-medium text-ink-3">
+              {computing && <Spinner size={13} />}
+              {computing ? '같은 쾌적도 비교 계산 중…' : '같은 쾌적도 비교를 불러오지 못했습니다'}
+            </div>
+            {computing && <Skeleton className="mt-2 h-[34px] w-[120px]" />}
+          </div>
+        )}
         <Figure
-          label="고정 스케줄 대비"
-          value={`−${vsFixed.toFixed(1)}`}
+          label="강의 중 쾌적 유지율"
+          value={T.ai.comfort_pct != null ? T.ai.comfort_pct.toFixed(1) : '–'}
           unit="%"
           info={
             <p className="text-[13.5px]">
-              고정 스케줄(평일 08:30–22:30 가동) <b className="tnum font-semibold text-ink">{fmtNum(T.fixed.kwh)} kWh</b>를 AI는{' '}
-              <b className="tnum font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b>로 운전했습니다. 규칙 기반(10분 전 가동)과 비교하면 {vsRule >= 0 ? '−' : '+'}
-              {Math.abs(vsRule).toFixed(1)}%, {COLD_START.short}는 {fmtNum(cold.rule)}회 → {fmtNum(cold.ai)}회입니다.
-            </p>
-          }
-        />
-        <Figure
-          label="아낀 전기요금"
-          value={fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}
-          unit="만원"
-          info={
-            <p className="text-[13.5px]">
-              고정 스케줄 대비 금액입니다. 한전 교육용(을) 고압A 선택I 시간대별 전력량요금(2023-05-16 게시본)으로 계산했고 기본요금은 뺐습니다. AI {fmtNum(T.ai.cost_krw)}원, 고정 {fmtNum(T.fixed.cost_krw)}원.
+              강의 시간 중 실내온도가 쾌적 범위 안이었던 비율입니다. 이전 운영은 {fmtPct(T.fixed.comfort_pct)}, {COLD_START.short}는 이전 운영 {fmtNum(cold.fixed)}회, AI {fmtNum(cold.ai)}회입니다.
             </p>
           }
         />
@@ -244,7 +223,7 @@ function Hero({
           value={((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)}
           unit="tCO₂"
           align="right"
-          info={<p className="text-[13.5px]">고정 스케줄 대비입니다. 전력량에 국가 전력배출계수 0.4173 kgCO₂eq/kWh(2023년도)를 곱했습니다.</p>}
+          info={<p className="text-[13.5px]">이전 운영 대비입니다. 전력량에 국가 전력배출계수 0.4173 kgCO₂eq/kWh(2023년도)를 곱했습니다.</p>}
         />
       </div>
     </div>

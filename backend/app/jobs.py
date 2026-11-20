@@ -134,6 +134,18 @@ def run(job_id: str) -> dict:
                 _save(job)
 
             job["result"] = lab.run(_date.fromisoformat(p["start"]), int(p["days"]), p.get("mode", "rule"), progress=lprogress)
+        elif job["kind"] == "tier_run":
+            from datetime import date as _date
+
+            from . import planning
+
+            def tprogress(pr):
+                job["progress"] = {"steps": pr.get("steps", []), "tier": pr.get("tier"), "date": pr.get("date")}
+                _save(job)
+
+            r = planning.run_tier(int(p["tier"]), _date.fromisoformat(p["date"]) if p.get("date") else None, p.get("actor", "운영자"), progress=tprogress)
+            job["progress"] = {"steps": r["run"]["steps"], "tier": r["run"]["tier"], "date": r["run"]["date"]}
+            job["result"] = {"run": r["run"], "plan": r["plan"]}
         elif job["kind"] == "precompute":
             job["result"] = service.precompute()
         elif job["kind"] == "refresh":

@@ -6,7 +6,7 @@ import type { StrategyKey } from '../lib/types'
 
 // ---------------------------------------------------------------- surfaces
 
-/** Card: white surface + one hairline + 14px radius (v5). No shadow (only floating layers get one). */
+/** Card: white surface + one hairline + 22px radius (ON:D). No shadow (only floating layers get one). */
 export function Card({
   children,
   className,
@@ -24,7 +24,7 @@ export function Card({
   'data-tour'?: string
 }) {
   return (
-    <As className={cx('rounded-[14px] border border-line bg-surface', pad === true && 'p-6', pad === 'dense' && 'p-5', pad === 'lg' && 'p-8', className)} {...rest}>
+    <As className={cx('rounded-[22px] border border-line bg-surface', pad === true && 'p-7', pad === 'dense' && 'p-5', pad === 'lg' && 'p-9', className)} {...rest}>
       {children}
     </As>
   )
@@ -48,11 +48,11 @@ export function CardHeader({
   return (
     <div className={cx('mb-5 flex items-start justify-between gap-x-4 gap-y-2 max-sm:flex-wrap', className)}>
       <div className="min-w-0 flex-1">
-        <h2 id={id} className="flex items-center gap-2 text-[17px] leading-snug font-[650] tracking-[-0.01em] text-ink">
+        <h2 id={id} className="flex items-center gap-2 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
           {icon && <span className="flex text-ink-3">{icon}</span>}
           {title}
         </h2>
-        {sub && <div className="mt-1 text-[13px] leading-normal text-ink-3">{sub}</div>}
+        {sub && <div className="mt-1 text-[13px] leading-[1.5] text-ink-3">{sub}</div>}
       </div>
       {right && <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{right}</div>}
     </div>
@@ -62,10 +62,10 @@ export function CardHeader({
 /** Page title + the page's one-sentence answer + at most one action group. */
 export function PageHeader({ title, desc, right, className }: { title: string; desc?: ReactNode; right?: ReactNode; className?: string }) {
   return (
-    <div className={cx('mb-7 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
+    <div className={cx('mb-9 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
       <div className="min-w-0 flex-[1_1_20rem]">
         <h1 className="balance text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">{title}</h1>
-        {desc && <p className="pretty mt-2 max-w-[64ch] text-[17px] leading-[1.55] text-ink-2">{desc}</p>}
+        {desc && <p className="pretty mt-2 max-w-[60ch] text-[17px] leading-[1.55] text-ink-2">{desc}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -126,7 +126,7 @@ export function Figure({
       <span className={cx('mt-1.5 flex items-baseline gap-1', align === 'right' && 'justify-end')}>
         <span
           className={cx(
-            'tnum leading-none font-[650] tracking-[-0.025em] whitespace-nowrap text-ink',
+            'tnum leading-[1.1] font-[650] tracking-[-0.02em] whitespace-nowrap text-ink',
             size === 'lg' ? 'text-[40px]' : size === 'sm' ? 'text-[24px]' : 'text-[30px]',
           )}
         >
@@ -143,7 +143,7 @@ export function Figure({
       label={infoTitle ?? (typeof label === 'string' ? `${label} 근거` : '수치 근거')}
       align={align === 'right' ? 'end' : 'start'}
       className={className}
-      buttonClassName="group -m-2 block min-w-0 rounded-[12px] p-2 text-left transition-colors hover:bg-hover"
+      buttonClassName="group -m-2 block min-w-0 rounded-[14px] p-2 text-left transition-colors hover:bg-hover"
       button={body}
     >
       {info}
@@ -154,7 +154,7 @@ export function Figure({
 /** Legacy strip (kept for compatibility). New screens use Figure rows without boxes. */
 export function StatStrip({ children, className, cols }: { children: ReactNode; className?: string; cols?: string }) {
   return (
-    <section className={cx('overflow-hidden rounded-[14px] border border-line bg-line', className)}>
+    <section className={cx('overflow-hidden rounded-[22px] border border-line bg-line', className)}>
       <div className={cx('grid gap-px', cols ?? 'grid-cols-2 lg:grid-cols-5 max-lg:[&>*:last-child:nth-child(odd)]:col-span-2')}>{children}</div>
     </section>
   )
@@ -185,7 +185,7 @@ export function StatTile({
         <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 flex items-baseline gap-1">
-        <span className="tnum text-[28px] leading-none font-[650] tracking-[-0.02em] text-ink">{value}</span>
+        <span className="tnum text-[28px] leading-[1.1] font-[650] tracking-[-0.02em] text-ink">{value}</span>
         {unit && <span className="text-[14px] font-medium text-ink-3">{unit}</span>}
       </div>
       {sub && <div className="mt-2 text-[13px] leading-snug text-ink-3">{sub}</div>}
@@ -211,7 +211,7 @@ export function Badge({ children, tone = 'neutral', className, title }: { childr
     heat: 'bg-[#fdeee6] text-heat-ink',
   }
   return (
-    <span title={title} className={cx('inline-flex items-center gap-1 rounded-[6px] px-2 py-[1px] text-[13px] leading-[20px] font-medium whitespace-nowrap', tones[tone], className)}>
+    <span title={title} className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-[1px] text-[13px] leading-[20px] font-medium whitespace-nowrap', tones[tone], className)}>
       {children}
     </span>
   )
@@ -228,7 +228,7 @@ export function StatusBadge({ group, label }: { group: StatusGroup; label?: stri
   const m = GROUP_META[group]
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-[6px] px-2 py-[1px] text-[13px] leading-[20px] font-semibold whitespace-nowrap"
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-[1px] text-[13px] leading-[20px] font-semibold whitespace-nowrap"
       style={{ background: m.bg, color: m.ink }}
     >
       <GroupIcon group={group} size={13} />
@@ -260,15 +260,15 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 
 export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md', className?: string) {
   const v: Record<Variant, string> = {
-    primary: 'bg-brand text-white border border-brand hover:bg-brand-ink hover:border-brand-ink active:bg-[#18469a]',
-    secondary: 'bg-surface text-ink border border-line-strong hover:bg-hover hover:border-ink-4',
-    ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-hover hover:text-ink',
+    primary: 'bg-ink text-white border border-ink hover:bg-[#2a2e37] hover:border-[#2a2e37] active:bg-black',
+    secondary: 'bg-surface text-ink border border-[rgb(12_14_19/0.18)] hover:border-[rgb(12_14_19/0.5)]',
+    ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
     danger: 'bg-surface text-crit-ink border border-[#efc6c6] hover:bg-crit-bg hover:border-[#e3a9a9]',
     link: 'bg-transparent text-brand-ink border border-transparent underline-offset-4 hover:underline !px-0',
   }
-  const s = size === 'sm' ? 'h-8 px-3 text-[13px] gap-1.5' : 'h-10 px-4 text-[14px] gap-2'
+  const s = size === 'sm' ? 'h-8 px-3.5 text-[13px] gap-1.5' : 'h-10 px-5 text-[14px] gap-2'
   return cx(
-    'inline-flex shrink-0 items-center justify-center rounded-[10px] font-medium whitespace-nowrap transition-[background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-45',
+    'inline-flex shrink-0 items-center justify-center rounded-full leading-none font-semibold whitespace-nowrap transition-[background-color,border-color,color] duration-200 disabled:cursor-not-allowed disabled:opacity-40',
     v[variant],
     s,
     className,
@@ -314,7 +314,7 @@ export function IconButton({ onClick, label, children, disabled, className }: { 
       aria-label={label}
       title={label}
       className={cx(
-        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-ink-3 transition-colors duration-150 hover:bg-hover hover:text-ink disabled:opacity-35',
+        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors duration-150 hover:bg-hover hover:text-ink disabled:opacity-35',
         className,
       )}
     >
@@ -332,8 +332,8 @@ export function ToggleChip({ pressed, onChange, children, title }: { pressed: bo
       title={title}
       onClick={() => onChange(!pressed)}
       className={cx(
-        'inline-flex h-8 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
-        pressed ? 'border-brand bg-brand-bg text-brand-ink hover:bg-[#dde9fc]' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4 hover:text-ink',
+        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-colors duration-150',
+        pressed ? 'border-brand bg-brand-bg text-brand-ink hover:bg-[#dde9fc]' : 'border-[rgb(12_14_19/0.18)] bg-surface text-ink-2 hover:border-[rgb(12_14_19/0.5)] hover:text-ink',
       )}
     >
       {children}
@@ -355,7 +355,7 @@ export function Segmented<T extends string>({
   label?: string
 }) {
   return (
-    <div className="inline-flex rounded-[10px] bg-[#eef0f4] p-[3px]" role="radiogroup" aria-label={label}>
+    <div className="inline-flex rounded-full bg-well p-1" role="radiogroup" aria-label={label}>
       {options.map((o) => {
         const on = o.value === value
         return (
@@ -367,9 +367,9 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cx(
-              'inline-flex items-center gap-1.5 rounded-[8px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
-              size === 'sm' ? 'h-7 px-2.5 text-[13px]' : 'h-8 px-3 text-[13.5px]',
-              on ? 'bg-surface text-brand-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.06)]' : 'text-ink-3 hover:text-ink',
+              'inline-flex items-center gap-1.5 rounded-full whitespace-nowrap transition-[background-color,color,box-shadow] duration-200',
+              size === 'sm' ? 'h-7 px-3 text-[13px]' : 'h-8 px-3.5 text-[13.5px]',
+              on ? 'bg-surface font-semibold text-ink shadow-[0_1px_2px_rgb(12_14_19/0.1),0_0_0_1px_rgb(12_14_19/0.06)]' : 'font-medium text-ink-3 hover:text-ink',
             )}
           >
             {o.label}
@@ -401,8 +401,8 @@ export function Tabs<T extends string>({
             aria-selected={on}
             onClick={() => onChange(t.value)}
             className={cx(
-              '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 pt-1 pb-3 text-[14.5px] font-medium transition-colors duration-150',
-              on ? 'border-brand text-ink' : 'border-transparent text-ink-3 hover:text-ink',
+              '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 pt-1 pb-3 text-[14.5px] transition-colors duration-150',
+              on ? 'border-ink font-semibold text-ink' : 'border-transparent font-medium text-ink-3 hover:text-ink',
             )}
           >
             {t.icon && <span className={on ? 'text-brand' : 'text-ink-4'}>{t.icon}</span>}
@@ -418,7 +418,7 @@ export function Tabs<T extends string>({
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-1.5 block text-[13px] font-medium text-ink-2">{label}</span>
+      <span className="mb-2 block text-[13px] font-semibold text-ink-2">{label}</span>
       {children}
       {hint && <span className="mt-1.5 block text-[13px] leading-snug text-ink-3">{hint}</span>}
     </label>
@@ -426,7 +426,7 @@ export function Field({ label, hint, children, className }: { label: string; hin
 }
 
 export const inputBase =
-  'h-10 rounded-[10px] border border-line-strong bg-surface px-3 text-[14px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-4 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_3px_rgb(47_111_222/0.16)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
+  'h-11 rounded-[12px] border border-line-strong bg-surface px-3.5 text-[14.5px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-4 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_4px_rgb(47_111_222/0.14)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
 
 export const inputCls = `${inputBase} w-full`
 
@@ -473,7 +473,7 @@ export function Disclosure({
           aria-expanded={open}
           aria-controls={id}
           onClick={toggle}
-          className="inline-flex items-center gap-1.5 rounded-[8px] py-1 text-[13.5px] font-medium text-ink-2 transition-colors hover:text-ink"
+          className="inline-flex items-center gap-1.5 rounded-full py-1 text-[13.5px] font-semibold text-ink-2 transition-colors hover:text-ink"
         >
           {title}
           <ChevronDown size={15} className={cx('transition-transform duration-200', open && 'rotate-180')} aria-hidden />
@@ -492,15 +492,15 @@ export function Disclosure({
         aria-expanded={open}
         aria-controls={id}
         onClick={toggle}
-        className="group flex min-h-[60px] w-full items-center gap-3 px-6 py-3 text-left transition-colors duration-150 hover:bg-[#fafbfc]"
+        className="group flex min-h-[64px] w-full items-center gap-3 px-7 py-3 text-left transition-colors duration-150 hover:bg-[#fafafb]"
       >
-        {icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-well text-ink-2">{icon}</span>}
-        <span className="min-w-0 flex-1 text-[15px] font-semibold text-ink">{title}</span>
+        {icon && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-well text-ink-2">{icon}</span>}
+        <span className="min-w-0 flex-1 text-[15px] leading-[1.35] font-semibold text-ink">{title}</span>
         {summary != null && <span className="tnum hidden shrink-0 text-[14px] text-ink-3 sm:inline">{summary}</span>}
         <ChevronDown size={18} className={cx('shrink-0 text-ink-4 transition-transform duration-200 group-hover:text-ink-2', open && 'rotate-180')} aria-hidden />
       </button>
       {open && (
-        <div id={id} className="reveal px-6 pt-1 pb-6">
+        <div id={id} className="reveal px-7 pt-1 pb-7">
           {children}
         </div>
       )}
@@ -512,8 +512,8 @@ export function Disclosure({
 export function DisclosureList({ children, title, hideTitle = false, className }: { children: ReactNode; title?: string; hideTitle?: boolean; className?: string }) {
   return (
     <section className={className} aria-label={title}>
-      {title && !hideTitle && <h2 className="mb-3 px-1 text-[17px] font-[650] text-ink">{title}</h2>}
-      <div className="divide-y divide-line overflow-hidden rounded-[14px] border border-line bg-surface">{children}</div>
+      {title && !hideTitle && <h2 className="mb-3 px-1 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">{title}</h2>}
+      <div className="divide-y divide-line overflow-hidden rounded-[22px] border border-line bg-surface">{children}</div>
     </section>
   )
 }
@@ -592,7 +592,7 @@ export function Popover({
           role="dialog"
           aria-label={label}
           className={cx(
-            'pop absolute top-full z-50 mt-2 rounded-[14px] border border-line bg-surface p-4 text-left text-[14px] leading-relaxed font-normal text-ink-2 shadow-[var(--shadow-float)]',
+            'pop absolute top-full z-50 mt-2 rounded-[18px] bg-surface p-5 text-left text-[14px] leading-relaxed font-normal text-ink-2 shadow-[var(--shadow-float)]',
             side === 'end' ? 'right-0' : 'left-0',
           )}
           style={{ width, maxWidth: 'calc(100vw - 32px)' }}
@@ -628,13 +628,13 @@ export function PageSkeleton({ label }: { label: string }) {
   return (
     <div className="space-y-6" role="status" aria-label={label}>
       <div className="space-y-3">
-        <Skeleton className="h-8 w-[200px] rounded-[10px]" />
+        <Skeleton className="h-10 w-[260px] rounded-[12px]" />
         <Skeleton className="h-5 w-[min(560px,80%)] rounded-[8px]" />
       </div>
       <div className="flex items-center gap-2 text-[14px] text-ink-3">
         <Spinner size={15} /> {label}
       </div>
-      <Skeleton className="h-[420px] rounded-[14px]" />
+      <Skeleton className="h-[420px] rounded-[22px]" />
     </div>
   )
 }
@@ -642,7 +642,7 @@ export function PageSkeleton({ label }: { label: string }) {
 export function ErrorBox({ error, onRetry, title }: { error: Error | string; onRetry?: () => void; title?: string }) {
   const msg = typeof error === 'string' ? error : error.message
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-[12px] border border-[#efc6c6] bg-crit-bg px-4 py-3" role="alert">
+    <div className="flex flex-wrap items-start justify-between gap-3 rounded-[14px] border border-[#efc6c6] bg-crit-bg px-4 py-3" role="alert">
       <div className="flex min-w-0 items-start gap-2.5">
         <AlertTriangle size={16} className="mt-0.5 shrink-0 text-crit" aria-hidden />
         <div className="min-w-0">
@@ -659,14 +659,18 @@ export function ErrorBox({ error, onRetry, title }: { error: Error | string; onR
   )
 }
 
-export function Empty({ title, desc, icon, action }: { title: string; desc?: ReactNode; icon?: ReactNode; action?: ReactNode }) {
+export function Empty({ title, desc, icon, art, action }: { title: string; desc?: ReactNode; icon?: ReactNode; art?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-12 text-center">
-      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-well text-ink-3" aria-hidden>
-        {icon ?? <Info size={18} />}
-      </div>
-      <div className="text-[15px] font-semibold text-ink">{title}</div>
-      {desc && <div className="max-w-sm text-[13.5px] leading-relaxed text-ink-3">{desc}</div>}
+      {art ? (
+        <div className="mb-4">{art}</div>
+      ) : (
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-well text-ink-3" aria-hidden>
+          {icon ?? <Info size={18} />}
+        </div>
+      )}
+      <div className="text-[16px] leading-[1.35] font-[650] text-ink">{title}</div>
+      {desc && <div className="max-w-sm text-[13.5px] leading-[1.55] text-ink-3">{desc}</div>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   )
@@ -677,7 +681,7 @@ export function Note({ children, tone = 'neutral', icon }: { children: ReactNode
   return (
     <div
       className={cx(
-        'flex items-start gap-2 rounded-[10px] px-3.5 py-2.5 text-[13.5px] leading-relaxed',
+        'flex items-start gap-2 rounded-[14px] px-4 py-3 text-[13.5px] leading-relaxed',
         tone === 'neutral' && 'bg-well text-ink-2',
         tone === 'good' && 'bg-good-bg text-good-ink',
         tone === 'warn' && 'bg-warn-bg text-warn-ink',
@@ -730,19 +734,19 @@ export function Drawer({
   if (!open) return null
   return (
     <div className="fixed inset-0 z-40">
-      <div className="fade-in absolute inset-0 bg-[rgb(20_32_51/0.28)]" onClick={onClose} />
+      <div className="fade-in absolute inset-0 bg-[rgb(12_14_19/0.24)] backdrop-blur-[2px]" onClick={onClose} />
       <div
         ref={ref}
         tabIndex={-1}
-        className="slide-in absolute top-0 right-0 flex h-full max-w-[96vw] flex-col bg-surface shadow-[var(--shadow-cover)] outline-none"
+        className="slide-in absolute top-2 right-2 bottom-2 flex max-w-[calc(100vw-16px)] flex-col rounded-[24px] bg-surface shadow-[var(--shadow-cover)] outline-none"
         style={{ width }}
         role="dialog"
         aria-modal="true"
       >
         <header className="flex items-start justify-between gap-3 px-8 pt-7 pb-5">
           <div className="min-w-0">
-            <h2 className="text-[22px] leading-tight font-bold tracking-[-0.02em] text-ink">{title}</h2>
-            {sub && <div className="mt-1.5 text-[13.5px] text-ink-3">{sub}</div>}
+            <h2 className="text-[26px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">{title}</h2>
+            {sub && <div className="mt-1.5 text-[13.5px] leading-[1.5] text-ink-3">{sub}</div>}
           </div>
           <div className="flex items-center gap-2">
             {right}
@@ -776,23 +780,23 @@ export function Modal({
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fade-in absolute inset-0 bg-[rgb(20_32_51/0.32)]" onClick={onClose} />
+      <div className="fade-in absolute inset-0 bg-[rgb(12_14_19/0.28)] backdrop-blur-[2px]" onClick={onClose} />
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        className="pop relative max-h-[90vh] overflow-y-auto overscroll-contain rounded-[14px] bg-surface shadow-[var(--shadow-cover)] outline-none"
+        className="pop relative max-h-[90vh] overflow-y-auto overscroll-contain rounded-[26px] bg-surface shadow-[var(--shadow-cover)] outline-none"
         style={{ width, transformOrigin: 'center' }}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-2">
-          <h2 className="text-[17px] font-[650] text-ink">{title}</h2>
+        <div className="flex items-center justify-between px-7 pt-6 pb-2">
+          <h2 className="text-[18px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">{title}</h2>
           <IconButton onClick={onClose} label="닫기">
             <X size={18} />
           </IconButton>
         </div>
-        <div className="px-6 pt-1 pb-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-6 py-4">{footer}</div>}
+        <div className="px-7 pt-1 pb-7">{children}</div>
+        {footer && <div className="flex justify-end gap-2 border-t border-line px-7 py-4">{footer}</div>}
       </div>
     </div>
   )
@@ -825,7 +829,7 @@ export function ToastHost() {
         <div
           key={t.id}
           className={cx(
-            'pop pointer-events-auto flex items-center gap-2.5 rounded-[12px] px-4 py-3 text-[14px] font-medium shadow-[var(--shadow-float)]',
+            'pop pointer-events-auto flex items-center gap-2.5 rounded-full px-5 py-3 text-[14px] font-semibold shadow-[var(--shadow-float)]',
             t.tone === 'good' && 'bg-ink text-white',
             t.tone === 'crit' && 'bg-crit-ink text-white',
             t.tone === 'neutral' && 'border border-line bg-surface text-ink',
@@ -908,7 +912,7 @@ export function ChartCard({
 export function DataTable({ spec, maxHeight = 360 }: { spec: TableSpec; maxHeight?: number }) {
   const al = (i: number) => spec.align?.[i] ?? (i === 0 ? 'left' : 'right')
   return (
-    <div className="thin-scroll overflow-auto rounded-[12px] border border-line" style={{ maxHeight }}>
+    <div className="thin-scroll overflow-auto rounded-[14px] border border-line" style={{ maxHeight }}>
       <table className="tnum w-full text-[13.5px]">
         <thead className="sticky top-0 bg-well">
           <tr>
@@ -949,7 +953,7 @@ export function LegendItem({ color, label, kind = 'rect' }: { color: string; lab
 
 /** Standard table frame + header cell classes, so every table reads the same. */
 export const tbl = {
-  frame: 'overflow-hidden rounded-[12px] border border-line',
+  frame: 'overflow-hidden rounded-[14px] border border-line',
   table: 'tnum w-full text-[13.5px]',
   thead: 'bg-well text-ink-3',
   th: 'border-b border-line px-3.5 py-2.5 text-left text-[13px] font-semibold whitespace-nowrap',

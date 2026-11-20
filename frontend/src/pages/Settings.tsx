@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import type { BmsCommand, BuildingProfile, GatewayStatus, Policy, Settings, StrategyKey, WhatIf } from '../lib/types'
 import { COLD_START, ROOM_ORDER, SETTING_LABEL, STRATEGY } from '../lib/constants'
 import { addDays, cx, fmtDateK, fmtKwh, fmtPct, fmtTs, weekdayOf } from '../lib/format'
+import ModeSwitch from '../components/ModeSwitch'
 import { Badge, Button, Card, CardHeader, Disclosure, DisclosureList, ErrorBox, Field, Modal, Note, PageHeader, PageSkeleton, Spinner, StrategyName, inputBase, inputCls, tbl, toast } from '../components/ui'
 
 type NumKey =
@@ -229,6 +230,7 @@ export default function SettingsPage() {
         desc="값을 바꾸면 저장하기 전에 시뮬레이션으로 전력과 쾌적 변화를 먼저 확인합니다. 모든 변경은 변경 기록에 남습니다."
         right={
           <>
+            <ModeSwitch />
             <Button variant="ghost" onClick={() => setConfirm('reset')}>
               <RotateCcw size={15} aria-hidden /> 기본값으로
             </Button>
@@ -671,7 +673,7 @@ const CMD_STATUS: Record<BmsCommand['status'], { label: string; tone: 'good' | '
 
 function CommandStatus({ c }: { c: BmsCommand }) {
   const s = CMD_STATUS[c.status] ?? { label: c.status, tone: 'neutral' as const }
-  const label = c.simulated ? '시뮬레이터 확인' : s.label
+  const label = c.simulated ? '시뮬레이터가 받음 · 중앙제어기 미연결' : s.label
   const title = [c.gateway_id && `게이트웨이 ${c.gateway_id}`, c.readback != null && `되읽은 값 ${c.readback}`, c.error].filter(Boolean).join(' · ')
   return (
     <span title={title || undefined}>
@@ -783,7 +785,7 @@ function PolicyCommands() {
 
 function BuildingAndPolicy() {
   const nav = useNavigate()
-  const { restartOnboarding } = useAuth()
+  const { restartOnboarding, setApplied, user } = useAuth()
   const b = useApi<BuildingProfile>('/api/building')
   const pol = useApi<Policy>('/api/policy')
   const [form, setForm] = useState<Policy | null>(null)
@@ -850,9 +852,24 @@ function BuildingAndPolicy() {
           title="건물 연결과 정책"
           sub="온보딩에서 연결한 중앙 제어 시스템과, AI가 스케줄을 바꿀 때 넘지 않는 운전 정책입니다."
           right={
-            <Button size="sm" onClick={restart}>
-              온보딩 다시 보기
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {user?.applied !== false && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setApplied(false)
+                    nav('/')
+                  }}
+                  title="시연용: 대시보드를 시간표를 넣기 전(현재 운영) 상태로 되돌립니다"
+                >
+                  적용 전 화면부터 다시 보기
+                </Button>
+              )}
+              <Button size="sm" onClick={restart}>
+                온보딩 다시 보기
+              </Button>
+            </div>
           }
         />
         <div className="grid gap-x-10 gap-y-6 lg:grid-cols-3">

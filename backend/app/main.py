@@ -180,6 +180,13 @@ async def import_file(request: Request, file: UploadFile = File(...), hint: str 
     return {"mode": "job", "job": job["id"], "source": name}
 
 
+@app.get("/api/import/sample.csv")
+def import_sample():
+    """The PNU IT관 2026-2 timetable as delivered (grid CSV), for trying the timetable upload."""
+    return PlainTextResponse(service.RAW_CSV.read_text(encoding="utf-8-sig"), media_type="text/csv; charset=utf-8",
+                             headers={"Content-Disposition": "attachment; filename=\"pnu_it_timetable_2026_2.csv\""})
+
+
 @app.post("/api/import/commit")
 def import_commit(body: dict = Body(...)):
     try:
@@ -411,6 +418,7 @@ def admin_reset(request: Request):
 
     st.replace_kind("adjustment", {})
     st.replace_kind("command", {})
+    st.replace_kind("tier_run", {})
     kept = {f["id"]: f for f in st.list_items("feedback") if f.get("source") == "simulated"}
     st.replace_kind("feedback", kept)
     st.put_item("meta", "op_mode", {"mode": "recommend", "changed_at": None, "by": None})
@@ -511,6 +519,26 @@ def plan_tier(tier: int, date: str | None = None):
         return planning.tier_plan(tier, _date(date) if date else None)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.get("/api/plan/runs")
+def plan_runs():
+    from . import planning
+
+    return planning.tier_runs()
+
+
+@app.post("/api/plan/tier/{tier}/run")
+def plan_tier_run(tier: int, request: Request, body: dict = Body(default={})):
+    """Compute this tier now, step by step, as a job the screen can watch."""
+    if tier not in (1, 2, 3):
+        raise HTTPException(400, "tier는 1, 2, 3 중 하나입니다.")
+    _rate_limit(request, "tier_run", 20)
+    d = body.get("date")
+    if d:
+        _date(str(d))
+    job = jobs.create("tier_run", {"tier": tier, "date": d, "actor": "운영자"})
+    return {"job": job["id"]}
 
 
 @app.get("/api/adjustments")
@@ -652,6 +680,16 @@ def lab_measured_clear():
 
     lab.clear_measured()
     return {"cleared": True}
+
+
+@app.post("/api/respond/preview")
+def respond_preview(request: Request, body: dict = Body(...)):
+    """Change response: apply one change to the day and show how the AI operation reacts (nothing saved)."""
+    from . import respond
+
+    _rate_limit(request, "respond", 30)
+    d = _date(body["date"]) if body.get("date") else None
+    return respond.preview(str(body.get("kind") or ""), d)
 
 
 # ---------------------------------------------------------------- edge gateway (outbound HTTPS from the building)

@@ -1,30 +1,26 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { RotateCcw, CloudSun, Cloud, CloudRain, CloudSnow, Sun, Droplets, WindIcon, Wrench, History, Info, Fan, Clock3, CalendarRange, Sparkles, ArrowLeft, Download } from 'lucide-react'
+import { FileUp, RotateCcw, Clock3, ArrowLeft, Download } from 'lucide-react'
 import { useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
-import type { Day, Live, Meta, StrategyKey, WeatherNow } from '../lib/types'
-import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
+import { useAuth } from '../lib/auth'
+import TimetableApply, { type AppliedSummary } from '../components/TimetableApply'
+import { Ondy } from '../components/PublicShell'
+import type { Day, Live, Meta, OpMode } from '../lib/types'
 import { COLD_START, STRATEGY, decisionLabel, statusInfo } from '../lib/constants'
-import { cx, fmtDateK, fmtKwh, fmtMin, fmtPct, hm, josa, pctSaving } from '../lib/format'
+import { cx, fmtDateK, fmtKwh, fmtMin, fmtPct, fmtWon, hm, pctSaving } from '../lib/format'
 import { MODE, buildingAt, buildingFromLive, type BuildingState } from '../lib/thermal'
 import BuildingView, { MapLegend, TimeScrubber } from '../components/BuildingView'
-import Gantt, { DecisionIcon, GanttLegend, decisionMinute } from '../components/Gantt'
+import { DecisionIcon, decisionMinute } from '../components/Gantt'
 import { RoomDetails, RoomHero, type RoomNow } from '../components/RoomDrawer'
 import {
-  Badge,
   Button,
-  Disclosure,
-  DisclosureList,
   ErrorBox,
   Figure,
-  LegendItem,
-  Loading,
   PageSkeleton,
   Popover,
   Segmented,
   Skeleton,
-  ToggleChip,
   btnCls,
   inputBase,
 } from '../components/ui'
@@ -36,7 +32,6 @@ export default function Overview() {
   const live = useApi<Live>(at ? `/api/live?at=${encodeURIComponent(at)}` : '/api/live', { maxAgeMs: 30_000, refreshMs: at ? undefined : 60_000 })
   const date = live.data?.now.date
   const day = useApi<Day>(date ? `/api/day/${date}` : null)
-  const weather = useApi<WeatherNow>('/api/weather', { maxAgeMs: 10 * 60_000 })
   // the selected room lives in the URL (?room=407): the page shows that room instead of the whole building
   const drawerRoom = params.get('room')
   const setDrawerRoom = useCallback(
@@ -54,7 +49,6 @@ export default function Overview() {
   )
   const [viewMinute, setViewMinute] = useState<number | null>(null)
   const [viewKey, setViewKey] = useState<string | null>(null)
-  const [showOdus, setShowOdus] = useState(false)
 
   // scrubbed minute belongs to one reference date; reset when the date changes
   const key = `${date}|${at ?? ''}`
@@ -63,6 +57,14 @@ export default function Overview() {
     setViewMinute(null)
   }
   const onScrub = useCallback((m: number) => setViewMinute(m), [])
+  // before ON:D AI is applied the dashboard shows the building as it runs today (central control,
+  // fixed schedule); after the timetable is reflected and AI is applied it switches to the AI operation
+  const { user } = useAuth()
+  const applied = user?.applied !== false
+  const [view, setView] = useState<'current' | 'ai'>(applied ? 'ai' : 'current')
+  const [ttOpen, setTtOpen] = useState(false)
+  const [justApplied, setJustApplied] = useState<AppliedSummary | null>(null)
+  useEffect(() => setView(applied ? 'ai' : 'current'), [applied])
 
   if (live.error) return <ErrorBox title="건물 상태를 불러오지 못했습니다" error={live.error} onRetry={live.reload} />
   if (metaError && !meta) return <ErrorBox title="기본 정보를 불러오지 못했습니다" error={metaError} onRetry={reloadMeta} />
@@ -72,20 +74,23 @@ export default function Overview() {
   const now = L.now
   const D = day.data?.date === now.date ? day.data : undefined
   const scrubbing = viewMinute != null && viewMinute !== now.minute && !!D
-  const shown = scrubbing ? buildingAt(D!, meta, viewMinute!) : buildingFromLive(L, meta, D)
+  const cur = view === 'current'
   const minute = scrubbing ? viewMinute! : now.minute
+  if (cur && !D) return <PageSkeleton label="현재 운영 상태를 불러오는 중…" />
+  const shown = cur ? buildingAt(D!, meta, minute, 'fixed') : scrubbing ? buildingAt(D!, meta, viewMinute!) : buildingFromLive(L, meta, D)
   const ref: 'now' | 'replay' | 'scrub' = scrubbing ? 'scrub' : at ? 'replay' : 'now'
   const drawerNow = drawerRoom ? roomNow(shown, meta, drawerRoom, minute, scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재') : undefined
 
   return (
     <div>
-      {/* the page's answer: one sentence from the data + three key numbers */}
-      <header data-tour="ov-summary" className="mb-6 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+      {/* the page's answer: one sentence from the data, set as the landing's display type, + key numbers.
+          Keyed on the view so switching current <-> ON:D AI replays the rise: the change is the moment. */}
+      <header data-tour="ov-summary" className="mb-9 grid grid-cols-1 gap-x-14 gap-y-7 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[26px] leading-[1.2] font-bold tracking-[-0.025em] text-[#2b3447]">운영 현황</h1>
+          <h1 className="sr-only">운영 현황</h1>
+          <div className="flex flex-wrap items-center gap-2.5">
             {at && (
-              <span className="inline-flex items-center gap-2 rounded-full bg-brand px-3 py-1 text-[13.5px] font-semibold text-white">
+              <span className="inline-flex items-center gap-2 rounded-full bg-brand px-3 py-1 text-[13px] font-semibold text-white">
                 <Clock3 size={14} aria-hidden />
                 <span className="tnum">
                   {fmtDateK(now.date)} {fmtMin(now.minute)} 재현 중
@@ -93,12 +98,39 @@ export default function Overview() {
               </span>
             )}
           </div>
-          <p className="pretty mt-2 max-w-[62ch] text-[16.5px] leading-[1.6] text-ink-2">
-            {now.live || at ? summarize(shown, meta, D, minute, ref) : <span className="text-warn-ink">{now.reason}</span>}
-          </p>
+          {(() => {
+            const text = cur ? currentSentence(shown, meta, D!, minute, applied) : now.live || at ? summarize(shown, meta, D, minute, ref) : null
+            if (!text) return <p className="mt-4 max-w-[62ch] text-[16.5px] leading-[1.6] text-warn-ink">{now.reason}</p>
+            const [l1, l2, rest] = splitHead(text)
+            return (
+              <div key={view}>
+                <p className="display balance mt-4 max-w-[24em] text-[clamp(28px,2.5vw,38px)]">
+                  <span className="rise-mask">
+                    <span className="rise-line">{l1}</span>
+                  </span>
+                  {l2 && (
+                    <span className="rise-mask">
+                      <span className="rise-line d1">{l2}</span>
+                    </span>
+                  )}
+                </p>
+                {rest && <p className="pretty fade-in mt-4 max-w-[62ch] text-[17px] leading-[1.55] text-ink-2">{rest}</p>}
+              </div>
+            )
+          })()}
+          <div className="mt-7">{cur ? <CurrentFigures L={L} /> : <ManagerFigures L={L} at={!!at} />}</div>
         </div>
-        <KeyFigures L={L} at={!!at} />
+        {cur && !applied ? <ApplyCta onUpload={() => setTtOpen(true)} /> : <div className="xl:pt-1"><ViewSwitch view={view} onChange={setView} /></div>}
       </header>
+      <TimetableApply
+        open={ttOpen}
+        onClose={() => setTtOpen(false)}
+        onApplied={(sum) => {
+          setJustApplied(sum)
+          setView('ai')
+        }}
+      />
+      {justApplied && !cur && <AppliedBanner s={justApplied} L={L} onCompare={() => setView('current')} onClose={() => setJustApplied(null)} />}
 
       {drawerRoom && meta.rooms[drawerRoom] ? (
         /* one room in focus (mock 1): the room card, its status and its chart, then the day's detail */
@@ -114,7 +146,7 @@ export default function Overview() {
               <RoomPicker meta={meta} state={shown} value={drawerRoom} onChange={setDrawerRoom} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={cx('tnum rounded-full px-3 py-1 text-[13.5px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-[#edf1f7] text-ink-2')}>
+              <span className={cx('tnum rounded-full px-3 py-1 text-[13.5px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-well text-ink-2')}>
                 {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재'}
               </span>
               {D && (
@@ -139,44 +171,29 @@ export default function Overview() {
         </section>
       ) : (
         /* hero: the building as floor plates */
-        <section data-tour="ov-building" className="rounded-[14px] border border-line bg-surface" aria-labelledby="bv-title">
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
+        <section data-tour="ov-building" className="relative overflow-hidden rounded-[26px] border border-line bg-[#fafafb]" aria-labelledby="bv-title">
+          <div className="ground-grid pointer-events-none absolute inset-0" aria-hidden />
+          <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-8 pt-7">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <h2 id="bv-title" className="text-[17px] font-[650] tracking-[-0.01em] text-ink">
+              <h2 id="bv-title" className="text-[20px] leading-[1.3] font-bold tracking-[-0.025em] text-ink">
                 IT관 3·4층
               </h2>
-              <span className={cx('tnum rounded-full px-3 py-1 text-[13.5px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-[#edf1f7] text-ink-2')}>
-                {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재'}
-              </span>
+              {(scrubbing || at) && (
+                <span className={cx('tnum rounded-full px-3 py-1 text-[13px] font-semibold', scrubbing ? 'bg-brand text-white' : 'bg-white text-ink-2 ring-1 ring-line')}>
+                  {fmtMin(minute)} {scrubbing ? (minute > now.minute ? '계획' : '기록') : '재현'}
+                </span>
+              )}
               {scrubbing && (
                 <Button size="sm" variant="ghost" onClick={() => setViewMinute(null)}>
                   <RotateCcw size={13} aria-hidden /> {at ? '기준 시각으로' : '지금으로'}
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <ToggleChip pressed={showOdus} onChange={setShowOdus} title="실외기 3대와 배관, 지금 전력을 평면도에 겹쳐 봅니다">
-                <Fan size={14} aria-hidden /> 실외기
-              </ToggleChip>
-              <ReplayControl
-                now={now}
-                at={at}
-                semester={meta.semester}
-                onSet={(v) =>
-                  setParams((prev) => {
-                    const n = new URLSearchParams(prev)
-                    if (v) n.set('at', v)
-                    else n.delete('at')
-                    return n
-                  })
-                }
-              />
-            </div>
           </div>
-          <div className="px-5 pt-4 pb-2">
-            <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={showOdus} />
+          <div className="relative px-5 pt-4 pb-2">
+            <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={false} />
           </div>
-          <div data-tour="ov-time" className="border-t border-line px-7 pt-9 pb-6">
+          <div data-tour="ov-time" className="relative border-t border-line bg-surface px-8 pt-9 pb-7">
             {D ? (
               <TimeScrubber day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
             ) : day.error ? (
@@ -186,40 +203,27 @@ export default function Overview() {
             )}
             <div className="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
               <MapLegend meta={meta} />
-              <span className="text-[13px] text-ink-3">강의실을 누르면 그 강의실 화면으로 바뀝니다</span>
+              {at && (
+                <ReplayControl
+                  now={now}
+                  at={at}
+                  semester={meta.semester}
+                  onSet={(v) =>
+                    setParams((prev) => {
+                      const n = new URLSearchParams(prev)
+                      if (v) n.set('at', v)
+                      else n.delete('at')
+                      return n
+                    })
+                  }
+                />
+              )}
             </div>
           </div>
         </section>
       )}
 
-      {/* everything else is one click away */}
-      <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
-        <Disclosure icon={<CalendarRange size={16} aria-hidden />} title={at ? `${fmtDateK(now.date)} 운전 타임라인` : '오늘 운전 타임라인'} summary={D ? `강의 ${D.sessions.length}건` : undefined}>
-          {D ? (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <GanttLegend primary="ai" compact />
-                <Link to={`/schedule?date=${now.date}`} className={btnCls('secondary', 'sm')}>
-                  스케줄 화면에서 보기
-                </Link>
-              </div>
-              <Gantt day={D} meta={meta} primary="ai" compact nowMinute={minute} onRoomClick={setDrawerRoom} selectedRoom={drawerRoom} />
-              <HourlyEnergy day={D} nowMinute={now.minute} />
-            </div>
-          ) : day.error ? (
-            <ErrorBox error={day.error} onRetry={day.reload} />
-          ) : (
-            <Loading label="운전 기록을 불러오는 중…" />
-          )}
-        </Disclosure>
-        <Disclosure icon={<Sparkles size={16} aria-hidden />} title={at ? 'AI 판단과 자동 조치' : '오늘 AI 판단과 자동 조치'} summary={D ? `${feedCount(D)}건` : undefined}>
-          <Feed day={D} nowMinute={now.minute} onOpen={setDrawerRoom} />
-        </Disclosure>
-        <Disclosure icon={<CloudSun size={16} aria-hidden />} title={at ? '재현 시각 외기와 예보' : '외기와 예보'} summary={`${L.outdoor.t.toFixed(1)}℃, 습도 ${Math.round(L.outdoor.rh)}%`}>
-          <WeatherDetail live={L} weather={weather.data} day={D} replay={!!at} />
-        </Disclosure>
-      </DisclosureList>
-
+      {!drawerRoom && !cur && <NextActions day={D} nowMinute={now.minute} onOpen={setDrawerRoom} />}
     </div>
   )
 }
@@ -309,80 +313,98 @@ function RoomPicker({ meta, state, value, onChange }: { meta: Meta; state: Build
   )
 }
 
-// ---------------------------------------------------------------- key figures (basis on click)
+// ---------------------------------------------------------------- the manager's three numbers: money, comfort, to-do
 
-function KeyFigures({ L, at }: { L: Live; at: boolean }) {
+function ManagerFigures({ L, at }: { L: Live; at: boolean }) {
   const ds = L.date_summary
   const so = L.kwh_so_far
-  const ai = so.ai
-  const svFixed = pctSaving(so.fixed, ai)
-  // compare whole days (cold starts are per day), not the so-far totals
-  const dayDiff = ds.strategies.ai.kwh - ds.strategies.rule.kwh
-  const coldRule = ds.strategies.rule.cold_starts
-  const coldAi = ds.strategies.ai.cold_starts
-  const when = at ? '이 시각까지' : '지금까지'
-  const row = (k: StrategyKey, v: string, strong = false) => (
-    <div key={k} className={cx('flex items-center justify-between gap-4 py-1', strong && 'font-semibold text-ink')}>
-      <span className="inline-flex items-center gap-2">
-        <span className="inline-block h-2 w-2 rounded-full" style={{ background: STRATEGY[k].color }} aria-hidden />
-        {STRATEGY[k].label}
-      </span>
-      <span className="tnum">{v}</span>
-    </div>
-  )
+  const ai = ds.strategies.ai
+  const fx = ds.strategies.fixed
+  const pct = pctSaving(fx.cost_krw, ai.cost_krw)
+  const modeQ = useApi<OpMode>('/api/mode', { maxAgeMs: 20_000, refreshMs: 60_000 })
+  const pending = Number(modeQ.data?.pending) || 0
+  const review = ds.needs_review ?? Math.max((ds.anomalies ?? 0) - (ds.auto_actions ?? 0), 0)
+  const todo = pending + review
   return (
-    <div className="flex flex-wrap gap-x-10 gap-y-5">
+    <div className="flex flex-wrap gap-x-12 gap-y-5">
       <Figure
-        label={`${when} AI 전력`}
-        value={fmtKwh(ai)}
-        unit="kWh"
+        label={at ? '이 날 전기요금 (AI 운전)' : '오늘 전기요금 (AI 운전)'}
+        value={fmtWon(ai.cost_krw)}
         accent={STRATEGY.ai.color}
-        info={
-          <>
-            <p className="mb-2 text-[13.5px]">
-              {when} 쓴 전력을 같은 시간표·날씨의 다른 운전 방식과 비교합니다. 하루 전체 AI 예상은 <b className="tnum font-semibold text-ink">{fmtKwh(ds.strategies.ai.kwh)} kWh</b>입니다.
-            </p>
-            {(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((k) => row(k, `${fmtKwh(so[k])} kWh`, k === 'ai'))}
-          </>
-        }
-      />
-      <Figure
-        label="고정 스케줄 대비"
-        value={svFixed != null ? `−${svFixed.toFixed(1)}` : '–'}
-        unit="%"
-        info={
-          <div className="space-y-2.5 text-[13.5px]">
-            <p>
-              고정 스케줄(평일 08:30–22:30)이었다면 {when} <b className="tnum font-semibold text-ink">{fmtKwh(so.fixed)} kWh</b>를 썼습니다. AI는 {fmtKwh(so.fixed - ai)} kWh 덜 썼습니다.
-            </p>
-            <div className="rounded-[10px] bg-well px-3 py-2.5">
-              <div className="font-semibold text-ink">규칙 기반(10분 전 가동)과 하루 비교</div>
-              <div className="tnum mt-1">
-                {ds.sessions > 0 && coldRule != null && coldAi != null
-                  ? `AI가 하루 ${fmtKwh(Math.abs(dayDiff))} kWh ${dayDiff > 0 ? '더 쓰지만' : '덜 쓰고'}, ${COLD_START.label}${josa(COLD_START.label, '은', '는')} 규칙 ${coldRule}/${ds.sessions}건, AI ${coldAi}/${ds.sessions}건입니다.`
-                  : `AI가 하루 ${fmtKwh(Math.abs(dayDiff))} kWh ${dayDiff > 0 ? '더' : '덜'} 씁니다.`}
-              </div>
-              {dayDiff > 0 && coldAi != null && coldRule != null && coldAi < coldRule && <div className="mt-1 text-ink-3">더 쓴 전력은 수업 전에 미리 데운 몫입니다.</div>}
-            </div>
-          </div>
-        }
-      />
-      <Figure
-        label="강의 중 쾌적 유지율"
-        value={ds.strategies.ai.comfort_pct != null ? ds.strategies.ai.comfort_pct.toFixed(1) : '–'}
-        unit="%"
-        align="right"
+        sub={`기존 방식이면 ${fmtWon(fx.cost_krw)}${pct != null ? ` · −${pct.toFixed(0)}%` : ''}`}
         info={
           <div className="space-y-2 text-[13.5px]">
-            <p>강의 시간 중 실내온도가 쾌적 범위 안이었던 비율입니다(오늘 하루, 지금 이후는 AI 계획 기준).</p>
-            {(['ai', 'rule', 'manual'] as StrategyKey[]).map((k) => row(k, fmtPct(ds.strategies[k].comfort_pct), k === 'ai'))}
-            <div className="border-t border-line pt-2">
-              계획·실행 정합성 <b className="tnum font-semibold text-ink">{fmtPct(ds.match_rate)}</b>, 강의 {ds.sessions}건, 계획 반영 {fmtPct(ds.plan_coverage, 0)}
+            <p>기존 방식은 중앙 제어 고정 스케줄(평일 08:30–22:30 일괄 가동)입니다. 같은 시간표와 날씨로 열모델 시뮬레이션해 비교했고, 요금은 한전 교육용(을) 시간대별 단가입니다.</p>
+            <div className="tnum">
+              {at ? '이 시각까지' : '지금까지'} 전력: 기존 방식 {fmtKwh(so.fixed)} kWh → AI {fmtKwh(so.ai)} kWh
+            </div>
+            <div className="tnum">
+              하루 전체: {fmtKwh(fx.kwh)} → {fmtKwh(ai.kwh)} kWh
             </div>
           </div>
         }
       />
+      <Figure
+        label="수업 중 쾌적"
+        value={ai.comfort_pct != null ? ai.comfort_pct.toFixed(0) : '–'}
+        unit="%"
+        sub={`강의 ${ds.sessions}건 · ${COLD_START.short} ${ai.cold_starts ?? 0}건`}
+        info={
+          <div className="space-y-2 text-[13.5px]">
+            <p>강의 시간 중 실내온도가 쾌적 범위 안이었던 비율입니다(오늘 하루, 지금 이후는 AI 계획 기준). {COLD_START.desc}</p>
+            <div className="tnum">기존 방식 {fmtPct(fx.comfort_pct)} · 계획·실행 정합 {fmtPct(ds.match_rate)}</div>
+          </div>
+        }
+      />
+      <Link to="/plan?tier=3" className="group -m-2 block rounded-[14px] p-2 transition-colors hover:bg-hover" title="AI 스케줄링 › 3차 검증으로">
+        <Figure
+          label="할 일"
+          value={todo}
+          unit="건"
+          align="right"
+          sub={pending ? `승인 대기 ${pending}${review ? ` · 확인 필요 ${review}` : ''}` : review ? `확인 필요 ${review}` : '지금 할 일이 없습니다'}
+        />
+      </Link>
     </div>
+  )
+}
+
+/** What the AI will do next today, as three lines the manager can read without opening anything. */
+function NextActions({ day, nowMinute, onOpen }: { day: Day | undefined; nowMinute: number; onOpen: (r: string) => void }) {
+  if (!day) return null
+  const items = feedItems(day)
+    .filter((i) => i.kind === 'decision' && i.minute > nowMinute)
+    .slice(0, 3)
+  if (items.length === 0) return null
+  return (
+    <section className="mt-6 rounded-[22px] border border-line bg-surface p-6" aria-labelledby="next-title" data-tour="ov-next">
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <h2 id="next-title" className="text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
+          오늘 남은 AI 조치
+        </h2>
+        {items.length > 0 && <span className="text-[13px] text-ink-3">시각이 되면 자동으로 실행됩니다. 누르면 그 강의실로 갑니다.</span>}
+      </div>
+      {(
+        <ol className="mt-3 divide-y divide-line">
+          {items.map((it, i) => (
+            <li key={i}>
+              <button type="button" onClick={() => onOpen(it.room)} className="flex w-full items-center gap-4 rounded-[10px] px-2 py-3 text-left transition-colors hover:bg-well">
+                <span className="tnum w-14 shrink-0 text-[16px] font-bold text-ink">{fmtMin(it.minute)}</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink text-white" aria-hidden>
+                  <DecisionIcon type={it.type ?? ''} size={13} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14.5px] font-semibold text-ink">
+                    <span className="tnum text-ink-2">{it.room}호</span> {it.title}
+                  </span>
+                  <span className="block truncate text-[13px] leading-[1.5] text-ink-3">{it.detail}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   )
 }
 
@@ -448,180 +470,6 @@ function ReplayControl({ now, at, semester, onSet }: { now: Live['now']; at: str
   )
 }
 
-// ---------------------------------------------------------------- detail: hourly energy
-
-function HourlyEnergy({ day, nowMinute }: { day: Day; nowMinute: number }) {
-  const keys: StrategyKey[] = ['fixed', 'rule', 'ai']
-  const hours = Array.from({ length: 17 }, (_, i) => i + 7)
-  const option = useMemo<EChartsOption>(
-    () => ({
-      grid: { left: 40, right: 12, top: 12, bottom: 24 },
-      tooltip: {
-        ...baseTooltip,
-        trigger: 'axis',
-        formatter: (ps: unknown) => {
-          const arr = ps as { seriesName: string; value: number; color: string; axisValue: string }[]
-          let h = ttTitle(`${arr[0]?.axisValue}시대${Number(arr[0]?.axisValue) * 60 > nowMinute ? ' (계획)' : ''}`)
-          for (const p of arr) h += ttRow(p.color, p.seriesName, `${p.value.toFixed(2)} kWh`)
-          return h
-        },
-      },
-      xAxis: { type: 'category', data: hours.map(String), ...axisCommon, axisLabel: { ...axisCommon.axisLabel, formatter: (v: string) => `${v}시` } },
-      yAxis: { type: 'value', ...axisCommon, axisLine: { show: false }, splitNumber: 3 },
-      series: keys.map((k) => ({
-        name: STRATEGY[k].label,
-        type: 'line',
-        step: 'middle',
-        showSymbol: false,
-        lineStyle: { width: 2, color: STRATEGY[k].color },
-        itemStyle: { color: STRATEGY[k].color },
-        areaStyle: k === 'ai' ? { color: 'rgba(20,166,115,0.10)' } : undefined,
-        z: k === 'ai' ? 5 : 2,
-        data: hours.map((h) => day.strategies[k]?.kwh_by_hour[h] ?? 0),
-        ...(k === 'fixed'
-          ? {
-              markLine: {
-                silent: true,
-                symbol: 'none',
-                lineStyle: { color: '#142033', width: 1, type: 'solid' },
-                label: { show: false },
-                data: [{ xAxis: String(Math.min(23, Math.max(7, Math.floor(nowMinute / 60)))) }],
-              },
-            }
-          : {}),
-      })) as never,
-    }),
-    [day, nowMinute],
-  )
-  return (
-    <div className="border-t border-line pt-5">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[14px] font-semibold text-ink">시간대별 전력량 (kWh)</span>
-        <span className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-ink-2">
-          {(['ai', 'rule', 'fixed'] as StrategyKey[]).map((k) => (
-            <LegendItem key={k} color={STRATEGY[k].color} label={STRATEGY[k].label} kind="line" />
-          ))}
-          <LegendItem color="#142033" label="현재 시각" kind="line" />
-        </span>
-      </div>
-      <EChart option={option} height={170} />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------- detail: weather
-
-function skyIcon(sky: number, pty: number, size = 18) {
-  if (pty === 1 || pty === 4 || pty === 5) return <CloudRain size={size} className="text-cool" aria-hidden />
-  if (pty === 2 || pty === 3 || pty === 6 || pty === 7) return <CloudSnow size={size} className="text-cool" aria-hidden />
-  if (sky === 1) return <Sun size={size} className="text-[#d98a00]" aria-hidden />
-  if (sky === 3) return <CloudSun size={size} className="text-ink-3" aria-hidden />
-  return <Cloud size={size} className="text-ink-3" aria-hidden />
-}
-
-function skyLabel(sky: number, pty: number) {
-  if (pty === 1) return '비'
-  if (pty === 2) return '비/눈'
-  if (pty === 3) return '눈'
-  if (pty === 4) return '소나기'
-  if (sky === 1) return '맑음'
-  if (sky === 3) return '구름많음'
-  return '흐림'
-}
-
-function WeatherDetail({ live, weather, day, replay }: { live: Live; weather: WeatherNow | undefined; day: Day | undefined; replay: boolean }) {
-  const now = live.now
-  const h0 = Math.floor(now.minute / 60)
-  const key = `${now.date}T${String(h0).padStart(2, '0')}`
-  const kma = weather?.kma_hourly ?? {}
-  const kmaKeys = Object.keys(kma).sort()
-  const kmaCovers = kmaKeys.some((k) => k.startsWith(now.date))
-  // KMA short-term forecast only covers the coming days; for other reference dates use that day's simulation weather.
-  const hourly: Record<string, { t: number; rh: number; sky: number; pty: number; pop: number }> = kmaCovers
-    ? kma
-    : Object.fromEntries(
-        (day?.weather.actual.t ?? []).map((t, h) => [
-          `${now.date}T${String(h).padStart(2, '0')}`,
-          { t, rh: day!.weather.actual.rh[h], sky: (day!.weather.actual.ghi[h] ?? 0) > 250 ? 1 : 3, pty: 0, pop: 0 },
-        ]),
-      )
-  const keys = Object.keys(hourly).sort()
-  const upcoming = keys.filter((k) => k >= key).slice(0, 10)
-  const cur = hourly[keys.find((k) => k >= key) ?? '']
-  const nc = replay ? null : weather?.nowcast
-  const src = kmaCovers
-    ? `기상청 단기예보${weather?.kma_base ? ` ${weather.kma_base.slice(4, 6)}/${weather.kma_base.slice(6, 8)} ${weather.kma_base.slice(8, 10)}시 발표` : ''}`
-    : `${day?.weather.src_actual ?? 'Open-Meteo'} 시간별 기온`
-  const temps = upcoming.map((k) => hourly[k].t)
-  const tMin = Math.min(...temps)
-  const tMax = Math.max(...temps)
-  return (
-    <div className="grid grid-cols-1 gap-x-10 gap-y-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <div>
-        <div className="flex items-center gap-3">
-          {cur ? skyIcon(cur.sky, cur.pty, 34) : <CloudSun size={34} className="text-ink-3" aria-hidden />}
-          <div className="tnum text-[40px] leading-none font-[650] tracking-[-0.03em] text-ink">
-            {live.outdoor.t.toFixed(1)}
-            <span className="ml-0.5 text-[18px] font-medium text-ink-3">℃</span>
-          </div>
-        </div>
-        <div className="mt-3 space-y-1 text-[13.5px] text-ink-2">
-          <div className="flex items-center gap-1.5">
-            <Droplets size={14} className="text-ink-3" aria-hidden /> 습도 {Math.round(live.outdoor.rh)}%
-            {cur && (
-              <span>
-                , {skyLabel(cur.sky, cur.pty)}
-                {kmaCovers ? `, 강수 ${cur.pop}%` : ''}
-              </span>
-            )}
-          </div>
-          <div className="text-ink-3">
-            {replay ? '재현 시각' : '지금'} {fmtMin(now.minute)}, {live.outdoor.src}
-          </div>
-          {nc && (
-            <div className="tnum text-ink-3">
-              기상청 초단기실황 {nc.t.toFixed(1)}℃, 습도 {Math.round(nc.rh)}%, <WindIcon size={12} className="inline" aria-hidden /> {nc.wind}m/s ({nc.time.slice(11, 13)}시 관측)
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="min-w-0">
-        <div className="mb-2 text-[13px] text-ink-3">{src}</div>
-        {upcoming.length > 0 ? (
-          <>
-            <div className="grid" style={{ gridTemplateColumns: `repeat(${upcoming.length}, minmax(0, 1fr))` }}>
-              {upcoming.map((k) => {
-                const h = hourly[k]
-                return (
-                  <div key={k} className="flex flex-col items-center text-center" title={`${skyLabel(h.sky, h.pty)}, 습도 ${h.rh}%${kmaCovers ? `, 강수확률 ${h.pop}%` : ''}`}>
-                    <span className="tnum text-[13px] text-ink-3">{k.slice(11, 13)}시</span>
-                    <span className="my-1.5">{skyIcon(h.sky, h.pty, 17)}</span>
-                    <span className="tnum text-[14px] font-semibold text-ink">{Math.round(h.t)}°</span>
-                  </div>
-                )
-              })}
-            </div>
-            <svg className="mt-2 block h-[24px] w-full" viewBox={`0 0 ${upcoming.length * 10} 24`} preserveAspectRatio="none" aria-hidden>
-              <polyline
-                fill="none"
-                stroke="#8a94a3"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-                points={upcoming.map((k, i) => `${i * 10 + 5},${21 - (tMax > tMin ? (hourly[k].t - tMin) / (tMax - tMin) : 0.5) * 18}`).join(' ')}
-              />
-            </svg>
-          </>
-        ) : weather ? (
-          <p className="text-[13.5px] text-ink-3">이 시각 이후의 시간별 예보가 없습니다.</p>
-        ) : (
-          <Skeleton className="h-[80px]" />
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------- detail: decision feed
 
 type FeedItem = {
@@ -652,75 +500,95 @@ function feedItems(day: Day): FeedItem[] {
   return out.sort((a, b) => a.minute - b.minute)
 }
 
-function feedCount(day: Day) {
-  return feedItems(day).length
+// ---------------------------------------------------------------- current operation (before ON:D AI)
+
+/** Headline lines for the display sentence: first sentence split at its first comma, then the rest as body. */
+function splitHead(text: string): [string, string | null, string | null] {
+  const m = text.match(/^(.+?[.!?])(\s+.+)?$/s)
+  const first = (m?.[1] ?? text).trim()
+  const rest = m?.[2]?.trim() || null
+  const i = first.indexOf(', ')
+  if (i > 0) return [first.slice(0, i + 1), first.slice(i + 2), rest]
+  return [first, null, rest]
 }
 
-function Feed({ day, nowMinute, onOpen }: { day: Day | undefined; nowMinute: number; onOpen: (r: string) => void }) {
-  const [filter, setFilter] = useState<'all' | 'decision' | 'auto'>('all')
-  const items = useMemo<FeedItem[]>(() => (day ? feedItems(day) : []), [day])
-  const shown = items.filter((i) => filter === 'all' || (filter === 'decision' ? i.kind === 'decision' : i.kind !== 'decision'))
-  const nDec = items.filter((i) => i.kind === 'decision').length
-  const nAuto = items.length - nDec
+function currentSentence(b: BuildingState, meta: Meta, D: Day, minute: number, applied: boolean) {
+  const on = b.rooms.filter((r) => r.state !== 'OFF')
+  const occ = on.filter((r) => r.session)
+  const empty = on.length - occ.length
+  const fx = D.strategies.fixed
+  const total = fx ? fx.kwh : null
+  const hours = `${String(meta.settings.fixed_on ?? '08:30')}~${String(meta.settings.fixed_off ?? '22:30')}`
+  // before applying, the call to action beside the sentence already says what the timetable does
+  const tail = applied ? ' ON:D를 적용했을 때와 바로 비교할 수 있습니다.' : ''
+  if (!on.length)
+    return `지금(${fmtMin(minute)})은 운전 시간 밖이라, 모든 강의실이 꺼져 있습니다. 중앙 제어가 매일 ${hours}에 일괄로 켜고 끄며, 오늘 전력은 ${total != null ? `${fmtKwh(total)} kWh` : '계산 중'}입니다.${tail}`
+  return `강의실 ${on.length}곳이 켜져 있고, 그중 ${empty}곳은 빈 강의실입니다. 중앙 제어가 매일 ${hours}에 일괄로 켜고 끄며, 수업 중인 곳은 ${occ.length}곳입니다.${tail}`
+}
 
-  if (!day) return <Loading />
+function CurrentFigures({ L }: { L: Live }) {
+  const so = L.kwh_so_far
+  const ds = L.date_summary
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <Segmented
-          size="sm"
-          label="항목 종류"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: 'all', label: `전체 ${items.length}` },
-            { value: 'decision', label: `AI 판단 ${nDec}` },
-            { value: 'auto', label: `자동 조치 ${nAuto}` },
-          ]}
-        />
-        <span className="text-[13px] text-ink-3">항목을 누르면 그 강의실 상세가 열립니다</span>
-      </div>
-      {shown.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-[10px] bg-well px-3.5 py-3 text-[13.5px] text-ink-2">
-          <Info size={15} className="text-ink-3" aria-hidden />
-          {filter === 'auto' ? '오늘은 사람이 개입하거나 시스템이 바로잡은 이상 상황이 없었습니다.' : '이 날은 강의가 없어 AI가 판단할 일이 없었습니다.'}
-        </div>
-      ) : (
-        <ol className="thin-scroll -mx-2 max-h-[440px] overflow-y-auto px-2">
-          {shown.map((it, i) => {
-            const future = it.minute > nowMinute
-            return (
-              <li key={i} className="border-b border-line last:border-b-0">
-                <button type="button" className="flex w-full gap-3 rounded-[10px] px-2 py-3 text-left transition-colors hover:bg-well" onClick={() => onOpen(it.room)}>
-                  <span className={cx('tnum w-12 shrink-0 pt-0.5 text-[14px] font-semibold', future ? 'text-ink-3' : 'text-ink')}>{fmtMin(it.minute)}</span>
-                  <span
-                    className={cx(
-                      'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
-                      it.kind === 'decision' ? (future ? 'bg-well text-ink-2 ring-1 ring-line-strong ring-inset' : 'bg-ink text-white') : 'bg-warn-bg text-[#c98500]',
-                    )}
-                    aria-hidden
-                  >
-                    {it.kind === 'decision' ? <DecisionIcon type={it.type ?? ''} size={12} /> : it.kind === 'auto' ? <Wrench size={12} strokeWidth={2.4} /> : <History size={12} strokeWidth={2.4} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-                      <span className="tnum shrink-0 text-ink-2">{it.room}</span>
-                      <span className="truncate">{it.title}</span>
-                      {future && (
-                        <Badge tone="outline" className="shrink-0">
-                          예정
-                        </Badge>
-                      )}
-                    </span>
-                    <span className="mt-0.5 block text-[13.5px] leading-snug text-ink-2">{it.detail}</span>
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ol>
-      )}
+    <div className="flex flex-wrap gap-x-12 gap-y-4">
+      <Figure label="지금까지 전력" value={fmtKwh(so.fixed)} unit="kWh" accent={STRATEGY.fixed.color} />
+      <Figure label="오늘 예상 전력" value={fmtKwh(ds.strategies.fixed?.kwh)} unit="kWh" />
     </div>
   )
 }
 
+/** Before ON:D AI is applied: the one place to act, with Ondy holding the timetable. */
+function ApplyCta({ onUpload }: { onUpload: () => void }) {
+  return (
+    <div className="relative w-full overflow-hidden rounded-[26px] bg-[#f4f7fd] p-7 xl:w-[380px]">
+      <Ondy pose="schedule" size={108} pop className="absolute -top-1 right-5" />
+      <p className="max-w-[11em] pr-24 text-[20px] leading-[1.35] font-bold tracking-[-0.02em] text-ink">시간표를 넣으면 AI가 1차 계획을 만듭니다</p>
+      <p className="mt-3 text-[14px] leading-[1.6] text-ink-2">수업이 있는 강의실만 필요한 만큼 미리 켜는 계획입니다. 적용하면 이 화면이 바로 AI 운전으로 바뀝니다.</p>
+      <Button variant="primary" className="mt-5 h-12 w-full text-[15px]" onClick={onUpload}>
+        <FileUp size={16} aria-hidden /> 시간표 넣기
+      </Button>
+    </div>
+  )
+}
+
+function ViewSwitch({ view, onChange }: { view: 'current' | 'ai'; onChange: (v: 'current' | 'ai') => void }) {
+  return (
+    <Segmented
+      label="운전 비교"
+      value={view}
+      onChange={onChange}
+      options={[
+        { value: 'current', label: '기존 방식' },
+        { value: 'ai', label: 'ON:D' },
+      ]}
+    />
+  )
+}
+
+function AppliedBanner({ s, L, onCompare, onClose }: { s: AppliedSummary; L: Live; onCompare: () => void; onClose: () => void }) {
+  const fx = L.date_summary.strategies.fixed?.kwh ?? 0
+  const ai = L.date_summary.strategies.ai?.kwh ?? 0
+  const today = fx > 0 ? Math.round((100 * (fx - ai)) / fx) : null
+  return (
+    <div className="reveal relative mb-8 flex flex-wrap items-center justify-between gap-4 rounded-[22px] bg-ink py-5 pr-6 pl-[112px] text-white" role="status">
+      <div className="absolute top-1/2 left-5 -translate-y-1/2" aria-hidden>
+        <Ondy pose="main" size={70} pop className="rounded-full" />
+      </div>
+      <div>
+        <div className="text-[16px] leading-[1.35] font-[650]">ON:D AI 운전을 적용했습니다 ({s.mode === 'auto' ? '자동 운전' : '추천 모드'})</div>
+        <div className="mt-1 text-[14px] leading-[1.5] text-white/70">
+          {s.month} 1차 계획: 기존 방식 {fmtKwh(s.baseline_kwh)} kWh → AI {fmtKwh(s.kwh)} kWh{s.saving_pct != null ? ` (−${s.saving_pct}%)` : ''} · 오늘 하루: {fmtKwh(fx)} → {fmtKwh(ai)} kWh
+          {today != null ? ` (−${today}%)` : ''}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={onCompare} className="inline-flex h-9 items-center rounded-full bg-white px-4 text-[13.5px] font-semibold text-ink transition-colors hover:bg-white/85">
+          기존 방식과 비교해 보기
+        </button>
+        <button type="button" onClick={onClose} className="inline-flex h-9 items-center rounded-full px-3.5 text-[13.5px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white">
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}

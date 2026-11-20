@@ -7,7 +7,6 @@ import {
   CalendarDays,
   CalendarRange,
   CheckCircle2,
-  ChevronRight,
   Compass,
   MessagesSquare,
   Power,
@@ -16,11 +15,12 @@ import {
   Wind,
   X,
   Check,
-  FlaskConical,
 } from 'lucide-react'
 import { apiSend, invalidateAll, useApi } from '../lib/api'
 import { useMeta } from '../lib/context'
-import type { Adjustment, DataSource, Meta, TierCheck, TierDay, TierPlan, TierRoomRow, Verdict } from '../lib/types'
+import { useAuth } from '../lib/auth'
+import { Link } from 'react-router-dom'
+import type { Adjustment, DataSource, Meta, TierCheck, TierDay, TierPlan, TierRoomRow, TierRun, TierRuns, Verdict } from '../lib/types'
 import { ROOM_ORDER, WEEKDAY } from '../lib/constants'
 import { cx, fmtDateK, fmtDateShort, fmtKwh, fmtMin, fmtWon, hm, isoDate } from '../lib/format'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from '../components/EChart'
@@ -28,14 +28,18 @@ import { BRAND, HATCH, NowLine, PillChip, ROOM_TYPE_TONE, RoomTypeIcon, TimePill
 import { ORIGIN_META, SourceIcon, sourceMeta } from '../components/dataSources'
 import AgentDebate from '../components/AgentDebate'
 import { AgentAvatar } from '../components/Characters'
-import { Button, Card, CardHeader, Empty, ErrorBox, Figure, PageHeader, PageSkeleton, Segmented, Spinner, btnCls, inputBase, toast } from '../components/ui'
+import { Button, Card, CardHeader, Disclosure, DisclosureList, Empty, ErrorBox, Figure, PageHeader, PageSkeleton, Segmented, Spinner, btnCls, inputBase, toast } from '../components/ui'
+import ChangeResponse from '../components/ChangeResponse'
+import { Ondy } from '../components/PublicShell'
+import { RunGate, RunLine, RunSteps, useTierRun } from '../components/TierRun'
+import ScenarioCard from '../components/ScenarioCard'
 
 type TierN = 1 | 2 | 3
 
 const TIERS: Record<TierN, { label: string; title: string; desc: string; data: string; icon: typeof CalendarDays }> = {
-  1: { label: '1차 · 월간', title: '월간 기본 계획', desc: '시간표·학사일정·평년 기후로 한 달 운전 계획을 세웁니다.', data: '시간표 · 학사일정 · 평년 기후 · 설비', icon: CalendarDays },
-  2: { label: '2차 · 주간', title: '주간 조정', desc: '이번 주 예보·행사·지난주 의견과 재실 추세로 월간 계획을 다시 맞춥니다.', data: '주간 예보 · 행사 · 의견 · 재실 추세', icon: CalendarRange },
-  3: { label: '3차 · 일일', title: '일일 검증', desc: '오늘 들어온 실황·CO₂·재실·의견으로 오늘 계획이 맞는지 검증합니다.', data: '실황 · CO₂ · 재실 밀도 · 센서 · 의견', icon: CalendarCheck },
+  1: { label: '1차 · 월간', title: '월간 기본 계획', desc: '시간표·학사일정·평년 기후로 한 달 운전 계획을 세웁니다.', data: '시간표·학사일정·평년 기후·설비', icon: CalendarDays },
+  2: { label: '2차 · 주간', title: '주간 조정', desc: '이번 주 예보·행사·지난주 의견과 재실 추세로 월간 계획을 다시 맞춥니다.', data: '주간 예보·행사·의견·재실 추세', icon: CalendarRange },
+  3: { label: '3차 · 일일', title: '일일 검증', desc: '오늘 들어온 실황·CO₂·재실·의견으로 오늘 계획이 맞는지 검증합니다.', data: '실황·CO₂·재실 밀도·센서·의견', icon: CalendarCheck },
 }
 
 const VERDICT: Record<Verdict, { label: string; ink: string; bg: string; color: string; icon: typeof CheckCircle2 }> = {
@@ -68,8 +72,13 @@ export default function Plan() {
   const t: TierN = tier === 1 || tier === 2 || tier === 3 ? tier : 3
   const date = params.get('date')
   const debateOpen = params.get('debate') === '1'
+  // the plan is computed when the operator asks (RunGate); until then nothing is fetched or shown
+  const runs = useApi<TierRuns>('/api/plan/runs', { maxAgeMs: 10_000 })
+  const runDate = date ?? runs.data?.defaults?.[String(t)] ?? null
+  const ran = useMemo(() => (Array.isArray(runs.data?.runs) ? runs.data!.runs.find((r) => r.tier === t && r.date === runDate) : undefined), [runs.data, t, runDate])
+  const tr = useTierRun(t, date)
   const url = `/api/plan/tier/${t}${date ? `?date=${date}` : ''}`
-  const res = useApi<TierPlan>(url, { maxAgeMs: 60_000 })
+  const res = useApi<TierPlan>(ran ? url : null, { maxAgeMs: 60_000 })
   const plan = normalize(res.data?.tier === t ? res.data : undefined)
 
   const set = (patch: Record<string, string | null>) => {
@@ -82,6 +91,25 @@ export default function Plan() {
   }
 
   const anchor = date ?? plan?.period.start ?? meta?.now.date ?? isoDate(new Date())
+  const { user } = useAuth()
+  if (user?.applied === false)
+    return (
+      <div>
+        <PageHeader title="AI 스케줄링" desc="1차 월간 계획을 2차 주간, 3차 일일 데이터로 다시 검증하고, 맞지 않으면 조정합니다." />
+        <Card>
+          <Empty
+            art={<Ondy pose="schedule" size={128} pop />}
+            title="아직 AI 스케줄이 없습니다"
+            desc="운전 현황 화면 오른쪽 위의 '시간표 넣기'로 시간표를 반영하면 1차 스케줄이 만들어지고, AI 운전을 적용하면 2·3차 검증이 이어집니다."
+            action={
+              <Link to="/" className={btnCls('primary', 'md')}>
+                운전 현황으로 가기
+              </Link>
+            }
+          />
+        </Card>
+      </div>
+    )
 
   return (
     <div>
@@ -90,7 +118,6 @@ export default function Plan() {
         desc="1차 월간 계획을 2차 주간, 3차 일일 데이터로 다시 검증하고, 맞지 않으면 조정합니다."
         right={
           <>
-            {plan && <ModeBadge mode={plan.mode} />}
             <label className="sr-only" htmlFor="plan-date">
               기준 날짜
             </label>
@@ -104,43 +131,75 @@ export default function Plan() {
               max={meta?.semester.end}
               onChange={(e) => set({ date: e.target.value || null })}
             />
-            <a href="/lab" target="_blank" rel="noopener" className={btnCls('secondary', 'md')} title="에이전트 판단으로 운전을 다시 시뮬레이션해 전력을 비교하는 별도 화면">
-              <FlaskConical size={15} aria-hidden /> 시뮬레이션 랩
-            </a>
           </>
         }
       />
 
-      <div data-tour="plan-tiers">
+      <div data-tour="plan-tiers" className="mb-2">
         <TierPipeline tier={t} onChange={(n) => set({ tier: String(n), debate: n === 1 ? null : params.get('debate') })} />
       </div>
 
-      {res.error && !plan ? (
+      {runs.error && !runs.data ? (
+        <div className="mt-6">
+          <ErrorBox title="계산 기록을 불러오지 못했습니다" error={runs.error} onRetry={runs.reload} />
+        </div>
+      ) : !runs.data || !meta ? (
+        <div className="mt-6">
+          <PageSkeleton label="불러오는 중…" />
+        </div>
+      ) : !ran ? (
+        <div className="mt-6 space-y-6">
+          <RunGate key={`${t}:${runDate}`} tier={t} run={tr} data-tour="plan-summary" />
+          {t === 3 && <ChangeResponse />}
+        </div>
+      ) : res.error && !plan ? (
         <div className="mt-6">
           <ErrorBox title={`${TIERS[t].label} 계획을 불러오지 못했습니다`} error={res.error} onRetry={res.reload} />
         </div>
-      ) : !plan || !meta ? (
+      ) : !plan ? (
         <div className="mt-6">
-          <PageSkeleton label={`${TIERS[t].label} 계획을 만드는 중…`} />
+          <PageSkeleton label={`${TIERS[t].label} 계획을 불러오는 중…`} />
         </div>
       ) : (
         <div className={cx('mt-6 space-y-6 transition-opacity duration-200', res.loading && 'opacity-60')}>
-          <div data-tour="plan-summary">
-            <SummaryRow plan={plan} onDebate={t === 1 ? undefined : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} />
+          {tr.running || (tr.steps && tr.steps.length > 0 && !tr.result && !tr.err) ? (
+            <Card>
+              <CardHeader title={`${TIERS[t].label} 다시 계산 중`} sub="지금 데이터로 처음부터 다시 계산합니다. 끝나면 아래 내용이 바뀝니다." />
+              <RunSteps tier={t} steps={tr.steps ?? []} shown={tr.shown} running={tr.running} done={tr.done} />
+            </Card>
+          ) : null}
+          {tr.err && <ErrorBox title="다시 계산하지 못했습니다" error={tr.err} />}
+          <div data-tour="plan-summary" className="reveal">
+            <SummaryRow plan={plan} run={ran} onRerun={tr.start} rerunning={tr.running} onDebate={t === 1 ? undefined : () => set({ debate: debateOpen ? null : '1' })} debateOpen={debateOpen} />
           </div>
+          {ran?.scenarios && ran.scenarios.scenarios?.length > 0 && <ScenarioCard r={ran.scenarios} />}
+          {t === 3 && <ChangeResponse />}
+          {/* only what the operator has to look at; the room-by-room visual is one click away */}
+          {plan.checks.every((c) => c.verdict === 'ok') && plan.adjustments.length === 0 ? (
+            <div data-tour="plan-checks">
+              <AllClear checks={plan.checks} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+              <div data-tour="plan-checks" className="min-w-0">
+                <ChecksCard checks={plan.checks} />
+              </div>
+              <div data-tour="plan-adjustments" className="min-w-0">
+                <AdjustmentsCard items={plan.adjustments} mode={plan.mode} onChanged={() => invalidateAll()} />
+              </div>
+            </div>
+          )}
           <div data-tour="plan-sources">
-            <SourcesStrip sources={plan.sources} />
-          </div>
-          <div data-tour="plan-visual">
-            <TierVisual plan={plan} meta={meta} />
-          </div>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <div data-tour="plan-checks" className="min-w-0">
-              <ChecksCard checks={plan.checks} />
-            </div>
-            <div data-tour="plan-adjustments" className="min-w-0">
-              <AdjustmentsCard items={plan.adjustments} mode={plan.mode} onChanged={() => invalidateAll()} />
-            </div>
+            <DisclosureList title="자세히" hideTitle>
+              <Disclosure title={t === 1 ? '날짜별 계획 전력과 강의실별 운전' : t === 2 ? '이번 주 날짜별 계획과 강의실별 운전' : '오늘 강의실별 운전 시간'}>
+                <div data-tour="plan-visual">
+                  <TierVisual plan={plan} meta={meta} />
+                </div>
+              </Disclosure>
+              <Disclosure title="이번 판단에 쓴 데이터" summary={`${plan.sources.length}개 · 실데이터 ${plan.sources.filter((x) => x.origin === 'live').length}개`}>
+                <SourcesStrip sources={plan.sources} bare />
+              </Disclosure>
+            </DisclosureList>
           </div>
           {t !== 1 && debateOpen && (
             <section id="debate" data-tour="plan-debate" className="scroll-mt-24">
@@ -155,75 +214,70 @@ export default function Plan() {
 
 // ---------------------------------------------------------------- header pieces
 
-function ModeBadge({ mode }: { mode: TierPlan['mode'] }) {
-  const auto = mode === 'auto'
-  return (
-    <span
-      className={cx('inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-[13.5px] font-semibold', auto ? 'bg-good-bg text-good-ink' : 'bg-brand-bg text-brand-ink')}
-      title={auto ? '조정안을 바로 적용하고 중앙 제어기에 명령을 보냅니다.' : '조정안은 승인해야 적용됩니다.'}
-    >
-      <span className={cx('inline-block h-2 w-2 rounded-full', auto ? 'bg-good' : 'bg-brand')} aria-hidden />
-      {auto ? '자동 운전 모드' : '추천 모드'}
-    </span>
-  )
-}
-
+/** 1차 → 2차 → 3차 is a real sequence: drawn like the landing's step track, filled up to the chosen tier. */
 function TierPipeline({ tier, onChange }: { tier: TierN; onChange: (t: TierN) => void }) {
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]" role="tablist" aria-label="스케줄 차수">
-      {([1, 2, 3] as TierN[]).map((n, i) => {
+    <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-3" role="tablist" aria-label="스케줄 차수">
+      {([1, 2, 3] as TierN[]).map((n) => {
         const m = TIERS[n]
         const on = n === tier
         return (
-          <div key={n} className="contents">
-            {i > 0 && (
-              <div className="hidden items-center justify-center text-ink-4 md:flex" aria-hidden>
-                <ChevronRight size={20} />
-              </div>
-            )}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => onChange(n)}
-              className={cx(
-                'flex items-center gap-3.5 rounded-[16px] border px-5 py-4 text-left transition-[background-color,border-color,box-shadow] duration-150',
-                on ? 'border-transparent bg-brand-bg shadow-[0_0_0_2px_var(--color-brand)]' : 'border-line bg-surface hover:border-ink-4',
-              )}
-            >
-              <span
-                className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]', on ? 'text-white' : 'bg-well text-ink-2')}
-                style={on ? { background: BRAND } : undefined}
-              >
-                <m.icon size={19} aria-hidden />
-              </span>
-              <span className="min-w-0">
-                <span className={cx('block text-[15px] font-bold', on ? 'text-brand-ink' : 'text-ink')}>
-                  {n}차 <span className={cx('font-semibold', on ? 'text-brand-ink' : 'text-ink-2')}>{m.title}</span>
-                </span>
-                <span className="mt-0.5 block truncate text-[13px] text-ink-3">{m.data}</span>
-              </span>
-            </button>
-          </div>
+          <button
+            key={n}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(n)}
+            className={cx('group block rounded-[4px] text-left transition-colors duration-200', on ? 'text-ink' : 'text-ink-3 hover:text-ink')}
+          >
+            <span
+              className={cx('block h-[3px] rounded-full transition-colors duration-300', on ? 'bg-brand' : n < tier ? 'bg-brand/35' : 'bg-line group-hover:bg-line-strong')}
+              aria-hidden
+            />
+            <span className="mt-4 flex items-baseline gap-2.5">
+              <span className={cx('tnum text-[28px] leading-[1.1] font-bold tracking-[-0.03em]', on ? 'text-ink' : 'text-ink-4 group-hover:text-ink-3')}>{n}차</span>
+              <span className="text-[16px] leading-[1.35] font-semibold tracking-[-0.01em]">{m.title}</span>
+            </span>
+            <span className="mt-1.5 block truncate text-[13px] leading-[1.5] text-ink-3">{m.data}</span>
+          </button>
         )
       })}
     </div>
   )
 }
 
-function SummaryRow({ plan, onDebate, debateOpen }: { plan: TierPlan; onDebate?: () => void; debateOpen: boolean }) {
+function SummaryRow({
+  plan,
+  run,
+  onRerun,
+  rerunning,
+  onDebate,
+  debateOpen,
+}: {
+  plan: TierPlan
+  run?: TierRun
+  onRerun?: () => void
+  rerunning?: boolean
+  onDebate?: () => void
+  debateOpen: boolean
+}) {
   const s = plan.summary
   const counts = { ok: 0, adjust: 0, review: 0 }
   for (const c of plan.checks) counts[c.verdict] += 1
   return (
     <Card pad="lg">
+      {run && onRerun && (
+        <div className="mb-5 border-b border-line pb-4">
+          <RunLine run={run} onRerun={onRerun} running={!!rerunning} />
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
         <div className="min-w-0 flex-[1_1_28rem]">
           <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium text-ink-3">
             <span className="rounded-full bg-well px-2.5 py-0.5 font-semibold text-ink-2">{plan.label || TIERS[plan.tier].label}</span>
             <span className="tnum">{plan.period.label || `${fmtDateK(plan.period.start)} – ${fmtDateK(plan.period.end)}`}</span>
           </div>
-          <p className="pretty mt-3 max-w-[60ch] text-[19px] leading-[1.55] font-medium text-ink">{s.sentence || TIERS[plan.tier].desc}</p>
+          <p className="pretty mt-3 max-w-[56ch] text-[18px] leading-[1.55] font-medium text-ink">{s.sentence || TIERS[plan.tier].desc}</p>
           {onDebate && (
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <button
@@ -241,17 +295,17 @@ function SummaryRow({ plan, onDebate, debateOpen }: { plan: TierPlan; onDebate?:
                 <MessagesSquare size={16} aria-hidden />
                 {debateOpen ? '에이전트 협의 닫기' : '에이전트 협의 열기'}
               </button>
-              <span className="text-[13.5px] text-ink-3">북항이(요금·전력)와 사용자 에이전트(쾌적)가 설정온도를 두고 협의합니다.</span>
+              <span className="text-[13.5px] text-ink-3">관리자 온디(요금·전력)와 사용자 온디(쾌적)가 설정온도를 두고 협의합니다.</span>
             </div>
           )}
         </div>
         <div className="flex flex-wrap gap-x-10 gap-y-5">
-          <Figure label="AI 계획 전력" value={fmtKwh(s.kwh)} unit="kWh" sub={`현재 운영 ${fmtKwh(s.baseline_kwh)} kWh`} accent="#14a673" />
           <Figure
-            label="현재 운영 대비"
+            label="기존 방식 대비 전력"
             value={s.saving_pct != null ? `−${Math.abs(s.saving_pct).toFixed(1)}` : '–'}
             unit={s.saving_pct != null ? '%' : undefined}
-            sub={s.cost_krw ? `예상 요금 ${fmtWon(s.cost_krw)}` : undefined}
+            sub={`${fmtKwh(s.baseline_kwh)} → ${fmtKwh(s.kwh)} kWh${s.cost_krw ? ` · 요금 ${fmtWon(s.cost_krw)}` : ''} (시뮬레이션)`}
+            accent="#14a673"
           />
           <Figure
             label="정합성 점검"
@@ -262,7 +316,7 @@ function SummaryRow({ plan, onDebate, debateOpen }: { plan: TierPlan; onDebate?:
                 <span style={{ color: VERDICT.review.color }}>{counts.review}</span>
               </span>
             }
-            sub="정상 · 조정 · 확인 필요"
+            sub="정상, 조정, 확인 필요"
           />
         </div>
       </div>
@@ -270,11 +324,12 @@ function SummaryRow({ plan, onDebate, debateOpen }: { plan: TierPlan; onDebate?:
   )
 }
 
-function SourcesStrip({ sources }: { sources: DataSource[] }) {
+function SourcesStrip({ sources, bare = false }: { sources: DataSource[]; bare?: boolean }) {
   if (!sources.length) return null
+  const Wrap = bare ? ({ children }: { children: React.ReactNode }) => <div>{children}</div> : Card
   return (
-    <Card>
-      <CardHeader title="이번 판단에 쓴 데이터" sub="AI가 이 차수에서 읽은 데이터입니다. 실데이터와 시뮬레이션 센서, 운영자 입력, 가정값을 구분합니다." />
+    <Wrap>
+      {!bare && <CardHeader title="이번 판단에 쓴 데이터" sub="AI가 이 차수에서 읽은 데이터입니다. 실데이터와 시뮬레이션 센서, 운영자 입력, 가정값을 구분합니다." />}
       <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {sources.map((s) => {
           const o = ORIGIN_META[s.origin] ?? ORIGIN_META.assumption
@@ -298,37 +353,60 @@ function SourcesStrip({ sources }: { sources: DataSource[] }) {
           )
         })}
       </ul>
-    </Card>
+    </Wrap>
   )
 }
 
 // ---------------------------------------------------------------- checks & adjustments
 
+/** Nothing to act on: one line instead of every check, the full list one click away. */
+function AllClear({ checks }: { checks: TierCheck[] }) {
+  const [open, setOpen] = useState(false)
+  if (open) return <ChecksCard checks={checks} />
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-5">
+          <Ondy pose="comfort" size={84} pop />
+          <div>
+            <div className="flex items-center gap-2 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
+              <CheckCircle2 size={18} className="text-good" aria-hidden /> 계획이 새 데이터와 모두 맞고, 승인할 조정안이 없습니다
+            </div>
+            <div className="mt-1 text-[13.5px] text-ink-3">점검 {checks.length}개: {checks.map((c) => c.title).join(', ')}</div>
+          </div>
+        </div>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+          점검 {checks.length}개 보기
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
 function ChecksCard({ checks }: { checks: TierCheck[] }) {
-  const [filter, setFilter] = useState<'all' | Verdict>('all')
-  const shown = filter === 'all' ? checks : checks.filter((c) => c.verdict === filter)
-  const n = (v: Verdict) => checks.filter((c) => c.verdict === v).length
+  const attn = checks.filter((c) => c.verdict !== 'ok')
+  const [filter, setFilter] = useState<'attn' | 'all'>('attn')
+  const shown = filter === 'all' ? checks : attn
   return (
     <Card>
       <CardHeader
-        title="데이터 정합성 점검"
-        sub="계획이 가정한 값과 새로 들어온 데이터를 맞대어 보고, 어긋나면 AI가 조정합니다."
+        title={attn.length ? `새 데이터와 어긋난 곳 ${attn.length}개` : '계획이 새 데이터와 모두 맞습니다'}
+        sub={`점검 ${checks.length}개 중 ${checks.length - attn.length}개는 정상이라 접어 두었습니다. 어긋난 곳은 AI가 조정했거나 확인이 필요합니다.`}
         right={
           <Segmented
             size="sm"
-            label="판정 필터"
+            label="보기"
             value={filter}
             onChange={setFilter}
             options={[
+              { value: 'attn', label: `어긋난 곳 ${attn.length}` },
               { value: 'all', label: `전체 ${checks.length}` },
-              { value: 'adjust', label: `조정 ${n('adjust')}` },
-              { value: 'review', label: `확인 ${n('review')}` },
             ]}
           />
         }
       />
       {shown.length === 0 ? (
-        <Empty title={checks.length ? '해당하는 점검이 없습니다' : '점검 결과가 없습니다'} desc={checks.length ? '다른 판정을 골라 보세요.' : '이 기간에는 비교할 데이터가 아직 없습니다.'} />
+        <Empty title={checks.length ? '어긋난 곳이 없습니다' : '점검 결과가 없습니다'} desc={checks.length ? '"전체"를 누르면 정상인 점검도 볼 수 있습니다.' : '이 기간에는 비교할 데이터가 아직 없습니다.'} />
       ) : (
         <ol className="space-y-3">
           {shown.map((c) => (
@@ -514,8 +592,7 @@ function AdjustmentRow({ a, busy, onDecide }: { a: Adjustment; busy: boolean; on
                 type="button"
                 disabled={busy}
                 onClick={() => onDecide('approve')}
-                className="inline-flex h-9 items-center gap-1.5 rounded-[10px] px-3.5 text-[13.5px] font-semibold text-white transition-colors hover:bg-brand-ink disabled:opacity-50"
-                style={{ background: BRAND }}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-[#2a2e37] disabled:opacity-50"
               >
                 {busy ? <Spinner size={14} className="text-white" /> : <Check size={15} aria-hidden />} 승인하고 적용
               </button>
@@ -562,7 +639,7 @@ function MonthVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
   const today = meta.now.date
 
   return (
-    <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <div className="space-y-6">
       <Card>
         <CardHeader
           title={`${y}년 ${m}월 일별 계획 전력`}
@@ -616,10 +693,12 @@ function MonthVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
           })}
         </div>
       </Card>
-      <Card>
-        <CardHeader title="강의실 × 요일 수업 패턴" sub="월간 계획의 뼈대입니다. 막대는 08–22시 사이 수업 시간이고, 이 패턴에 예열·관성 정지를 더해 운전 시간을 정합니다." />
-        <WeekPattern rooms={plan.rooms ?? []} meta={meta} />
-      </Card>
+      <DisclosureList title="월간 계획 자세히" hideTitle className="self-start">
+        <Disclosure title="강의실 × 요일 수업 패턴" summary="월간 계획의 뼈대">
+          <p className="mb-3 text-[13.5px] text-ink-3">막대는 08–22시 사이 수업 시간이고, 이 패턴에 예열·관성 정지를 더해 운전 시간을 정합니다.</p>
+          <WeekPattern rooms={plan.rooms ?? []} meta={meta} />
+        </Disclosure>
+      </DisclosureList>
     </div>
   )
 }
@@ -724,12 +803,12 @@ function WeekVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
           </div>
         )}
       </Card>
-      <Card pad={false}>
-        <div className="px-6 pt-6">
-          <CardHeader title="강의실별 주간 계획" sub="설정온도는 적용된 조정을 포함합니다. CO₂ 최고값은 예상 인원과 환기 단계로 예측했고, 일사는 방향을 반영한 오후 부하입니다." />
-        </div>
-        <RoomTable rooms={rooms} meta={meta} />
-      </Card>
+      <DisclosureList title="주간 계획 자세히" hideTitle>
+        <Disclosure title="강의실별 주간 계획" summary="설정온도 · CO₂ · 환기 · 의견 · 일사">
+          <p className="mb-3 text-[13.5px] text-ink-3">설정온도는 적용된 조정을 포함합니다. CO₂ 최고값은 예상 인원과 환기 단계로 예측했고, 일사는 방향을 반영한 오후 부하입니다.</p>
+          <RoomTable rooms={rooms} meta={meta} />
+        </Disclosure>
+      </DisclosureList>
     </div>
   )
 }
@@ -815,21 +894,19 @@ function DayVisual({ plan, meta }: { plan: TierPlan; meta: Meta }) {
         />
         <RoomDayTimeline rooms={rooms} meta={meta} nowMinute={plan.now_minute ?? null} />
       </Card>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader title="예보 대비 실황" sub="계획에 쓴 예보(점선)와 실제로 들어온 기온(실선)입니다. 차이가 크면 운전 계획을 다시 계산합니다." />
+      <DisclosureList title="오늘 데이터 자세히" hideTitle>
+        <Disclosure title="예보 대비 실황" summary="차이가 크면 운전 계획을 다시 계산">
+          <p className="mb-3 text-[13.5px] text-ink-3">계획에 쓴 예보(점선)와 실제로 들어온 기온(실선)입니다.</p>
           <WeatherChart plan={plan} />
-        </Card>
-        <Card>
+        </Disclosure>
+        <Disclosure title="CO₂와 재실" summary="강의실별 15분 간격, 시뮬레이션 센서">
           <CO2Panel plan={plan} rooms={rooms} />
-        </Card>
-      </div>
-      <Card pad={false}>
-        <div className="px-6 pt-6">
-          <CardHeader title="강의실별 오늘 상태" sub="실내 온도는 중앙 제어기 센서값, CO₂·재실은 시뮬레이션 센서입니다." />
-        </div>
-        <RoomTable rooms={rooms} meta={meta} today />
-      </Card>
+        </Disclosure>
+        <Disclosure title="강의실별 오늘 상태" summary="실내 온도 · 설정온도 · CO₂ · 환기 · 의견">
+          <p className="mb-3 text-[13.5px] text-ink-3">실내 온도는 중앙 제어기 센서값, CO₂·재실은 시뮬레이션 센서입니다.</p>
+          <RoomTable rooms={rooms} meta={meta} today />
+        </Disclosure>
+      </DisclosureList>
     </div>
   )
 }

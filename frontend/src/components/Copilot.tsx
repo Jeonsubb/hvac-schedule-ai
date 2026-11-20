@@ -167,7 +167,7 @@ export default function Copilot() {
               type="button"
               onClick={() => !busy && setMsgs([])}
               disabled={busy}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] px-2.5 text-[13px] font-medium text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-3 transition-colors hover:bg-hover hover:text-ink disabled:opacity-40"
               title="대화를 지우고 새로 시작"
             >
               <RotateCcw size={15} aria-hidden /> 새 대화

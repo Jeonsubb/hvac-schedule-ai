@@ -2,13 +2,13 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
 import { LayoutDashboard, CalendarRange, Sparkles, X, CloudSun, LogOut, BookOpenText } from 'lucide-react'
+import { Wordmark } from './PublicShell'
 import { useMeta, useCopilot } from '../lib/context'
 import { useAuth } from '../lib/auth'
 import { cx, fmtDateK, fmtMin } from '../lib/format'
 import { useApi } from '../lib/api'
 import type { Live } from '../lib/types'
 import { Popover, Spinner, ToastHost } from './ui'
-import ModeSwitch from './ModeSwitch'
 import TourOverlay from './TourOverlay'
 import { useTour } from '../lib/tour'
 
@@ -46,87 +46,41 @@ export function groupOf(pathname: string) {
   return NAV_GROUPS.find((g) => g.tabs.some((t) => (t.to === '/' ? pathname === '/' : pathname.startsWith(t.to)))) ?? NAV_GROUPS[0]
 }
 
-/** Mark (v5): a blue disc with two floor slabs (4F warm, 3F cool), the same drawing as the building plan. */
+/** Kept for older call sites: the ON:D wordmark at a size. */
 export function LogoMark({ size = 30 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="16" fill="#2f6fde" />
-      <path d="M7.5 20.6h12.2l5-4.1H12.5z" fill="#cfe0fb" />
-      <path d="M7.5 20.6h12.2v2H7.5z" fill="#9dbdf2" />
-      <path d="M7.5 13.6h12.2l5-4.1H12.5z" fill="#ffffff" />
-      <path d="M7.5 13.6h12.2v2H7.5z" fill="#f2a477" />
-    </svg>
-  )
+  return <Wordmark size={Math.round(size * 0.72)} />
 }
 
 export function Logo() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <LogoMark size={34} />
-      <div className="text-[17px] font-bold tracking-[-0.02em] text-brand" translate="no">
-        ThermoPlan
-      </div>
-    </div>
-  )
+  return <Wordmark size={24} />
 }
 
-function Sidebar() {
-  const { meta } = useMeta()
-  const { user, logout } = useAuth()
+/** The two sections as words, the way /welcome names its scenes; the live one carries the blue dot. */
+function MainNav() {
   const loc = useLocation()
   const active = groupOf(loc.pathname)
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] flex-col border-r border-line bg-surface lg:flex">
-      <div className="px-6 pt-7 pb-10">
-        <Logo />
-      </div>
-      <nav className="flex-1 space-y-1" aria-label="주 메뉴">
-        {NAV_GROUPS.map((n) => {
-          const on = active === n
-          return (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.to === '/'}
-              title={n.desc}
-              aria-current={on ? 'page' : undefined}
-              className={cx(
-                'relative flex h-11 items-center gap-3 px-6 text-[15px] transition-colors duration-150',
-                on ? 'font-semibold text-brand' : 'font-medium text-ink-3 hover:text-ink',
-              )}
-            >
-              <n.icon size={19} strokeWidth={on ? 2.3 : 1.9} className={on ? 'text-brand' : 'text-ink-4'} aria-hidden />
-              {n.label}
-              {/* active marker sits on the sidebar's hairline, as in the mock */}
-              {on && <span className="absolute top-1.5 right-[-1px] bottom-1.5 w-[3px] rounded-l-full bg-brand" aria-hidden />}
-            </NavLink>
-          )
-        })}
-      </nav>
-      <div className="space-y-4 px-6 pb-6">
-        <div className="text-[13px] leading-relaxed text-ink-3">
-          <div className="font-medium text-ink-2">{meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'}</div>
-          <div className="tnum">{meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'}</div>
-        </div>
-        {user && (
-          <div className="flex items-center justify-between gap-2 border-t border-line pt-4">
-            <div className="min-w-0">
-              <div className="truncate text-[13.5px] font-semibold text-ink">{user.name}</div>
-              <div className="truncate text-[12.5px] text-ink-3">{user.id}</div>
-            </div>
-            <button
-              type="button"
-              onClick={logout}
-              aria-label="로그아웃"
-              title="로그아웃"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-ink-3 transition-colors duration-150 hover:bg-hover hover:text-ink"
-            >
-              <LogOut size={16} aria-hidden />
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
+    <nav className="hidden items-center gap-1 lg:flex" aria-label="주 메뉴">
+      {NAV_GROUPS.map((n) => {
+        const on = active === n
+        return (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.to === '/'}
+            title={n.desc}
+            aria-current={on ? 'page' : undefined}
+            className={cx(
+              'inline-flex h-10 items-center gap-2 rounded-full px-4 text-[15px] leading-none transition-colors duration-200',
+              on ? 'font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
+            )}
+          >
+            <span className={cx('inline-block h-[7px] w-[7px] rounded-full transition-colors duration-200', on ? 'bg-brand' : 'bg-transparent')} aria-hidden />
+            {n.label}
+          </NavLink>
+        )
+      })}
+    </nav>
   )
 }
 
@@ -136,7 +90,7 @@ function SectionTabs() {
   const g = groupOf(loc.pathname)
   return (
     <nav className="thin-scroll flex min-w-0 overflow-x-auto" aria-label={`${g.label} 하위 화면`}>
-      <div className="inline-flex shrink-0 gap-0.5 rounded-full bg-[#edf1f7] p-1">
+      <div className="inline-flex shrink-0 gap-1">
         {g.tabs.map((t) => (
           <NavLink
             key={t.to}
@@ -144,10 +98,8 @@ function SectionTabs() {
             end={t.to === '/'}
             className={({ isActive }) =>
               cx(
-                'inline-flex h-8 shrink-0 items-center rounded-full px-4 text-[14px] whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
-                isActive
-                  ? 'bg-surface font-semibold text-brand-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.05)]'
-                  : 'font-medium text-ink-3 hover:text-ink',
+                'inline-flex h-9 shrink-0 items-center rounded-full px-4 text-[14px] whitespace-nowrap transition-[background-color,color] duration-200',
+                isActive ? 'bg-ink font-semibold text-white' : 'font-medium text-ink-3 hover:bg-[rgb(12_14_19/0.05)] hover:text-ink',
               )
             }
           >
@@ -159,30 +111,30 @@ function SectionTabs() {
   )
 }
 
-/** "11월 20일 (금) 12:04 | 18.8℃ (부산)" — the reference clock and outdoor air, as one quiet pill. */
-function ClockPill() {
+/** "11월 20일 (금) 12:04 | 18.8℃ (부산)" — the reference clock and outdoor air, one line in the account menu. */
+function ClockLine() {
   const { meta } = useMeta()
   const live = useApi<Live>('/api/live', { maxAgeMs: 60_000, refreshMs: 60_000 })
   const now = meta?.now
-  if (!now) return <span className="hidden h-9 items-center rounded-[10px] bg-[#edf1f7] px-3.5 text-[13.5px] text-ink-3 xl:inline-flex">기준 시각 확인 중…</span>
+  if (!now) return <span className="text-[13.5px] text-ink-3">기준 시각 확인 중…</span>
   const out = live.data?.outdoor
   return (
     <div
-      className="hidden h-9 items-center gap-3 rounded-[10px] bg-[#edf1f7] px-3.5 text-[13.5px] xl:inline-flex"
+      className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px]"
       title={now.live ? `실시간 기준 시각입니다.${out ? ` 지금 외기 ${out.t.toFixed(1)}℃, 습도 ${Math.round(out.rh)}% (${out.src})` : ''}` : now.reason}
     >
       {!now.live && <span className="font-semibold whitespace-nowrap text-warn-ink">대체 기준</span>}
-      <span className="tnum font-medium whitespace-nowrap text-ink">
+      <span className="tnum font-semibold whitespace-nowrap text-ink">
         {fmtDateK(now.date)} {fmtMin(now.minute)}
       </span>
       {out && (
         <>
-          <span className="h-4 w-px bg-line-strong" aria-hidden />
+          <span className="h-3.5 w-px bg-line-strong" aria-hidden />
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-ink">
             <CloudSun size={16} className="text-ink-3" aria-hidden />
             <span className="sr-only">지금 외기</span>
-            <span className="tnum font-medium">{out.t.toFixed(1)}℃</span>
-            <span className="text-ink-3">(부산)</span>
+            <span className="tnum font-semibold">{out.t.toFixed(1)}℃</span>
+            <span className="text-ink-3">부산</span>
           </span>
         </>
       )}
@@ -190,45 +142,79 @@ function ClockPill() {
   )
 }
 
+/** The account: initial in a circle; the building, term and sign-out live behind it. */
+function AccountMenu() {
+  const { meta } = useMeta()
+  const { user, logout } = useAuth()
+  const tour = useTour()
+  if (!user) return null
+  const building = meta ? `${meta.building.campus.replace('부산캠퍼스', '').trim() || '부산대학교'} ${meta.building.name}` : '부산대학교 IT관'
+  return (
+    <Popover
+      label="계정"
+      align="end"
+      width={260}
+      buttonClassName="inline-flex h-10 w-10 items-center justify-center rounded-full bg-well text-[14px] font-bold text-ink ring-1 ring-line transition-colors duration-150 hover:bg-hover"
+      button={
+        <>
+          <span aria-hidden>{user.name.trim().charAt(0) || 'O'}</span>
+          <span className="sr-only">계정 메뉴 열기</span>
+        </>
+      }
+    >
+      <div className="text-[15px] leading-[1.35] font-semibold text-ink">{user.name}</div>
+      <div className="text-[13px] leading-[1.5] text-ink-3">{user.id}</div>
+      <div className="mt-3 border-t border-line pt-3 text-[13.5px] leading-relaxed">
+        <div className="font-semibold text-ink-2">{building}</div>
+        <div className="tnum text-ink-3">{meta ? `${meta.semester.year}년 ${meta.semester.term}` : '2026년 2학기'}</div>
+      </div>
+      <div className="mt-3 border-t border-line pt-3">
+        <ClockLine />
+        <SystemStatus />
+      </div>
+      <button
+        type="button"
+        onClick={() => tour.start(0)}
+        className="mt-3 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-well text-[13.5px] font-semibold text-ink transition-colors hover:bg-hover"
+      >
+        <BookOpenText size={15} aria-hidden /> 화면 안내 보기
+      </button>
+      <button
+        type="button"
+        onClick={logout}
+        className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full border border-[rgb(12_14_19/0.18)] text-[13.5px] font-semibold text-ink transition-colors hover:border-[rgb(12_14_19/0.5)]"
+      >
+        <LogOut size={15} aria-hidden /> 로그아웃
+      </button>
+    </Popover>
+  )
+}
+
 function TopBar() {
   const { open, setOpen } = useCopilot()
-  const tour = useTour()
-  const loc = useLocation()
-  const g = groupOf(loc.pathname)
   return (
-    <header className="sticky top-0 z-20 border-b border-line/70 bg-paper/90 backdrop-blur-md">
-      <div className="flex h-[68px] items-center justify-between gap-4 px-8">
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="lg:hidden">
-            <LogoMark size={30} />
-          </span>
-          {/* section name, like the mock's page title; the section's screens are the tabs below */}
-          <div className="hidden truncate text-[20px] font-bold tracking-[-0.02em] text-ink lg:block">{g.label}</div>
+    <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-md">
+      <div className="flex h-[72px] items-center justify-between gap-4 px-[clamp(16px,3vw,40px)]">
+        <div className="flex min-w-0 items-center gap-6">
+          <NavLink to="/" className="rounded-[10px]" aria-label="ON:D 운전 현황으로">
+            <Logo />
+          </NavLink>
+          <MainNav />
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => tour.start(0)}
-            title="화면을 챕터별로 하나씩 안내합니다"
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3 text-[13.5px] font-semibold text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink"
-          >
-            <BookOpenText size={15} aria-hidden /> 챕터로 보기
-          </button>
-          <ModeSwitch />
-          <SystemStatus />
-          <ClockPill />
           <button
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             className={cx(
-              'inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-[14px] font-semibold transition-colors duration-150',
-              open ? 'border border-line-strong bg-surface text-ink hover:bg-hover' : 'bg-brand text-white hover:bg-brand-ink',
+              'inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-[14px] font-semibold transition-colors duration-200',
+              open ? 'border border-[rgb(12_14_19/0.18)] bg-surface text-ink hover:border-[rgb(12_14_19/0.5)]' : 'bg-ink text-white hover:bg-[#2a2e37]',
             )}
           >
-            {open ? <X size={16} aria-hidden /> : <Sparkles size={16} aria-hidden />}
+            {open ? <X size={16} aria-hidden /> : <Sparkles size={16} className="text-[#8fb3f0]" aria-hidden />}
             {open ? '코파일럿 닫기' : 'AI 코파일럿'}
           </button>
+          <AccountMenu />
         </div>
       </div>
     </header>
@@ -259,19 +245,19 @@ function SystemStatus() {
   const tone: 'good' | 'warn' | 'crit' | 'idle' = down ? 'crit' : !meta ? 'idle' : bad || fallback ? 'warn' : 'good'
   const label = down ? '서버 연결 끊김' : !meta ? '상태 확인 중' : bad ? 'AI 연결 불안정' : fallback ? '저장소 대체 모드' : '시스템 정상 운영 중'
   const pill = {
-    good: 'bg-good-bg text-good-ink',
+    good: 'text-ink-2 hover:bg-[rgb(12_14_19/0.05)]',
     warn: 'bg-warn-bg text-warn-ink',
     crit: 'bg-crit-bg text-crit-ink',
-    idle: 'bg-[#edf1f7] text-ink-3',
+    idle: 'text-ink-3',
   }[tone]
   const dot = { good: 'bg-good soft-ping', warn: 'bg-warn', crit: 'bg-crit', idle: 'bg-ink-4' }[tone]
   return (
-    <div className="hidden md:block">
+    <div>
     <Popover
       label="시스템 상태"
-      align="end"
+      align="start"
       width={300}
-      buttonClassName={cx('inline-flex h-9 items-center gap-2 rounded-[10px] px-3.5 text-[13.5px] font-semibold whitespace-nowrap transition-[filter] duration-150 hover:brightness-[0.97]', pill)}
+      buttonClassName={cx('-ml-2.5 inline-flex h-8 items-center gap-2 rounded-full px-2.5 text-[13.5px] font-semibold whitespace-nowrap transition-colors duration-150', pill)}
       button={
         <>
           <span className={cx('inline-block h-2 w-2 rounded-full', dot)} aria-hidden />
@@ -325,7 +311,7 @@ function MobileNav() {
   const loc = useLocation()
   const active = groupOf(loc.pathname)
   return (
-    <nav className="thin-scroll sticky top-[68px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2 lg:hidden" aria-label="주 메뉴">
+    <nav className="thin-scroll sticky top-[72px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-white/90 px-4 py-2 backdrop-blur-md lg:hidden" aria-label="주 메뉴">
       {NAV_GROUPS.flatMap((g) =>
         g.tabs.map((t) => (
           <NavLink
@@ -334,8 +320,8 @@ function MobileNav() {
             end={t.to === '/'}
             className={({ isActive }) =>
               cx(
-                'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-medium whitespace-nowrap',
-                isActive ? 'bg-brand-bg text-brand-ink' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
+                'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap',
+                isActive ? 'bg-ink font-semibold text-white' : active === g ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
               )
             }
           >
@@ -368,14 +354,13 @@ export default function Layout() {
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>
-      <Sidebar />
-      <div className={cx('min-h-full lg:pl-[220px]', open && '2xl:pr-[440px]')}>
+      <div className={cx('min-h-full', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        <div className="mx-auto hidden max-w-[1480px] px-8 pt-6 lg:block">
+        <div className="mx-auto hidden max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-6 lg:block">
           <SectionTabs />
         </div>
-        <main id="main" className="mx-auto max-w-[1480px] px-8 pt-6 pb-20">
+        <main id="main" className="mx-auto max-w-[1360px] px-[clamp(16px,3vw,40px)] pt-8 pb-24">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />
@@ -390,7 +375,7 @@ export default function Layout() {
             </div>
           }
         >
-          <ErrorBoundary area="AI 코파일럿 패널" wrapClassName="fixed top-0 right-0 bottom-0 z-40 w-[440px] max-w-[100vw] overflow-y-auto border-l border-line bg-paper p-4">
+          <ErrorBoundary area="AI 코파일럿 패널" wrapClassName="fixed top-0 right-0 bottom-0 z-40 w-[440px] max-w-[100vw] overflow-y-auto border-l border-line bg-[#fafafb] p-4">
             <Copilot />
           </ErrorBoundary>
         </Suspense>

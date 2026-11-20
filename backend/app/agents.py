@@ -1,6 +1,6 @@
 """Two agents negotiate the per-room setpoints: cost vs comfort, grounded by the simulator.
 
-- 관리자(건물) 에이전트 '북항이' (agent='building'): proposes the cheapest setpoints the policy allows
+- 관리자(건물) 에이전트 '관리자 온디' (agent='building'): proposes the cheapest setpoints the policy allows
 - 사용자 에이전트 (agent='occupant'): speaks for the occupants (feedback, PMV, CO2) and pushes back
 - 시뮬레이터: every proposal is re-simulated (AI operation, same weather and occupancy) before the
   next turn, so the agents argue over computed numbers, like a generator and a discriminator
@@ -64,13 +64,13 @@ TURN_SCHEMA = {
 
 PERSONA = {
     "building": (
-        "당신은 '북항이'입니다. 부산 북항에서 온 상어 캐릭터로, 이 건물 관리자 쪽 에이전트입니다. "
+        "당신은 '관리자 온디'입니다. 이 건물 관리자 쪽 에이전트입니다. "
         "목표는 전기요금과 에너지를 줄이는 것입니다. 재실자 의견이 없는 강의실은 설정을 0.5℃씩 아끼는 쪽으로 제안하고, "
         "의견이 반복된 강의실은 현재 설정에서 시작해 시뮬레이터가 보여 준 쾌적 악화를 근거로 꼭 필요한 만큼만 양보합니다. "
         "말투는 차분하고 숫자로 설득합니다."
     ),
     "occupant": (
-        "당신은 '사용자 에이전트'입니다. 강의실을 쓰는 학생·교수의 쾌적을 대변합니다. "
+        "당신은 '사용자 온디'입니다. 강의실을 쓰는 학생·교수의 쾌적을 대변합니다. "
         "목표는 수업 중 체감 쾌적(PMV -0.5~+0.5)과 공기질(CO₂ 기준)을 지키는 것입니다. "
         "재실자 의견이 반복된 강의실은 쾌적 쪽으로 0.5~1℃ 조정을 요구하고, 의견이 없는 강의실은 PMV 하락이 0.1 이내이면 절감에 양보합니다. "
         "말투는 친근하지만 근거를 분명히 댑니다."
@@ -184,7 +184,7 @@ def _llm_turn(agent: str, ds: dict, history: list[dict], round_no: int) -> dict:
     )
     convo = []
     for t in history:
-        who = "북항이(관리자 에이전트)" if t["agent"] == "building" else "사용자 에이전트" if t["agent"] == "occupant" else "판정"
+        who = "관리자 온디(관리자 에이전트)" if t["agent"] == "building" else "사용자 온디(사용자 에이전트)" if t["agent"] == "occupant" else "판정"
         ev = t.get("eval") or {}
         props = ", ".join(f"{r} {v.get(ds['key'])}℃" for r, v in sorted(t["proposal"].items()))
         convo.append(f"[{t['round']}라운드 {who}] {t['message']}\n제안: {props}\n시뮬레이터 결과: 전력 {ev.get('kwh')} kWh, 요금 {ev.get('cost_krw')}원, "
@@ -362,7 +362,7 @@ def negotiate(tier: int, d: date, progress=None, use_ai: bool = True, sandbox: b
     emit("자료를 모으는 중")
     for i, agent in enumerate(order):
         rnd = i // 2 + 1
-        emit(f"{'북항이' if agent == 'building' else '사용자 에이전트'}가 자료를 확인하는 중")
+        emit(f"{'관리자 온디' if agent == 'building' else '사용자 온디'}가 자료를 확인하는 중")
         raw = None
         if ai_ok:
             try:
@@ -477,8 +477,8 @@ def negotiate(tier: int, d: date, progress=None, use_ai: bool = True, sandbox: b
             "id": f"T{tier}-{ds['dates'][0]}-agents-{str(sp).replace('.', '_')}", "tier": tier, "origin": "agents", "kind": "setpoint",
             "auto_ok": auto_ok,
             "title": f"{'·'.join(rooms)}호 {lab} {'/'.join(f'{x:.1f}' for x in olds)}℃ → {sp:.1f}℃ (에이전트 합의)",
-            "reason": ("의견이 반복된 강의실이라 사용자 에이전트의 요구를 반영했습니다. " if warmer else
-                       "의견이 없고 체감 변화가 작아 북항이의 절감안을 반영했습니다. ") + how
+            "reason": ("의견이 반복된 강의실이라 사용자 온디의 요구를 반영했습니다. " if warmer else
+                       "의견이 없고 체감 변화가 작아 관리자 온디의 절감안을 반영했습니다. ") + how
                       + ("" if auto_ok else " 한 번에 0.5℃를 넘게 바꾸므로 자동 운전 모드에서도 담당자 승인을 기다립니다."),
             "rooms": rooms, "date_from": ds["dates"][0], "date_to": ds["dates"][-1], "change": {ds["key"]: sp},
             "impact": {"kwh": dkr, "cost_krw": round(dkr * ds["rate"]), "pmv_before": pb, "pmv_after": pa,

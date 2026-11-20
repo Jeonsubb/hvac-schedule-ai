@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { CHAPTERS, useTour } from '../lib/tour'
+import { AiAvatar } from './PublicShell'
 import { cx } from '../lib/format'
 
 type Rect = { top: number; left: number; width: number; height: number }
@@ -122,16 +123,16 @@ export default function TourOverlay() {
       {/* dim everything except the spotlight */}
       {hole ? (
         <div
-          className="absolute rounded-[16px] ring-2 ring-brand transition-[top,left,width,height] duration-300 ease-out"
-          style={{ ...hole, boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.58)' }}
+          className="absolute rounded-[22px] ring-2 ring-brand transition-[top,left,width,height] duration-300 ease-out"
+          style={{ ...hole, boxShadow: '0 0 0 9999px rgba(12, 14, 19, 0.55)' }}
           aria-hidden
         />
       ) : (
-        <div className="absolute inset-0 bg-[rgba(15,23,42,0.58)]" aria-hidden />
+        <div className="absolute inset-0 bg-[rgba(12,14,19,0.55)]" aria-hidden />
       )}
 
       {/* chapter bar */}
-      <nav className="pointer-events-auto absolute bottom-4 left-1/2 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full bg-surface p-1.5 shadow-[0_12px_32px_rgb(20_32_51/0.25)]" aria-label="챕터">
+      <nav className="pointer-events-auto absolute bottom-4 left-1/2 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-full bg-surface p-1.5 shadow-[0_18px_48px_rgb(12_14_19/0.3)]" aria-label="챕터">
         {CHAPTERS.map((c, i) => (
           <button
             key={c.id}
@@ -140,10 +141,10 @@ export default function TourOverlay() {
             aria-current={i === t.chapter ? 'step' : undefined}
             className={cx(
               'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap transition-colors',
-              i === t.chapter ? 'bg-brand text-white' : i < t.chapter ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
+              i === t.chapter ? 'bg-ink font-semibold text-white' : i < t.chapter ? 'text-ink-2 hover:bg-hover' : 'text-ink-3 hover:bg-hover',
             )}
           >
-            <span className={cx('tnum text-[12px]', i === t.chapter ? 'text-white/80' : 'text-ink-4')}>{i + 1}</span>
+            <span className={cx('tnum text-[12px] font-bold', i === t.chapter ? 'text-[#8fb3f0]' : 'text-ink-4')}>{String(i + 1).padStart(2, '0')}</span>
             {c.title}
           </button>
         ))}
@@ -157,20 +158,22 @@ export default function TourOverlay() {
         ref={cardRef}
         role="dialog"
         aria-label={`${ch.title}: ${st.title}`}
-        className="pointer-events-auto absolute rounded-[16px] bg-surface p-5 shadow-[0_24px_64px_rgb(20_32_51/0.3)] transition-[top,left] duration-300 ease-out"
+        className="pointer-events-auto absolute rounded-[24px] bg-surface p-6 shadow-[0_32px_80px_rgb(12_14_19/0.35)] transition-[top,left] duration-300 ease-out"
         style={cardStyle}
       >
         <div className="flex items-center justify-between gap-3">
-          <span className="rounded-full bg-brand-bg px-2.5 py-0.5 text-[12.5px] font-semibold text-brand-ink">
-            챕터 {t.chapter + 1} · {ch.title}
+          <span className="inline-flex items-center gap-2.5 text-[13px] font-semibold text-ink-2">
+            <AiAvatar size={30} />
+            <span className="tnum font-bold text-brand-ink">{String(t.chapter + 1).padStart(2, '0')}</span>
+            {ch.title}
           </span>
           <span className="tnum text-[12.5px] text-ink-3">
             {index} / {total}
           </span>
         </div>
-        <div className="mt-2 text-[13px] font-medium text-ink-3">{ch.question}</div>
-        <h2 className="mt-1 text-[18px] font-bold tracking-[-0.01em] text-ink">{st.title}</h2>
-        <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">{missing ? '이 화면을 불러오지 못했거나 아직 계산 중입니다. 다음으로 넘어가도 됩니다.' : st.body}</p>
+        <div className="mt-4 text-[13px] font-medium text-ink-3">{ch.question}</div>
+        <h2 className="mt-1 text-[19px] leading-[1.35] font-bold tracking-[-0.015em] text-ink">{st.title}</h2>
+        <p className="mt-2 text-[15px] leading-[1.6] text-ink-2">{missing ? '이 부분은 아직 계산 전이거나 불러오지 못했습니다. 화면의 계산 버튼을 누르거나 다음으로 넘어가도 됩니다.' : st.body}</p>
         <div className="mt-4 flex items-center justify-between gap-2">
           <div className="flex gap-1" aria-hidden>
             {ch.steps.map((_, i) => (
@@ -182,11 +185,11 @@ export default function TourOverlay() {
               type="button"
               onClick={t.prev}
               disabled={t.chapter === 0 && t.step === 0}
-              className="inline-flex h-9 items-center gap-1 rounded-[10px] px-3 text-[14px] font-medium text-ink-2 hover:bg-hover disabled:opacity-40"
+              className="inline-flex h-10 items-center gap-1 rounded-full px-3.5 text-[14px] font-semibold text-ink-2 hover:bg-hover disabled:opacity-40"
             >
               <ArrowLeft size={15} aria-hidden /> 이전
             </button>
-            <button type="button" onClick={t.next} className="inline-flex h-9 items-center gap-1 rounded-[10px] bg-brand px-4 text-[14px] font-semibold text-white hover:bg-brand-ink">
+            <button type="button" onClick={t.next} className="inline-flex h-10 items-center gap-1 rounded-full bg-ink px-5 text-[14px] font-semibold text-white hover:bg-[#2a2e37]">
               {last ? '끝내기' : '다음'} {!last && <ArrowRight size={15} aria-hidden />}
             </button>
           </div>

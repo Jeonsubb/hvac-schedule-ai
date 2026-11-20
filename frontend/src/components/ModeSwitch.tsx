@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../lib/auth'
 import { Link } from 'react-router-dom'
 import { Bot, Hand, Inbox, Check, X } from 'lucide-react'
 import { apiSend, invalidate, useApi } from '../lib/api'
@@ -101,7 +102,10 @@ function PendingList({ onDone }: { onDone: () => void }) {
 export default function ModeSwitch() {
   const q = useApi<OpMode>('/api/mode', { maxAgeMs: 20_000, refreshMs: 60_000 })
   const [saving, setSaving] = useState(false)
+  const { user } = useAuth()
   const m = q.data
+  // before ON:D AI is applied there is no AI operation to switch or approve
+  if (user?.applied === false) return null
   if (!m || (m.mode !== 'auto' && m.mode !== 'recommend')) return null
 
   const set = async (mode: OpModeKey) => {
@@ -128,7 +132,7 @@ export default function ModeSwitch() {
 
   return (
     <div data-tour="mode" className="hidden items-center gap-2 md:flex">
-      <div className="inline-flex rounded-[10px] bg-[#eef0f4] p-[3px]" role="radiogroup" aria-label="운전 모드">
+      <div className="inline-flex rounded-full bg-well p-1" role="radiogroup" aria-label="운전 모드">
         {opts.map((o) => {
           const on = m.mode === o.key
           return (
@@ -141,8 +145,8 @@ export default function ModeSwitch() {
               disabled={saving}
               onClick={() => set(o.key)}
               className={cx(
-                'inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-150',
-                on ? 'bg-surface text-ink shadow-[0_1px_2px_rgb(20_32_51/0.08),0_0_0_1px_rgb(20_32_51/0.06)]' : 'text-ink-3 hover:text-ink',
+                'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] whitespace-nowrap transition-[background-color,color,box-shadow] duration-200',
+                on ? 'bg-surface font-semibold text-ink shadow-[0_1px_2px_rgb(12_14_19/0.1),0_0_0_1px_rgb(12_14_19/0.06)]' : 'font-medium text-ink-3 hover:text-ink',
               )}
             >
               <o.icon size={14} className={on ? (o.key === 'auto' ? 'text-brand' : 'text-ink-2') : undefined} aria-hidden />
@@ -157,7 +161,7 @@ export default function ModeSwitch() {
           label="승인 대기 조정안"
           align="end"
           width={380}
-          buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-warn-bg px-3 text-[13px] font-semibold whitespace-nowrap text-warn-ink transition-colors hover:bg-[#ffeec4]"
+          buttonClassName="inline-flex h-10 items-center gap-1.5 rounded-full bg-warn-bg px-3.5 text-[13px] font-semibold whitespace-nowrap text-warn-ink transition-colors hover:bg-[#ffeec4]"
           button={
             <>
               <Inbox size={14} aria-hidden />
@@ -172,7 +176,7 @@ export default function ModeSwitch() {
             </Link>
           </div>
           <PendingList onDone={q.reload} />
-          <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">승인하면 해당 강의실 실내기에 설정온도·환기 명령을 보내고, AI 운전 시뮬레이션을 다시 계산합니다.</p>
+          <p className="mt-3 text-[13px] leading-[1.5] text-ink-3">승인하면 해당 강의실 실내기에 설정온도·환기 명령을 보내고 운전을 다시 계산합니다. 중앙제어기가 연결되어 있지 않으면 명령은 시뮬레이터가 받고, 운영 규칙 › 최근 제어 명령에 그렇게 표시됩니다.</p>
         </Popover>
       )}
     </div>

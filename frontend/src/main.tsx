@@ -8,7 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary area="ThermoPlan 화면">
+    <ErrorBoundary area="ON:D 화면">
       <BrowserRouter>
         <App />
       </BrowserRouter>

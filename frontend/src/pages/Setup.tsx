@@ -5,31 +5,30 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Bot,
-  Building2,
-  CalendarDays,
+  
+  
   Check,
   CheckCircle2,
-  CloudSun,
+  
   Copy,
   FileUp,
-  Hand,
+  
   LogOut,
   Network,
   PlugZap,
-  Receipt,
+  
   Router,
-  Scale,
+  
   Server,
-  ShieldCheck,
+  
   Sparkles,
   Upload,
-  Wrench,
+  
   Cloud,
-  Wind,
-  Users,
-  MessageSquareWarning,
-  Thermometer,
+  
+  
+  
+  
 } from 'lucide-react'
 import { apiSend, invalidate, useApi } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -39,29 +38,28 @@ import type {
   BuildingType,
   CollectResult,
   ConnectResult,
-  DataSource,
   OnboardQuestion,
   OpModeKey,
   Policy,
   ProfileParse,
-  TierCheck,
-  TierDay,
-  TierPlan,
+  
+  
+  
 } from '../lib/types'
-import { cx, fmtKwh, fmtNum, fmtPct, fmtWon, parseDate, weekdayOf } from '../lib/format'
+import { cx, fmtNum } from '../lib/format'
 import { Badge, Button, ErrorBox, Field, Figure, Note, Spinner, btnCls, inputCls, tbl, toast } from '../components/ui'
-import { AiAvatar, Brand } from '../components/PublicShell'
+import { AiAvatar, Brand, Ondy } from '../components/PublicShell'
 
 // ---------------------------------------------------------------- vocabulary
 
 const STEPS = [
   { key: 'profile', label: '건물 알려주기', desc: '어떤 건물인지 말로 설명' },
   { key: 'connect', label: '중앙 제어 연결', desc: '중앙 제어 PC와 게이트웨이' },
-  { key: 'collect', label: '데이터 수집', desc: '시간표·설비·날씨·센서' },
-  { key: 'questions', label: '부족한 정보 확인', desc: 'AI가 묻고 담당자가 답함' },
-  { key: 'plan', label: 'AI 1차 스케줄', desc: '월간 기본 운전 계획' },
-  { key: 'mode', label: '운전 모드', desc: '자동 운전 또는 추천' },
+  { key: 'questions', label: '설비·운영 정보', desc: '허용 온도와 지금 운전 시간' },
 ] as const
+
+/** Onboarding registers the building and its equipment only; the timetable comes later on the dashboard. */
+const FACILITY_QUESTIONS = ['policy_heat', 'policy_cool', 'hours']
 
 const TYPE_LABEL: Record<BuildingType, string> = {
   school: '학교',
@@ -102,30 +100,6 @@ const METHODS: { key: BmsConnection['method']; title: string; body: string; icon
     icon: FileUp,
   },
 ]
-
-const ORIGIN: Record<DataSource['origin'], { label: string; tone: 'good' | 'info' | 'event' | 'warn' }> = {
-  live: { label: '실데이터', tone: 'good' },
-  simulated: { label: '시뮬레이션 센서', tone: 'info' },
-  input: { label: '운영자 입력', tone: 'event' },
-  assumption: { label: '가정값', tone: 'warn' },
-}
-
-const SOURCE_ICON: Record<string, typeof Server> = {
-  timetable: CalendarDays,
-  calendar: CalendarDays,
-  weather: CloudSun,
-  forecast: CloudSun,
-  nowcast: CloudSun,
-  bms: Server,
-  tariff: Receipt,
-  policy: Scale,
-  events: CalendarDays,
-  co2: Wind,
-  occupancy: Users,
-  density: Users,
-  feedback: MessageSquareWarning,
-  sensor: Thermometer,
-}
 
 const EXAMPLES = [
   '부산대학교 IT관입니다. 3층과 4층 강의실 10개를 시스템 에어컨으로 운영하고, 중앙 제어 PC가 시설과에 있습니다.',
@@ -281,11 +255,15 @@ function StepFooter({
 function StepHead({ n, title, desc }: { n: number; title: string; desc: ReactNode }) {
   return (
     <div className="mb-8">
-      <div className="text-[13px] font-semibold text-brand-ink">
-        {n} / {STEPS.length} 단계
+      <div className="tnum text-[13.5px] font-bold text-brand-ink">
+        {String(n).padStart(2, '0')} <span className="font-semibold text-ink-4">/ {String(STEPS.length).padStart(2, '0')}</span>
       </div>
-      <h1 className="mt-1.5 text-[28px] leading-tight font-bold tracking-[-0.025em] text-ink">{title}</h1>
-      <p className="pretty mt-2 max-w-[60ch] text-[16px] leading-relaxed text-ink-2">{desc}</p>
+      <h1 className="balance mt-3 text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">
+        <span className="rise-mask" key={title}>
+          <span className="rise-line">{title}</span>
+        </span>
+      </h1>
+      <p className="pretty mt-3 max-w-[58ch] text-[16px] leading-[1.6] text-ink-2">{desc}</p>
     </div>
   )
 }
@@ -294,7 +272,7 @@ function AiBubble({ children, className }: { children: ReactNode; className?: st
   return (
     <div className={cx('flex items-start gap-3', className)}>
       <AiAvatar size={34} />
-      <div className="min-w-0 flex-1 rounded-[14px] rounded-tl-[4px] bg-well px-4 py-3 text-[15px] leading-relaxed text-ink">{children}</div>
+      <div className="min-w-0 flex-1 rounded-[20px] rounded-tl-[6px] bg-well px-5 py-3.5 text-[15px] leading-relaxed text-ink">{children}</div>
     </div>
   )
 }
@@ -309,22 +287,6 @@ function UserBubble({ children, onEdit }: { children: ReactNode; onEdit?: () => 
       )}
       <div className="max-w-[80%] rounded-[14px] rounded-tr-[4px] bg-brand px-4 py-2.5 text-[15px] leading-relaxed text-white">{children}</div>
     </div>
-  )
-}
-
-function OriginBadge({ origin }: { origin: DataSource['origin'] }) {
-  const o = ORIGIN[origin] ?? { label: origin, tone: 'neutral' as const }
-  return <Badge tone={o.tone}>{o.label}</Badge>
-}
-
-function StatusDot({ status }: { status: DataSource['status'] }) {
-  const c = status === 'ok' ? 'bg-good' : status === 'stale' ? 'bg-warn' : 'bg-crit'
-  const l = status === 'ok' ? '정상' : status === 'stale' ? '지연' : '없음'
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-3">
-      <span className={cx('inline-block h-2 w-2 rounded-full', c)} aria-hidden />
-      {l}
-    </span>
   )
 }
 
@@ -504,7 +466,7 @@ function ConnectDiagram({ f }: { f: ConnectForm }) {
       )}
       {f.method === 'direct' && link(`VPN, ${proto}`)}
       {f.method === 'file' && link('CSV 내보내기')}
-      {node(<Cloud size={20} aria-hidden />, 'ThermoPlan', 'AWS 서울 리전', 'cloud')}
+      {node(<Cloud size={20} aria-hidden />, 'ON:D', 'AWS 서울 리전', 'cloud')}
     </div>
   )
 }
@@ -595,7 +557,7 @@ function ConnectStep({ s, patch, onBack, onNext }: { s: WizardState; patch: (p: 
       <StepHead
         n={2}
         title="중앙 제어 시스템과 연결합니다"
-        desc="건물의 중앙 제어 PC가 모으는 실내기 상태·설정온도·실내온도·전력을 ThermoPlan이 받아야 계획을 만들고 운전할 수 있습니다. 중앙 제어 PC에 접속하는 경로를 알려 주세요."
+        desc="건물의 중앙 제어 PC가 모으는 실내기 상태·설정온도·실내온도·전력을 ON:D가 받아야 계획을 만들고 운전할 수 있습니다. 중앙 제어 PC에 접속하는 경로를 알려 주세요."
       />
 
       <fieldset>
@@ -840,82 +802,6 @@ function PointGroup({ room, pts }: { room: string; pts: BmsPoint[] }) {
 
 // ---------------------------------------------------------------- step 3: collect
 
-function countSentence(c: CollectResult['counts']) {
-  const parts = [
-    c.courses ? `강의 시간표 ${fmtNum(c.courses)}개` : null,
-    c.rooms ? `강의실 ${fmtNum(c.rooms)}개` : null,
-    c.idus ? `실내기 ${fmtNum(c.idus)}대` : null,
-    c.odus ? `실외기 ${fmtNum(c.odus)}대` : null,
-    c.events ? `시간표 밖 일정 ${fmtNum(c.events)}건` : null,
-    c.holidays ? `공휴일 ${fmtNum(c.holidays)}일` : null,
-    c.weather_days ? `날씨 ${fmtNum(c.weather_days)}일치` : null,
-    c.feedback ? `재실자 의견 ${fmtNum(c.feedback)}건` : null,
-  ].filter(Boolean)
-  return parts.length ? `서버에서 ${parts.join(', ')}를 가져왔습니다.` : '가져온 데이터가 없습니다.'
-}
-
-function CollectStep({ onBack, onNext }: { onBack: () => void; onNext: (c: CollectResult) => void }) {
-  const q = useApi<CollectResult>('/api/onboarding/collect')
-  const data = q.data
-  const sources = Array.isArray(data?.sources) ? data!.sources : []
-  const shown = useReveal(sources.length, !!data, () => 260)
-  const done = !!data && shown >= sources.length
-  const c = data?.counts
-
-  return (
-    <div>
-      <StepHead n={3} title="서버에서 건물 데이터를 모읍니다" desc="중앙 제어 PC, 학사 시스템의 시간표, 기상청 예보, 센서, 재실자 의견을 한 번에 가져와 계획에 쓸 수 있는지 확인합니다." />
-      {q.error && <ErrorBox title="데이터를 가져오지 못했습니다" error={q.error} onRetry={q.reload} />}
-      {!data && !q.error && (
-        <div className="flex items-center gap-2 text-[15px] text-ink-2">
-          <Spinner /> 중앙 제어 PC와 학사 시스템에서 데이터를 가져오는 중…
-        </div>
-      )}
-      {data && (
-        <>
-          <ul className="divide-y divide-line overflow-hidden rounded-[16px] border border-line bg-surface">
-            {sources.slice(0, shown).map((src) => {
-              const Icon = SOURCE_ICON[src.key] ?? ShieldCheck
-              return (
-                <li key={src.key} className="reveal flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-well text-ink-2" aria-hidden>
-                    <Icon size={16} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[15px] font-semibold text-ink">{src.label}</span>
-                      <OriginBadge origin={src.origin} />
-                    </div>
-                    <div className="text-[13.5px] text-ink-2">{src.detail}</div>
-                  </div>
-                  <StatusDot status={src.status} />
-                </li>
-              )
-            })}
-            {!done && (
-              <li className="flex items-center gap-2 px-5 py-3 text-[14px] text-ink-3">
-                <Spinner size={14} /> 다음 데이터 확인 중…
-              </li>
-            )}
-          </ul>
-          {done && c && (
-            <div className="reveal mt-6 space-y-4">
-              <AiBubble>
-                {countSentence(c)}
-                {c.estimated_people > 0 && <span className="mt-1 block text-[14px] text-ink-2">그중 {fmtNum(c.estimated_people)}개 강의는 수강 인원이 없어 추정했습니다. 다음 단계에서 몇 가지만 확인하겠습니다.</span>}
-              </AiBubble>
-              <p className="ml-[46px] text-[13px] text-ink-3">
-                <Badge tone="good">실데이터</Badge> 외부에서 받은 실제 값, <Badge tone="info">시뮬레이션 센서</Badge> 시연용 센서 시뮬레이터 값, <Badge tone="warn">가정값</Badge> 담당자 확인이 필요한 값입니다.
-              </p>
-            </div>
-          )}
-        </>
-      )}
-      <StepFooter onBack={onBack} onNext={() => data && onNext(data)} nextDisabled={!done} />
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------- step 4: questions
 
 function defaultFor(q: OnboardQuestion): unknown {
@@ -1019,8 +905,8 @@ function QuestionInput({ q, value, onChange }: { q: OnboardQuestion; value: unkn
               aria-checked={on}
               onClick={() => onChange(o.value)}
               className={cx(
-                'h-10 rounded-[10px] border px-4 text-[14px] font-medium transition-colors',
-                on ? 'border-brand bg-brand-bg text-brand-ink' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4',
+                'h-10 rounded-full border px-4 text-[14px] font-medium transition-colors',
+                on ? 'border-brand bg-brand-bg font-semibold text-brand-ink' : 'border-[rgb(12_14_19/0.18)] bg-surface text-ink-2 hover:border-[rgb(12_14_19/0.5)]',
               )}
             >
               {o.label}
@@ -1044,8 +930,8 @@ function QuestionInput({ q, value, onChange }: { q: OnboardQuestion; value: unkn
           aria-checked={value === o.v}
           onClick={() => onChange(o.v)}
           className={cx(
-            'h-10 rounded-[10px] border px-4 text-[14px] font-medium transition-colors',
-            value === o.v ? 'border-brand bg-brand-bg text-brand-ink' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4',
+            'h-10 rounded-full border px-4 text-[14px] font-medium transition-colors',
+            value === o.v ? 'border-brand bg-brand-bg font-semibold text-brand-ink' : 'border-[rgb(12_14_19/0.18)] bg-surface text-ink-2 hover:border-[rgb(12_14_19/0.5)]',
           )}
         >
           {o.l}
@@ -1202,311 +1088,7 @@ function QuestionsStep({
         </div>
       )}
 
-      <StepFooter onBack={onBack} onNext={onNext} nextDisabled={questions.length > 0 && !s.applied} nextLabel="1차 스케줄 만들기" />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------- step 5: AI first-pass plan
-
-const HOPS: { key: string; keys: string[]; label: string; icon: typeof Server; doing: string }[] = [
-  { key: 'timetable', keys: ['timetable'], label: '시간표', icon: CalendarDays, doing: '강의를 요일·강의실별로 정리하고 있습니다' },
-  { key: 'calendar', keys: ['calendar', 'events'], label: '학사일정', icon: CalendarDays, doing: '공휴일과 시간표 밖 일정을 확인하고 있습니다' },
-  { key: 'weather', keys: ['weather', 'forecast', 'climatology'], label: '날씨', icon: CloudSun, doing: '예보와 평년 기온으로 예열·예냉 시간을 계산하고 있습니다' },
-  { key: 'bms', keys: ['bms', 'simulator'], label: '설비', icon: Server, doing: '실내기·실외기 용량으로 동시 기동 한계를 확인하고 있습니다' },
-  { key: 'tariff', keys: ['tariff'], label: '요금', icon: Receipt, doing: '시간대별 전기요금으로 비용을 계산하고 있습니다' },
-  { key: 'policy', keys: ['policy'], label: '정책', icon: Scale, doing: '정부 지침과 정책 온도 범위 안인지 확인하고 있습니다' },
-]
-
-const VERDICT: Record<TierCheck['verdict'], { label: string; icon: ReactNode; tone: 'good' | 'warn' | 'crit' }> = {
-  ok: { label: '정상', icon: <CheckCircle2 size={16} className="text-good" aria-hidden />, tone: 'good' },
-  adjust: { label: '조정', icon: <Wrench size={16} className="text-[#c98500]" aria-hidden />, tone: 'warn' },
-  review: { label: '확인 필요', icon: <AlertTriangle size={16} className="text-crit" aria-hidden />, tone: 'crit' },
-}
-
-function MonthCalendar({ days }: { days: TierDay[] }) {
-  if (!days.length) return null
-  const max = Math.max(...days.map((d) => d.kwh), 1)
-  const lead = weekdayOf(days[0].date)
-  const cells: (TierDay | null)[] = [...Array(lead).fill(null), ...days]
-  while (cells.length % 7) cells.push(null)
-  const SRC = { actual: '실측', forecast: '예보', climatology: '평년' } as const
-  return (
-    <div>
-      <div className="grid grid-cols-7 gap-1.5 text-center text-[12.5px] font-medium text-ink-3">
-        {['월', '화', '수', '목', '금', '토', '일'].map((w) => (
-          <div key={w}>{w}</div>
-        ))}
-      </div>
-      <div className="mt-1.5 grid grid-cols-7 gap-1.5">
-        {cells.map((d, i) => {
-          if (!d) return <div key={i} />
-          const a = d.kwh / max
-          return (
-            <div
-              key={d.date}
-              title={`${d.date} 강의 ${d.sessions}회, AI ${fmtKwh(d.kwh)} kWh (현재 운영 ${fmtKwh(d.baseline_kwh)} kWh), ${SRC[d.src] ?? d.src} 기온 ${d.t_min}~${d.t_max}℃${d.holiday ? `, ${d.holiday}` : ''}`}
-              className={cx(
-                'relative h-[54px] min-w-0 overflow-hidden rounded-[10px] border px-1.5 py-1.5 text-left',
-                d.holiday ? 'border-line bg-well' : d.src === 'actual' ? 'border-line' : 'border-dashed border-ink-4',
-              )}
-              style={!d.holiday && d.kwh > 0 ? { background: `rgba(47,111,222,${((d.src === 'climatology' ? 0.05 : 0.08) + a * (d.src === 'climatology' ? 0.3 : 0.5)).toFixed(3)})` } : undefined}
-            >
-              <span className={cx('tnum block text-[12.5px] leading-none font-semibold', d.holiday ? 'text-crit-ink' : 'text-ink')}>{parseDate(d.date).getDate()}</span>
-              <span className="tnum mt-1.5 block truncate text-[11.5px] text-ink-2">{d.holiday ? d.holiday : d.kwh > 0 ? fmtKwh(d.kwh) : '–'}</span>
-            </div>
-          )
-        })}
-      </div>
-      <p className="mt-2 text-[12.5px] leading-relaxed text-ink-3">칸의 숫자는 AI 계획의 하루 전력량(kWh)이고, 진할수록 많이 씁니다. 지난 날은 실측 날씨로, 점선 칸은 예보(가까운 날)나 평년 기온(먼 날)으로 계산했습니다.</p>
-    </div>
-  )
-}
-
-function PlanStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
-  const q = useApi<TierPlan>('/api/plan/tier/1')
-  const [hop, setHop] = useState(0)
-  useEffect(() => {
-    if (hop >= HOPS.length) return
-    const t = window.setTimeout(() => setHop((h) => h + 1), 720)
-    return () => window.clearTimeout(t)
-  }, [hop])
-  const plan = q.data
-  const ready = !!plan && hop >= HOPS.length
-  const findSource = (keys: string[]) => (Array.isArray(plan?.sources) ? plan!.sources.find((x) => keys.includes(x.key)) : undefined)
-  const days = Array.isArray(plan?.days) ? plan!.days : []
-  const checks = Array.isArray(plan?.checks) ? plan!.checks : []
-  const sm = plan?.summary
-
-  return (
-    <div>
-      <StepHead n={5} title="AI가 1차 월간 스케줄을 만듭니다" desc="모은 데이터를 차례로 확인해 이번 달 운전 계획과 예상 요금을 만들고, 계획이 데이터와 맞는지 정합성을 검증합니다." />
-
-      {/* thinking: hops across the data sources */}
-      <div className="rounded-[16px] border border-line bg-surface p-5" aria-live="polite">
-        <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-          {ready ? <CheckCircle2 size={16} className="text-good" aria-hidden /> : <Spinner size={15} />}
-          {ready ? '판단을 마쳤습니다' : 'AI가 데이터를 오가며 판단하는 중…'}
-        </div>
-        <ol className="mt-4 flex items-center gap-1 overflow-x-auto pb-1">
-          {HOPS.map((h, i) => {
-            const state = i < hop ? 'done' : i === hop && !ready ? 'now' : ready ? 'done' : 'todo'
-            return (
-              <li key={h.key} className="flex shrink-0 items-center gap-1">
-                <span
-                  className={cx(
-                    'inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13.5px] font-medium transition-[background-color,border-color,color] duration-200',
-                    state === 'done' && 'border-brand/30 bg-brand-bg text-brand-ink',
-                    state === 'now' && 'border-brand bg-brand text-white',
-                    state === 'todo' && 'border-line text-ink-3',
-                  )}
-                >
-                  <h.icon size={14} aria-hidden />
-                  {h.label}
-                </span>
-                {i < HOPS.length - 1 && <span className={cx('h-px w-5', i < hop ? 'bg-brand/50' : 'bg-line')} aria-hidden />}
-              </li>
-            )
-          })}
-        </ol>
-        <ul className="mt-4 space-y-1.5">
-          {HOPS.slice(0, Math.min(hop + 1, HOPS.length)).map((h, i) => {
-            const src = findSource(h.keys)
-            const finished = i < hop || ready
-            return (
-              <li key={h.key} className="reveal flex items-start gap-2 text-[14px]">
-                {finished ? <Check size={14} className="mt-1 shrink-0 text-good" aria-hidden /> : <Spinner size={13} className="mt-1" />}
-                <span className="text-ink-2">
-                  <span className="font-semibold text-ink">{h.label}</span> {finished && src ? src.detail : `${h.doing}…`}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
-
-      {q.error && (
-        <div className="mt-5">
-          <ErrorBox title="1차 스케줄을 만들지 못했습니다" error={q.error} onRetry={q.reload} />
-        </div>
-      )}
-      {!q.error && hop >= HOPS.length && !plan && (
-        <div className="mt-5 flex items-center gap-2 text-[14px] text-ink-3">
-          <Spinner size={14} /> 학기 운전 계획을 시뮬레이션하는 중입니다. 처음에는 1분 정도 걸릴 수 있습니다…
-        </div>
-      )}
-
-      {ready && plan && sm && (
-        <div className="reveal mt-6 space-y-5">
-          <div className="rounded-[16px] border border-line bg-surface p-6">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-[17px] font-[650] text-ink">{plan.label || '1차 · 월간 기본 계획'}</h2>
-              <span className="text-[13.5px] text-ink-3">{plan.period?.label}</span>
-            </div>
-            <p className="pretty mt-2 text-[16px] leading-relaxed text-ink-2">{sm.sentence}</p>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
-              <Figure label="AI 운전 계획" value={fmtKwh(sm.kwh)} unit="kWh" />
-              <Figure label="현재 운영" value={fmtKwh(sm.baseline_kwh)} unit="kWh" />
-              <Figure label="절감" value={sm.saving_pct == null ? '–' : fmtPct(sm.saving_pct)} />
-              <Figure label="예상 요금" value={fmtWon(sm.cost_krw)} />
-            </div>
-          </div>
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <div className="rounded-[16px] border border-line bg-surface p-5">
-              <h3 className="mb-3 text-[15px] font-semibold text-ink">날짜별 계획 전력</h3>
-              <MonthCalendar days={days} />
-            </div>
-            <div className="rounded-[16px] border border-line bg-surface p-5">
-              <h3 className="mb-3 text-[15px] font-semibold text-ink">정합성 검증 {checks.length}건</h3>
-              <ul className="space-y-3">
-                {checks.map((c) => {
-                  const v = VERDICT[c.verdict] ?? VERDICT.review
-                  return (
-                    <li key={c.id} className="flex items-start gap-2.5">
-                      <span className="mt-0.5 flex shrink-0">{v.icon}</span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-[14.5px] font-semibold text-ink">
-                          {c.title}
-                          <Badge tone={v.tone}>{v.label}</Badge>
-                        </div>
-                        <p className="mt-0.5 text-[13.5px] leading-relaxed text-ink-2">{c.action}</p>
-                      </div>
-                    </li>
-                  )
-                })}
-                {checks.length === 0 && <li className="text-[14px] text-ink-3">검증 결과가 없습니다.</li>}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <StepFooter
-        onBack={onBack}
-        onNext={onNext}
-        nextDisabled={!ready && !q.error}
-        extra={q.error ? <span className="text-[13.5px] text-ink-3">계획은 나중에 AI 스케줄링 화면에서 다시 만들 수 있습니다.</span> : undefined}
-      />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------- step 6: mode
-
-function ModeStep({
-  s,
-  patch,
-  onBack,
-  onFinish,
-  collect,
-}: {
-  s: WizardState
-  patch: (p: Partial<WizardState>) => void
-  onBack: () => void
-  onFinish: (force?: boolean) => Promise<void>
-  collect: CollectResult | null
-}) {
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const finish = async (force = false) => {
-    setBusy(true)
-    setErr(null)
-    try {
-      await onFinish(force)
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-  const p = s.profile
-  const c = s.connection
-  const opts: { key: OpModeKey; title: string; body: string; icon: typeof Bot; note: string }[] = [
-    {
-      key: 'auto',
-      title: '자동 운전',
-      body: 'AI 조정안을 바로 중앙 제어기에 반영합니다. 보낸 명령과 근거는 모두 기록되고, 언제든 추천 모드로 바꿀 수 있습니다.',
-      icon: Bot,
-      note: '운영이 안정된 뒤 권합니다',
-    },
-    {
-      key: 'recommend',
-      title: '추천만 받기',
-      body: 'AI는 조정안과 예상 효과(전력·요금·쾌적)만 제안합니다. 담당자가 승인한 조정만 중앙 제어기에 보냅니다.',
-      icon: Hand,
-      note: '처음 도입할 때 권합니다',
-    },
-  ]
-  return (
-    <div>
-      <StepHead n={6} title="운전을 얼마나 맡길지 고르세요" desc="ThermoPlan은 매일 새로 들어온 데이터로 계획을 검증하고 조정안을 만듭니다. 그 조정안을 바로 운전에 반영할지, 담당자 승인을 거칠지 정합니다." />
-      <div className="grid gap-4 md:grid-cols-2" role="radiogroup" aria-label="운전 모드">
-        {opts.map((o) => {
-          const on = s.mode === o.key
-          return (
-            <button
-              key={o.key}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => patch({ mode: o.key })}
-              className={cx(
-                'rounded-[16px] border p-6 text-left transition-[border-color,background-color,box-shadow] duration-150',
-                on ? 'border-brand bg-brand-bg/50 shadow-[0_0_0_1px_var(--color-brand)]' : 'border-line bg-surface hover:border-ink-4',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-[18px] font-[650] text-ink">
-                  <o.icon size={20} className={on ? 'text-brand' : 'text-ink-3'} aria-hidden /> {o.title}
-                </span>
-                <span className={cx('flex h-5 w-5 items-center justify-center rounded-full border-2', on ? 'border-brand bg-brand' : 'border-line-strong')} aria-hidden>
-                  {on && <Check size={12} className="text-white" strokeWidth={3} />}
-                </span>
-              </div>
-              <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">{o.body}</p>
-              <p className="mt-3 text-[13px] font-medium text-ink-3">{o.note}</p>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mt-8 rounded-[16px] border border-line bg-surface p-5">
-        <h2 className="text-[15px] font-semibold text-ink">설정 요약</h2>
-        <dl className="mt-3 grid gap-x-8 gap-y-3 text-[14px] sm:grid-cols-2">
-          <div>
-            <dt className="text-ink-3">건물</dt>
-            <dd className="font-medium text-ink">
-              {p ? `${p.org ? `${p.org} ` : ''}${p.name}` : '–'} {p && <span className="text-ink-3">({TYPE_LABEL[p.type]})</span>}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-3">중앙 제어 연결</dt>
-            <dd className="tnum font-medium text-ink">
-              {c ? `${PROTOCOLS[c.protocol]?.label ?? c.protocol} ${c.method === 'file' ? '파일 업로드' : `${c.host}:${c.port}`}` : '–'}
-              {c?.points ? <span className="text-ink-3">, 포인트 {fmtNum(c.points)}개</span> : null}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-3">수집한 데이터</dt>
-            <dd className="font-medium text-ink">{collect ? `강의 ${fmtNum(collect.counts.courses)}개, 강의실 ${fmtNum(collect.counts.rooms)}개, 날씨 ${fmtNum(collect.counts.weather_days)}일치` : '–'}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-3">반영한 답변</dt>
-            <dd className="font-medium text-ink">{s.applied ? `${s.applied.length}개 항목` : '기본값 사용'}</dd>
-          </div>
-        </dl>
-      </div>
-
-      {err && (
-        <div className="mt-5 space-y-3">
-          <ErrorBox title="서버에 설정을 저장하지 못했습니다" error={err} onRetry={() => finish(false)} />
-          <button type="button" onClick={() => finish(true)} className="text-[14px] font-medium text-brand-ink underline-offset-4 hover:underline">
-            저장하지 않고 운전 현황으로 이동
-          </button>
-        </div>
-      )}
-
-      <StepFooter onBack={onBack} onNext={() => finish(false)} busy={busy} nextLabel={s.mode === 'auto' ? '자동 운전 시작하기' : '추천 모드로 시작하기'} />
+      <StepFooter onBack={onBack} onNext={onNext} nextDisabled={questions.length > 0 && !s.applied} nextLabel="건물 등록 마치기" />
     </div>
   )
 }
@@ -1525,7 +1107,10 @@ export default function Setup() {
   useEffect(() => {
     if (collectQ.data && !collect) setCollect(collectQ.data)
   }, [collectQ.data, collect])
-  const questions = useMemo(() => (Array.isArray(collect?.questions) ? collect!.questions : []), [collect])
+  const questions = useMemo(
+    () => (Array.isArray(collect?.questions) ? collect!.questions.filter((q) => FACILITY_QUESTIONS.includes(q.id)) : []),
+    [collect],
+  )
 
   const go = (i: number) => {
     patch({ step: i, reached: Math.max(s.reached, i) })
@@ -1536,7 +1121,6 @@ export default function Setup() {
   const finish = async (force = false) => {
     const name = s.profile?.name.trim() || '내 건물'
     if (!force) {
-      await apiSend('PUT', '/api/mode', { mode: s.mode })
       await apiSend('PUT', '/api/building', {
         name,
         org: s.profile?.org ?? user?.org ?? '',
@@ -1549,16 +1133,16 @@ export default function Setup() {
     }
     completeOnboarding(name)
     clear()
-    toast(s.mode === 'auto' ? '자동 운전을 시작했습니다.' : '추천 모드로 시작했습니다. 조정안은 승인 후 반영됩니다.')
+    toast('건물 등록을 마쳤습니다. 지금은 현재 운영을 보여 줍니다. 오른쪽 위 "시간표 넣기"로 AI 1차 스케줄을 만드세요.')
     nav('/', { replace: true })
   }
 
   const step = s.step
   return (
     <div className="min-h-full bg-paper" ref={topRef}>
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-4 px-6">
-          <Brand sub="건물 연결 설정" />
+      <header className="sticky top-0 z-20 border-b border-line bg-white/85 backdrop-blur-md">
+        <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-4 px-6">
+          <Brand sub="건물 등록" />
           <div className="flex items-center gap-3 text-[14px]">
             <span className="hidden text-ink-2 sm:inline">
               {user?.org && user.org !== user.name ? `${user.org} ` : ''}
@@ -1578,9 +1162,9 @@ export default function Setup() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1200px] gap-8 px-6 py-10 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <nav aria-label="설정 단계" className="lg:sticky lg:top-24 lg:self-start">
-          <ol className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-1">
+      <div className="mx-auto grid max-w-[1240px] gap-10 px-6 py-12 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <nav aria-label="설정 단계" className="lg:sticky lg:top-28 lg:self-start">
+          <ol className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-0">
             {STEPS.map((st, i) => {
               const state = i < step ? 'done' : i === step ? 'now' : 'todo'
               const can = i <= s.reached
@@ -1592,50 +1176,52 @@ export default function Setup() {
                     onClick={() => can && go(i)}
                     aria-current={i === step ? 'step' : undefined}
                     className={cx(
-                      'flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-left transition-colors',
-                      i === step ? 'bg-surface shadow-[0_0_0_1px_var(--color-line)]' : can ? 'hover:bg-hover' : 'cursor-default',
+                      'relative flex w-full items-start gap-3 py-3 pr-2 text-left transition-colors lg:pl-5',
+                      can ? 'cursor-pointer' : 'cursor-default',
                     )}
                   >
+                    {/* the landing's step track, drawn vertically and filled up to the current step */}
+                    <span
+                      className={cx('absolute top-0 bottom-0 left-0 hidden w-[3px] rounded-full transition-colors duration-300 lg:block', state === 'now' ? 'bg-brand' : state === 'done' ? 'bg-brand/35' : 'bg-line')}
+                      aria-hidden
+                    />
                     <span
                       className={cx(
-                        'tnum flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold',
-                        state === 'done' && 'bg-brand text-white',
-                        state === 'now' && 'bg-ink text-white',
-                        state === 'todo' && 'bg-surface text-ink-3 ring-1 ring-line-strong',
+                        'tnum flex w-6 shrink-0 pt-[3px] text-[13px] font-bold',
+                        state === 'todo' ? 'text-ink-4' : 'text-brand-ink',
                       )}
                     >
-                      {state === 'done' ? <Check size={14} strokeWidth={3} aria-hidden /> : i + 1}
+                      {state === 'done' ? <Check size={15} strokeWidth={3} aria-hidden /> : String(i + 1).padStart(2, '0')}
                     </span>
                     <span className="min-w-0">
-                      <span className={cx('block text-[14.5px] font-semibold whitespace-nowrap', state === 'todo' ? 'text-ink-3' : 'text-ink')}>{st.label}</span>
-                      <span className="hidden text-[12.5px] text-ink-3 lg:block">{st.desc}</span>
+                      <span className={cx('block text-[15.5px] leading-[1.35] font-semibold whitespace-nowrap', state === 'todo' ? 'text-ink-3' : 'text-ink')}>{st.label}</span>
+                      <span className={cx('mt-0.5 hidden text-[13px] leading-[1.5] lg:block', state === 'now' ? 'text-ink-2' : 'text-ink-3')}>{st.desc}</span>
                     </span>
                   </button>
                 </li>
               )
             })}
           </ol>
-          <div className="mt-6 hidden rounded-[12px] border border-line bg-surface p-4 text-[13px] leading-relaxed text-ink-3 lg:block">
-            <Building2 size={16} className="mb-1.5 text-ink-3" aria-hidden />
-            중간에 새로 고쳐도 입력한 내용은 이 창에 남습니다.
+          <div className="mt-10 hidden lg:block">
+            <Ondy key={step} pose={step === 0 ? 'main' : step === 1 ? 'hvac' : 'comfort'} size={112} pop />
+            <p className="mt-4 text-[13px] leading-relaxed text-ink-3">중간에 새로 고쳐도 입력한 내용은 이 창에 남습니다.</p>
           </div>
         </nav>
 
-        <section className="min-w-0 rounded-[20px] border border-line bg-surface p-8 max-sm:p-5">
+        <section className="min-w-0 rounded-[28px] border border-line bg-surface p-10 max-sm:p-5">
           {step === 0 && <ProfileStep s={s} patch={patch} onNext={() => go(1)} />}
           {step === 1 && <ConnectStep s={s} patch={patch} onBack={() => go(0)} onNext={() => go(2)} />}
           {step === 2 && (
-            <CollectStep
+            <QuestionsStep
+              questions={questions}
+              s={s}
+              patch={patch}
               onBack={() => go(1)}
-              onNext={(c) => {
-                setCollect(c)
-                go(3)
+              onNext={() => {
+                finish(false).catch((e: Error) => toast(e.message, 'crit'))
               }}
             />
           )}
-          {step === 3 && <QuestionsStep questions={questions} s={s} patch={patch} onBack={() => go(2)} onNext={() => go(4)} />}
-          {step === 4 && <PlanStep onBack={() => go(3)} onNext={() => go(5)} />}
-          {step === 5 && <ModeStep s={s} patch={patch} onBack={() => go(4)} onFinish={finish} collect={collect} />}
         </section>
       </div>
     </div>

@@ -45,7 +45,7 @@ export default function Login() {
 
   return (
     <AuthLayout title="로그인" desc="시설 담당자 계정으로 로그인하세요. 건물 연결을 마친 계정은 바로 운전 현황으로 이동합니다.">
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      <form onSubmit={submit} className="space-y-5" noValidate>
         <Field label="아이디">
           <input
             className={inputCls}
@@ -75,12 +75,12 @@ export default function Login() {
             <Note tone="crit">{err}</Note>
           </div>
         )}
-        <Button type="submit" variant="primary" className="h-11 w-full text-[15px]" disabled={!id || !pw}>
+        <Button type="submit" variant="primary" className="h-12 w-full text-[15.5px]" disabled={!id || !pw}>
           <LogIn size={16} aria-hidden /> 로그인
         </Button>
       </form>
 
-      <div className="mt-6 rounded-[12px] border border-line bg-well p-4">
+      <div className="mt-7 rounded-[18px] bg-well p-5">
         <div className="flex items-start gap-3">
           <Building2 size={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
           <div className="min-w-0 flex-1">

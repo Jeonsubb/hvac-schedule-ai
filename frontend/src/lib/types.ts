@@ -612,6 +612,83 @@ export interface Adjustment {
   decided_by?: string | null
 }
 
+/** One step of an operator-triggered tier run: what was read or computed, and how long it really took. */
+export interface TierRunStep {
+  label: string
+  status: 'running' | 'done' | 'error'
+  text: string
+  ms: number | null
+}
+
+export interface TierRunOutcome {
+  adjustments: number
+  new: number
+  applied: number
+  pending: number
+  commands: number
+  /** no gateway online: the simulator received the commands */
+  simulated: boolean
+  gateway: string | null
+  mode: OpModeKey
+}
+
+export interface ScenarioEval {
+  kwh: number
+  cost_krw: number
+  pmv_mean: number | null
+  cold_rooms: string[]
+  hot_rooms: string[]
+  complaints_addressed: number
+  cold_starts: number
+}
+
+/** One whole-building setpoint scenario: proposed by the agent (llm) or a fixed rule, simulated by the engine, scored by the judge. */
+export interface Scenario {
+  id: string
+  name: string
+  goal: string
+  rationale: string
+  source: 'llm' | 'rule'
+  note?: string
+  setpoints: Record<string, number>
+  changes?: string[]
+  eval?: ScenarioEval
+  score?: number
+}
+
+export interface ScenarioResult {
+  tier: number
+  dates: string[]
+  season: 'heat' | 'cool'
+  key: 'sp_heat' | 'sp_cool'
+  rate: number
+  comfort_won: number
+  base_sp: Record<string, number>
+  complaint_rooms: string[]
+  scenarios: Scenario[]
+  chosen: string | null
+  ai: boolean
+  note: string | null
+  adjustment_ids: string[]
+}
+
+export interface TierRun {
+  id: string
+  tier: 1 | 2 | 3
+  date: string
+  at: string
+  actor: string
+  elapsed_ms: number
+  steps: TierRunStep[]
+  outcome: TierRunOutcome | null
+  scenarios?: ScenarioResult | null
+}
+
+export interface TierRuns {
+  runs: TierRun[]
+  defaults: Record<string, string>
+}
+
 export interface TierDay {
   date: string
   weekday: number

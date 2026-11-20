@@ -295,7 +295,7 @@ def _feedback_reply(fb: dict) -> dict:
                   f"이 건물은 난방 {pol['heat_min']:.0f}~{pol['heat_max']:.0f}℃, 냉방 {pol['cool_min']:.0f}~{pol['cool_max']:.0f}℃ 안에서 "
                   "AI가 수업마다 가장 경제적이면서 쾌적한 온도를 고릅니다.")
     nxt = ("오늘 같은 강의실 의견은 3차(일일) 검증에 바로 반영되어 설정온도 조정안이 만들어지고, "
-           "사용자 에이전트가 관리자 에이전트(북항이)와 비용·쾌적을 협의합니다. "
+           "사용자 온디가 관리자 온디와 비용·쾌적을 협의합니다. "
            + ("자동 운전 모드라 조정안은 바로 적용됩니다." if mode()["mode"] == "auto" else "추천 모드라 관리자가 승인하면 적용됩니다."))
     return {"message": " ".join(parts), "room": {"ta": ta, "state": state, "sp_heat": sp_h, "sp_cool": sp_c, "co2": co2, "session": sess},
             "policy": policy_txt, "next": nxt}
@@ -867,8 +867,13 @@ def _vent_proposals(tier: int, dates: list[date], ctx: service.Ctx, pol: dict, p
     return adjs, agg
 
 
-def _sync(adjs: list[dict]) -> list[dict]:
-    return [upsert_proposal(a) for a in adjs]
+def _sync(adjs: list[dict], tier: int | None = None, pkey: str | None = None) -> list[dict]:
+    out = [upsert_proposal(a) for a in adjs]
+    if tier and pkey:  # proposals other code made for the same period (scenario picks, agent negotiation)
+        ids = {a["id"] for a in out}
+        prefix = f"T{tier}-{pkey}-"
+        out += [a for a in get_store().list_items("adjustment") if a["id"].startswith(prefix) and a["id"] not in ids]
+    return out
 
 
 def _sentence_pct(p):
@@ -1007,7 +1012,7 @@ def tier2(anchor: date) -> dict:
     fb = _fb_by_room(fb_items)
     fb_adjs, fb_notes = _feedback_proposals(2, dates, fb, ctx, pol, season, 3, pkey)
     vent_adjs, vent_agg = _vent_proposals(2, dates, ctx, pol, pkey)
-    adjs = _sync(fb_adjs + vent_adjs)
+    adjs = _sync(fb_adjs + vent_adjs, 2, pkey)
 
     days = {d: service.get_day(d, ctx) for d in dates}
     # forecast vs the previous week's actual weather
@@ -1187,7 +1192,7 @@ def tier3(d: date) -> dict:
     pkey = d.isoformat()
     fb_adjs, fb_notes = _feedback_proposals(3, [d], dict(fb_today), ctx, pol, season, 1, pkey, top=4) if d >= today else ([], [])
     vent_adjs = [a for a in _vent_proposals(3, [d], ctx, pol, pkey)[0] if a["change"]["vent"] == "high"] if d >= today else []
-    adjs = _sync(fb_adjs + vent_adjs)
+    adjs = _sync(fb_adjs + vent_adjs, 3, pkey)
 
     val = day["validation"]
     occupied_now = [x for x in rooms if now_min is not None and any(l["s"] <= now_min < l["e"] for l in x["lectures"])]
@@ -1291,15 +1296,200 @@ def plan_date(ctx: service.Ctx | None = None) -> date:
     return date.fromisoformat(service.effective_now(ctx)["date"])
 
 
-def tier_plan(tier: int, d: date | None = None) -> dict:
+def _tier_date(tier: int, d: date | None) -> date:
     d = d or (_today() if tier == 1 else plan_date())
     s0, s1 = service.semester_range()
-    d = min(max(d, s0), s1)
+    return min(max(d, s0), s1)
+
+
+def _tier_key(tier: int, d: date) -> str:
     fb_n = len(get_store().list_items("feedback"))
     adj_key = service._h([(a["id"], a["status"]) for a in get_store().list_items("adjustment")])
-    key = f"{tier}|{d.isoformat()}|{fb_n}|{adj_key}|{mode()['mode']}|{service._h(policy())}|{service.now_kst().strftime('%Y%m%d%H')}"
+    return f"{tier}|{d.isoformat()}|{fb_n}|{adj_key}|{mode()['mode']}|{service._h(policy())}|{service.now_kst().strftime('%Y%m%d%H')}"
+
+
+def tier_plan(tier: int, d: date | None = None) -> dict:
+    d = _tier_date(tier, d)
     fn = {1: tier1, 2: tier2, 3: tier3}[tier]
-    return _cached(key, lambda: fn(d))
+    return _cached(_tier_key(tier, d), lambda: fn(d))
+
+
+# ---------------------------------------------------------------- operator-triggered runs (the plan is computed when asked, step by step)
+
+RUN_LABEL = {1: "1차 계획 만들기", 2: "2차 조정 실행", 3: "3차 검증 실행"}
+
+
+def tier_runs() -> dict:
+    """Which (tier, date) the operator has computed, plus the default date of each tier (for the gate)."""
+    items = get_store().list_items("tier_run")
+    return {"runs": sorted(items, key=lambda r: r.get("at", ""), reverse=True),
+            "defaults": {str(t): _tier_date(t, None).isoformat() for t in (1, 2, 3)}}
+
+
+def run_tier(tier: int, d: date | None = None, actor: str = "운영자", progress=None) -> dict:
+    """Compute one tier now, reporting each real step (what was read, how long it took) as it happens.
+    Nothing is pre-baked: the cache for this tier/date is dropped first and the plan is built from the
+    timetable, weather, sensors and opinions in front of the operator."""
+    from . import gateway
+
+    d = _tier_date(tier, d)
+    ctx_holder: dict = {}
+    steps: list[dict] = []
+    t_all = time.perf_counter()
+
+    def emit():
+        if progress:
+            progress({"steps": steps, "tier": tier, "date": d.isoformat()})
+
+    def step(label: str, fn):
+        rec = {"label": label, "status": "running", "text": "", "ms": None}
+        steps.append(rec)
+        emit()
+        t0 = time.perf_counter()
+        try:
+            rec["text"] = fn()
+            rec["status"] = "done"
+        except Exception as e:
+            rec["text"] = f"{type(e).__name__}: {str(e)[:160]}"
+            rec["status"] = "error"
+            rec["ms"] = round((time.perf_counter() - t0) * 1000)
+            emit()
+            raise
+        rec["ms"] = round((time.perf_counter() - t0) * 1000)
+        emit()
+
+    def s_timetable():
+        ctx = service.Ctx()
+        ctx_holder["ctx"] = ctx
+        if tier == 1:
+            first = d.replace(day=1)
+            last = d.replace(day=calendar.monthrange(d.year, d.month)[1])
+            n = sum(len(sessions_for_date(x, ctx.courses, ctx.events)) for x in _dates_in(first, last))
+            return f"강의 {len(ctx.courses)}개 · 등록 일정 {len(ctx.events)}건 → {d.month}월 수업 {n}회"
+        if tier == 2:
+            mon = d - timedelta(days=d.weekday())
+            ds = _dates_in(mon, mon + timedelta(days=6))
+            n = sum(len(sessions_for_date(x, ctx.courses, ctx.events)) for x in ds)
+            ev = [e for e in ctx.events if ds and ds[0].isoformat() <= e.get("date", "") <= ds[-1].isoformat()]
+            return f"이번 주 수업 {n}회 · 이번 주 일정 {len(ev)}건"
+        ss = sessions_for_date(d, ctx.courses, ctx.events)
+        return f"{d.month}/{d.day} 수업 {len(ss)}회 · 강의실 {len({x['room'] for x in ss})}곳"
+
+    def s_weather():
+        ctx = ctx_holder["ctx"]
+        src = service.weather_sources()
+        fa = (src.get("fetched_at") or "")[11:16]
+        kma = fmt_kma_base((src.get("kma_forecast") or {}).get("base"))
+        now_c = src.get("kma_nowcast") or {}
+        w = ctx.wx.get(d.isoformat())
+        parts = []
+        if kma:
+            parts.append(f"기상청 단기예보 {kma} 발표")
+        if now_c.get("t") is not None:
+            parts.append(f"실황 {now_c['t']}℃")
+        if w:
+            parts.append(f"{d.month}/{d.day} 예보 {min(w['forecast']['t']):.1f}~{max(w['forecast']['t']):.1f}℃")
+        if tier == 1:
+            n_wx = sum(1 for x in _dates_in(d.replace(day=1), d.replace(day=calendar.monthrange(d.year, d.month)[1])) if _src_kind(x) == "climatology")
+            if n_wx:
+                parts.append(f"예보 밖 {n_wx}일은 평년 기후")
+        return " · ".join(parts) + (f" (받은 시각 {fa})" if fa else "")
+
+    def s_sensors():
+        ctx = ctx_holder["ctx"]
+        if tier == 1:
+            n_idu = sum(len(r["idus"]) for r in config.ROOMS.values())
+            return f"실내기 {n_idu}대 · 실외기 {len(config.ODUS)}대 · 정책 난방 {policy()['heat_min']:.0f}~{policy()['heat_max']:.0f}℃"
+        day = service.get_day(d, ctx)
+        ai = day["strategies"]["ai"]
+        now = service.effective_now(ctx)
+        k5 = min(now["minute"] // 5, 287) if d.isoformat() == now["date"] else None
+        g = gateway.online()
+        live = f"게이트웨이 {g['id']}가 중앙제어기에서 읽은 값" if g else "열모델 시뮬레이터 값 (중앙제어기 미연결)"
+        if k5 is not None:
+            tas = [ai["rooms"][r]["ta"][k5] for r in config.ROOMS]
+            return f"실내 온도 {len(tas)}실 ({min(tas):.1f}~{max(tas):.1f}℃) · CO₂·재실 15분 간격 · {live}"
+        return f"강의실 {len(config.ROOMS)}곳 온도·CO₂·재실 시계열 · {live}"
+
+    def s_feedback():
+        n = len(feedback_items(2)) if tier == 3 else len(feedback_items(7)) if tier == 2 else len(feedback_items(14))
+        span = {1: "14일", 2: "7일", 3: "어제·오늘"}[tier]
+        return f"{span} 의견 {n}건" if n else f"{span} 의견 없음"
+
+    before_adj = {a["id"]: a["status"] for a in get_store().list_items("adjustment")}
+    before_cmd = {c["id"] for c in get_store().list_items("command")}
+    out: dict = {}
+
+    def s_compute():
+        key = _tier_key(tier, d)
+        _cache.pop(key, None)
+        fn = {1: tier1, 2: tier2, 3: tier3}[tier]
+        plan = _cached(key, lambda: fn(d))
+        out["plan"] = plan
+        cnt = {"ok": 0, "adjust": 0, "review": 0}
+        for c in plan["checks"]:
+            cnt[c["verdict"]] = cnt.get(c["verdict"], 0) + 1
+        return (f"현재 운영 {plan['summary']['baseline_kwh']:,.0f} kWh → AI {plan['summary']['kwh']:,.0f} kWh"
+                f" · 점검 {len(plan['checks'])}개 (정상 {cnt['ok']}, 조정 {cnt['adjust']}, 확인 {cnt['review']})")
+
+    planner_holder: dict = {}
+
+    def s_scn_propose():
+        from . import scenarios
+
+        pl = scenarios.Planner(tier, d, ctx_holder["ctx"], use_ai=True)
+        planner_holder["pl"] = pl
+        return pl.propose()
+
+    def s_scn_simulate():
+        return planner_holder["pl"].simulate()
+
+    def s_scn_choose():
+        pl = planner_holder["pl"]
+        txt = pl.choose()
+        out["scenarios"] = pl.result()
+        # the pick changed the proposals: rebuild the plan so its adjustment list is current
+        key = _tier_key(tier, d)
+        _cache.pop(key, None)
+        fn = {1: tier1, 2: tier2, 3: tier3}[tier]
+        out["plan"] = _cached(key, lambda: fn(d))
+        return txt
+
+    def s_actions():
+        plan = out["plan"]
+        adjs = [a for a in plan.get("adjustments", []) if a.get("status") != "rejected"]
+        new = [a for a in adjs if a["id"] not in before_adj]
+        applied = [a for a in adjs if a.get("status") == "applied"]
+        pending = [a for a in adjs if a.get("status") == "pending"]
+        cmds = [c for c in get_store().list_items("command") if c["id"] not in before_cmd]
+        g = gateway.online()
+        out["outcome"] = {"adjustments": len(adjs), "new": len(new), "applied": len(applied), "pending": len(pending),
+                          "commands": len(cmds), "simulated": not g, "gateway": g["id"] if g else None, "mode": mode()["mode"]}
+        if not adjs:
+            return "조정할 것이 없어 계획을 그대로 둡니다. 보낼 명령도 없습니다."
+        where = f"게이트웨이 {g['id']} → 중앙제어기(BACnet 쓰기·되읽기)" if g else "시뮬레이터가 받음 (중앙제어기 미연결)"
+        if mode()["mode"] == "auto":
+            return (f"자동 운전: 조정안 {len(adjs)}건 중 {len(applied)}건 바로 적용" + (f", {len(pending)}건은 0.5℃ 초과라 승인 대기" if pending else "")
+                    + (f" · 명령 {len(cmds)}건 → {where}" if cmds else ""))
+        return f"추천 모드: 조정안 {len(pending)}건이 승인을 기다립니다. 승인하면 명령이 나갑니다 ({where})."
+
+    labels = {
+        1: [("시간표·학사일정 읽기", s_timetable), ("예보·평년 기후 받기", s_weather), ("설비·정책 확인", s_sensors), ("최근 쾌적 의견 모으기", s_feedback),
+            ("열모델로 한 달 운전 계산", s_compute), ("조정안·명령 정리", s_actions)],
+        2: [("이번 주 시간표·일정 읽기", s_timetable), ("주간 예보 받기", s_weather), ("센서·재실 추세 읽기", s_sensors), ("지난주 쾌적 의견 모으기", s_feedback),
+            ("열모델로 주간 기본 운전 계산·점검", s_compute), ("에이전트: 자료 종합·시나리오 제안", s_scn_propose),
+            ("엔진: 시나리오별 전력·요금·쾌적 계산", s_scn_simulate), ("최적 시나리오 선택 → 조정안", s_scn_choose), ("조정안·명령 정리", s_actions)],
+        3: [("오늘 시간표·일정 읽기", s_timetable), ("실황·예보 받기", s_weather), ("실내 온도·CO₂·재실 읽기", s_sensors), ("어제·오늘 쾌적 의견 모으기", s_feedback),
+            ("열모델로 오늘 기본 운전 계산·점검", s_compute), ("에이전트: 자료 종합·시나리오 제안", s_scn_propose),
+            ("엔진: 시나리오별 전력·요금·쾌적 계산", s_scn_simulate), ("최적 시나리오 선택 → 조정안", s_scn_choose), ("조정안·명령 정리", s_actions)],
+    }[tier]
+    for label, fn in labels:
+        step(label, fn)
+    rec = {"id": f"{tier}:{d.isoformat()}", "tier": tier, "date": d.isoformat(), "at": service.now_kst().isoformat(timespec="seconds"),
+           "actor": actor, "elapsed_ms": round((time.perf_counter() - t_all) * 1000), "steps": steps, "outcome": out.get("outcome"),
+           "scenarios": out.get("scenarios")}
+    get_store().put_item("tier_run", rec["id"], rec)
+    return {"run": rec, "plan": out["plan"]}
 
 
 def run_daily(log=print) -> dict:

@@ -13,6 +13,8 @@ export interface Account {
   onboarded: boolean
   building?: string
   created_at: string
+  /** ThermoPlan AI operation applied (false: the dashboard shows the current central-control operation) */
+  applied?: boolean
 }
 
 const ACCOUNTS_KEY = 'tp.accounts'
@@ -26,6 +28,7 @@ export const DEMO_ACCOUNT: Account = {
   onboarded: true,
   building: 'IT관',
   created_at: '2026-09-01T09:00:00+09:00',
+  applied: true,
 }
 
 function readAccounts(): Record<string, Account> {
@@ -62,6 +65,8 @@ interface AuthCtx {
   completeOnboarding: (building: string) => void
   /** restart the setup wizard for the current account (demo) */
   restartOnboarding: () => void
+  /** switch the dashboard between the current operation and ThermoPlan AI operation */
+  setApplied: (v: boolean) => void
 }
 
 const AuthContext = createContext<AuthCtx | null>(null)
@@ -102,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const key = id.trim()
       if (!key || !password) return { ok: false, error: '아이디와 비밀번호를 입력하세요.' }
       if (accounts[key]) return { ok: false, error: '이미 사용 중인 아이디입니다.' }
-      const acc: Account = { id: key, password, name: name.trim() || key, org: org.trim() || name.trim() || key, onboarded: false, created_at: new Date().toISOString() }
+      const acc: Account = { id: key, password, name: name.trim() || key, org: org.trim() || name.trim() || key, onboarded: false, created_at: new Date().toISOString(), applied: false }
       save({ ...accounts, [key]: acc })
       setSession(key)
       return { ok: true }
@@ -122,10 +127,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const restartOnboarding = useCallback(() => {
     if (!user) return
-    save({ ...accounts, [user.id]: { ...user, onboarded: false } })
+    save({ ...accounts, [user.id]: { ...user, onboarded: false, applied: false } })
   }, [accounts, save, user])
 
-  const v = useMemo(() => ({ user, login, signup, logout, completeOnboarding, restartOnboarding }), [user, login, signup, logout, completeOnboarding, restartOnboarding])
+  const setApplied = useCallback(
+    (v: boolean) => {
+      if (!user) return
+      save({ ...accounts, [user.id]: { ...user, applied: v } })
+    },
+    [accounts, save, user],
+  )
+
+  const v = useMemo(
+    () => ({ user, login, signup, logout, completeOnboarding, restartOnboarding, setApplied }),
+    [user, login, signup, logout, completeOnboarding, restartOnboarding, setApplied],
+  )
   return <AuthContext.Provider value={v}>{children}</AuthContext.Provider>
 }
 

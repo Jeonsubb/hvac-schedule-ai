@@ -247,7 +247,9 @@ def compute_day(
     settings: dict,
     detail: bool = True,
     strategies: tuple = tuple(STRATEGIES),
+    inject: dict | None = None,
 ) -> dict:
+    """inject={"no_show": [session_id, ...]} adds unannounced no-shows (change-response previews)."""
     rooms, odus = ROOMS, ODUS
     weather_day = weather_by_date[d.isoformat()]
     init = warm_state(d, courses, events, weather_by_date, settings)
@@ -259,6 +261,12 @@ def compute_day(
     wf_min = {"to": minute_series(wf["t"]), "rh": minute_series(wf["rh"]), "ghi": minute_series(wf["ghi"])}
     clo = clo_for_month(d.month)
     scenario = field_scenario(d, by_room, settings)
+    for sid in (inject or {}).get("no_show", []):
+        for r, ss in by_room.items():
+            for x in ss:
+                if x["id"] == sid:
+                    scenario[r] = [e for e in scenario.get(r, []) if e.get("session") != sid] + [
+                        {"type": "no_show", "session": sid, "s": hm_to_min(x["start"]), "e": hm_to_min(x["end"])}]
     occ_actual = actual_occupancy(by_room, scenario)
 
     plans, decisions = {}, []

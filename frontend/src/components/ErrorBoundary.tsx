@@ -52,7 +52,7 @@ export default class ErrorBoundary extends Component<{ children: ReactNode; area
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-10 items-center rounded-[10px] border border-line-strong bg-surface px-4 text-[14px] font-medium text-ink transition-colors hover:bg-hover"
+                  className="inline-flex h-10 items-center rounded-full border border-line-strong bg-surface px-5 text-[14px] font-medium text-ink transition-colors hover:bg-hover"
                   onClick={() => window.location.reload()}
                 >
                   새로고침

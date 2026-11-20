@@ -383,14 +383,14 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
         <Figure label="강의 중 쾌적" value={ai.comfort_pct != null ? ai.comfort_pct.toFixed(1) : '–'} unit={ai.comfort_pct != null ? '%' : undefined} />
       </div>
       <div className="mt-8">
-        <div className="mb-3 text-[14px] font-semibold text-ink">운전 방식별 하루 전력</div>
-        <ul className="space-y-3" aria-label="운전 방식별 하루 전력량">
-          {(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((k) => {
+        <div className="mb-3 text-[14px] font-semibold text-ink">하루 전력: AI 운전과 이전 운영</div>
+        <ul className="space-y-3" aria-label="AI 운전과 이전 운영의 하루 전력량">
+          {(['ai', 'fixed'] as StrategyKey[]).map((k) => {
             const v = ds.strategies[k].kwh
-            const max = Math.max(...(['ai', 'rule', 'manual', 'fixed'] as StrategyKey[]).map((x) => ds.strategies[x].kwh), 1)
+            const max = Math.max(...(['ai', 'fixed'] as StrategyKey[]).map((x) => ds.strategies[x].kwh), 1)
             return (
-              <li key={k} className="grid grid-cols-[64px_minmax(0,1fr)_84px] items-center gap-3 text-[13.5px]">
-                <span className={cx(k === 'ai' ? 'font-semibold text-ink' : 'text-ink-2')}>{STRATEGY[k].short}</span>
+              <li key={k} className="grid grid-cols-[72px_minmax(0,1fr)_84px] items-center gap-3 text-[13.5px]">
+                <span className={cx(k === 'ai' ? 'font-semibold text-ink' : 'text-ink-2')}>{k === 'ai' ? 'AI 운전' : '이전 운영'}</span>
                 <span className="h-2.5 rounded-full bg-[#eef0f3]" aria-hidden>
                   <span className="block h-2.5 rounded-full" style={{ width: `${Math.max(1, (v / max) * 100)}%`, background: STRATEGY[k].color }} />
                 </span>
@@ -400,7 +400,7 @@ function DayPanel({ ds, day, date, isFuture }: { ds: DaySummary | undefined; day
           })}
         </ul>
       </div>
-      <Disclosure variant="inline" className="mt-auto pt-6" title="요금·쾌적과 시간대별 전력 보기">
+      <Disclosure variant="inline" className="mt-auto pt-6" title="운전 방식 4가지 비교와 시간대별 전력 보기">
         <table className="tnum w-full text-[14px]">
           <thead>
             <tr className="text-[13px] text-ink-3">

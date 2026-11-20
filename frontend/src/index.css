@@ -1,30 +1,31 @@
 @import "tailwindcss";
 
-/* ThermoPlan tokens (v5) — see DESIGN.md */
+/* ON:D tokens: the app speaks the landing's language (/welcome): white ground, near-black ink,
+   one blue for "this is on / selected", heavy tight Korean display type, pill controls. */
 @theme {
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 
-  /* chrome (v5): near-white canvas, white surfaces with hairlines, navy text, blue brand accent for interaction */
-  --color-paper: #f7f9fc;
+  /* chrome: white ground, hairlines instead of shadows, ink from the landing (#0c0e13) */
+  --color-paper: #ffffff;
   --color-surface: #ffffff;
-  --color-well: #f7f8fa;
-  --color-line: #e5e9f0;
-  --color-line-strong: #cfd5de;
-  --color-ink: #142033;
-  --color-ink-2: #4a5668;
-  --color-ink-3: #667183;
-  --color-ink-4: #a3acb8;
+  --color-well: #f4f5f7;
+  --color-line: #e7e8eb;
+  --color-line-strong: #d3d5da;
+  --color-ink: #0c0e13;
+  --color-ink-2: #454a54;
+  --color-ink-3: #6a707b;
+  --color-ink-4: #a3a8b1;
   --color-focus: #2f6fde;
-  --color-hover: #f0f2f5;
+  --color-hover: #f2f3f5;
 
   /* v5 brand accent (mock: blue logo, active nav, selected time column) */
   --color-brand: #2f6fde;
   --color-brand-ink: #1f56b8;
-  --color-brand-bg: #eaf1fd;
+  --color-brand-bg: #e8f0fd;
   /* agent characters */
-  --color-occupant: #e8894f; /* 사용자 에이전트 (주황 캐릭터) */
+  --color-occupant: #e8894f; /* 사용자 온디 (주황) */
   --color-occupant-bg: #fdf0e7;
-  --color-shark: #3d6fb6; /* 관리자 에이전트 북항이 (상어) */
+  --color-shark: #3d6fb6; /* 관리자 온디 (파랑) */
   --color-shark-bg: #e9f0fa;
 
   /* thermal (diverging; comfort band is the neutral midpoint) */
@@ -66,13 +67,13 @@
   --color-info-ink: #1c5cab;
   --color-info-bg: #eaf2fc;
 
-  --radius-panel: 14px;
-  --radius-inner: 12px;
-  --radius-control: 10px;
+  --radius-panel: 22px;
+  --radius-inner: 14px;
+  --radius-control: 12px;
   --radius-chip: 6px;
 
-  --shadow-float: 0 12px 32px rgb(20 32 51 / 0.12), 0 1px 3px rgb(20 32 51 / 0.06);
-  --shadow-cover: 0 24px 64px rgb(20 32 51 / 0.18);
+  --shadow-float: 0 18px 48px rgb(12 14 19 / 0.12), 0 0 0 1px rgb(12 14 19 / 0.05);
+  --shadow-cover: 0 32px 80px rgb(12 14 19 / 0.2);
 
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -111,7 +112,7 @@ body {
 }
 
 ::selection {
-  background: #cfe0fb;
+  background: rgb(47 111 222 / 0.18);
 }
 
 /* keyboard focus: always visible, never on mouse click */
@@ -135,6 +136,81 @@ body {
 }
 .pnum {
   font-variant-numeric: proportional-nums;
+}
+
+/* ON:D wordmark: heavy, tight, the colon is the one blue mark (same as /welcome) */
+.ond-word {
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+.ond-word i {
+  font-style: normal;
+  color: var(--color-brand);
+  margin: 0 0.015em;
+}
+
+/* the page's answer sentence: big, heavy, tight (the landing's h2 scale, smaller) */
+.display {
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+/* one orchestrated moment: a headline rises out of its mask when it first appears or when the
+   operator switches what it describes (current operation <-> ON:D AI). Same motion as /welcome. */
+.rise-mask {
+  display: block;
+  overflow: hidden;
+  padding: 0.04em 0 0.12em;
+  margin: -0.04em 0 -0.12em;
+}
+.rise-line {
+  display: block;
+  animation: rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.rise-line.d1 {
+  animation-delay: 0.07s;
+}
+.rise-line.d2 {
+  animation-delay: 0.14s;
+}
+@keyframes rise {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Ondy (mascot) arrives once per moment and stays still */
+@keyframes ondy-pop {
+  from {
+    transform: translateY(10px) scale(0.94);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.ondy-pop {
+  transform-origin: 50% 100%;
+  animation: ondy-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s both;
+}
+
+/* the ground the building stands on: the landing's faint grid, fading out at the edges */
+.ground-grid {
+  background-image:
+    linear-gradient(rgb(12 14 19 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(12 14 19 / 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 50%, #000 30%, transparent 78%);
 }
 
 /* v5: status pill dot that breathes only while the system reports healthy (reduced-motion turns it off) */
@@ -165,14 +241,14 @@ body {
 /* scrollbars */
 .thin-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #cdd4dd transparent;
+  scrollbar-color: #d3d5da transparent;
 }
 .thin-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #cdd4dd;
+  background: #d3d5da;
   border-radius: 8px;
 }
 .thin-scroll::-webkit-scrollbar-track {
@@ -358,7 +434,7 @@ body {
   }
 }
 .skeleton {
-  background: linear-gradient(90deg, #eef1f4 0px, #f7f8fa 160px, #eef1f4 320px);
+  background: linear-gradient(90deg, #eff0f2 0px, #f7f8f9 160px, #eff0f2 320px);
   background-size: 640px 100%;
   animation: shimmer 1.4s linear infinite;
   border-radius: var(--radius-inner);

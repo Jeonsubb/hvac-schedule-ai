@@ -183,3 +183,18 @@ def test_gateway_pair_telemetry_commands(client):
     done = [c for c in client.get("/api/commands?limit=50").json() if c.get("adjustment_id") == "T3-test-gw"]
     assert len(done) == 2 and all(c["status"] == "acked" and c["readback"] == 20.5 for c in done)
     assert gateway.map_point("SENS-405/CO2")["kind"] == "co2" and gateway.map_point("weird")["room"] is None
+
+
+def test_change_response_previews(client):
+    for kind in ("cancel", "add", "weather", "feedback", "noshow"):
+        r = client.post("/api/respond/preview", json={"kind": kind, "date": "2026-11-18"}).json()
+        assert [s["label"] for s in r["steps"]] == ["감지", "다시 계산", "조치"] and r["rooms"], kind
+        assert r["elapsed_ms"] < 5000 and "before" in r["totals"] and "after" in r["totals"]
+    c = client.post("/api/respond/preview", json={"kind": "cancel", "date": "2026-11-18"}).json()
+    room = c["event"]["room"]
+    rc = next(x for x in c["rooms"] if x["room"] == room)
+    assert c["event"]["type"] == "cancel" and len(rc["after"]["lectures"]) == len(rc["before"]["lectures"]) - 1
+    assert c["steps"][2]["text"].startswith(f"{room}호")
+    n = client.post("/api/respond/preview", json={"kind": "noshow", "date": "2026-11-18"}).json()
+    assert n["rooms"][0]["after"]["on_min"] <= n["rooms"][0]["before"]["on_min"]  # a vacancy stop never lengthens the run
+    assert client.post("/api/respond/preview", json={"kind": "nope"}).status_code == 400

@@ -37,19 +37,36 @@ export default function Signup() {
       desc="계정을 만들면 바로 건물 연결 단계로 이동합니다. 중앙 제어 PC 주소와 담당자가 아는 운영 정보만 있으면 됩니다."
       aside={
         <>
-          <p className="text-[28px] leading-[1.3] font-bold tracking-[-0.03em]">가입 후 10분이면 첫 월간 운전 계획이 나옵니다.</p>
-          <ol className="mt-6 space-y-3 text-[15px] text-[#c2d3ee]">
-            {['건물을 말로 알려 주기', '중앙 제어 PC 연결', '서버에서 데이터 수집', '부족한 정보 확인', 'AI 1차 스케줄', '운전 모드 선택'].map((s, i) => (
-              <li key={s} className="flex items-center gap-3">
-                <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-[12.5px] font-semibold text-white">{i + 1}</span>
-                {s}
+          <p className="display text-[clamp(36px,3.6vw,52px)]">
+            <span className="rise-mask">
+              <span className="rise-line">가입은</span>
+            </span>
+            <span className="rise-mask">
+              <span className="rise-line d1">건물 정보까지만.</span>
+            </span>
+          </p>
+          <ol className="mt-9 grid max-w-[30em] gap-5">
+            {[
+              ['건물 알려 주기', '건물 이름, 용도, 층과 강의실 수를 편하게 적습니다.'],
+              ['중앙 제어 연결', '중앙 제어 PC에 닿는 경로와 게이트웨이를 정합니다.'],
+              ['설비·운영 정보', '허용 온도와 지금 운전 시간을 확인합니다.'],
+            ].map(([t, d], i) => (
+              <li key={t} className="grid grid-cols-[32px_minmax(0,1fr)] gap-x-2">
+                <span className="tnum pt-[3px] text-[13px] font-bold text-brand-ink">{String(i + 1).padStart(2, '0')}</span>
+                <span>
+                  <strong className="block text-[17px] leading-[1.35] font-[650] tracking-[-0.01em] text-ink">{t}</strong>
+                  <span className="mt-1 block text-[15px] leading-[1.6] text-ink-2">{d}</span>
+                </span>
               </li>
             ))}
           </ol>
+          <p className="mt-7 max-w-[30em] text-[14px] leading-[1.6] text-ink-3">
+            등록을 마치면 지금 중앙 제어가 돌리는 고정 스케줄이 먼저 보입니다. 시간표는 대시보드에서 넣고, 넣는 순간 AI 1차 스케줄로 바뀝니다.
+          </p>
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4" noValidate>
+      <form onSubmit={submit} className="space-y-5" noValidate>
         <div className="grid grid-cols-2 gap-3">
           <Field label="기관·회사">
             <input className={inputCls} name="organization" autoComplete="organization" value={org} onChange={(e) => setOrg(e.target.value)} placeholder="예: 부산대학교…" />
@@ -78,7 +95,7 @@ export default function Signup() {
             <Note tone="crit">{err}</Note>
           </div>
         )}
-        <Button type="submit" variant="primary" className="h-11 w-full text-[15px]" disabled={!ready}>
+        <Button type="submit" variant="primary" className="h-12 w-full text-[15.5px]" disabled={!ready}>
           <UserPlus size={16} aria-hidden /> 가입하고 건물 연결하기
         </Button>
       </form>

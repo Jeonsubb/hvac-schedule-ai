@@ -4,13 +4,13 @@ import { ApiError, apiGet, apiSend, pollJob } from '../lib/api'
 import type { AgentTrace, AgentTurn, Negotiation, NegotiationEval, NegotiationJob, OpModeKey, RoomSetpoint } from '../lib/types'
 import { ROOM_ORDER } from '../lib/constants'
 import { cx, fmtDateK, fmtKwh, fmtWon } from '../lib/format'
-import { AGENT_META, AgentAvatar, BukhangShark, OccupantAgent, type AgentKey } from './Characters'
+import { AGENT_META, AgentAvatar, type AgentKey } from './Characters'
 import { BRAND, HATCH, PillChip } from './Gantt'
 import { SourceIcon, sourceMeta } from './dataSources'
 import { Card, ErrorBox, Loading, Note, Spinner } from './ui'
 
 /**
- * 에이전트 협의: 관리자 에이전트 '북항이'(요금·전력)와 사용자 에이전트(쾌적)가 설정온도를 두고 번갈아 제안하고,
+ * 에이전트 협의: 관리자 에이전트 '관리자 온디'(요금·전력)와 사용자 에이전트 '사용자 온디'(쾌적)가 설정온도를 두고 번갈아 제안하고,
  * 시뮬레이터가 매 제안을 검증하고, 판정이 합의안을 정리합니다. 진행 중에는 job.progress.turns가 차례로 늘어납니다.
  */
 
@@ -200,11 +200,10 @@ function VersusBanner({ neg, running, turns }: { neg: Negotiation | null; runnin
 
 function AgentCard({ agent, goal, speaking, align = 'left' }: { agent: 'building' | 'occupant'; goal: string; speaking: boolean; align?: 'left' | 'right' }) {
   const m = AGENT_META[agent]
-  const Pic = agent === 'building' ? BukhangShark : OccupantAgent
   return (
     <div className={cx('flex items-center gap-4', align === 'right' && 'md:flex-row-reverse md:text-right')}>
       <span className="relative rounded-full">
-        <Pic size={76} />
+        <AgentAvatar agent={agent} size={76} />
         {speaking && (
           <span className="absolute -top-1 -right-1 inline-flex h-6 items-center gap-0.5 rounded-full bg-surface px-1.5 shadow-[0_2px_8px_rgb(20_32_51/0.18)]" aria-label="발언 준비 중">
             {[0, 1, 2].map((i) => (
@@ -228,12 +227,12 @@ function EmptyDebate({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">
       <div className="flex items-end gap-2" aria-hidden>
-        <BukhangShark size={56} />
-        <OccupantAgent size={56} />
+        <AgentAvatar agent="building" size={56} />
+        <AgentAvatar agent="occupant" size={56} />
       </div>
       <div className="text-[16px] font-semibold text-ink">아직 이 날짜로 협의한 기록이 없습니다</div>
       <p className="max-w-md text-[13.5px] leading-relaxed text-ink-3">
-        협의를 시작하면 북항이가 전력을 아끼는 설정온도를 먼저 제안하고, 사용자 에이전트가 쾌적 의견과 체감 지수로 반박합니다. 시뮬레이터가 매 제안을 검증합니다.
+        협의를 시작하면 관리자 온디가 전력을 아끼는 설정온도를 먼저 제안하고, 사용자 온디가 쾌적 의견과 체감 지수로 반박합니다. 시뮬레이터가 매 제안을 검증합니다.
       </p>
       <button
         type="button"
@@ -274,8 +273,8 @@ function DebateTimeline({
   const cols = running ? rounds + 1 : Math.max(rounds, 2)
   const current = running ? (turns.length ? rounds + (turns[turns.length - 1].agent === 'occupant' ? 1 : 0) : 1) : null
   const lanes: { key: Lane; title: string; sub: string }[] = [
-    { key: 'building', title: '북항이', sub: '관리자 에이전트' },
-    { key: 'occupant', title: '사용자 에이전트', sub: '건물 이용자' },
+    { key: 'building', title: '관리자 온디', sub: '관리자 에이전트' },
+    { key: 'occupant', title: '사용자 온디', sub: '건물 이용자' },
     { key: 'simulator', title: '시뮬레이터', sub: '열모델 검증' },
     { key: 'arbiter', title: '판정', sub: '합의 정리' },
   ]
@@ -415,7 +414,7 @@ function Conversation({
           {waiting === 'building' && <AgentAvatar agent="building" size={36} />}
           <span className="inline-flex items-center gap-2 rounded-full bg-well px-4 py-2 text-[13.5px] text-ink-2">
             <Spinner size={14} />
-            {waiting === 'building' ? '북항이가 데이터를 확인하는 중…' : '사용자 에이전트가 쾌적 데이터를 확인하는 중…'}
+            {waiting === 'building' ? '관리자 온디가 데이터를 확인하는 중…' : '사용자 온디가 쾌적 데이터를 확인하는 중…'}
           </span>
           {waiting === 'occupant' && <AgentAvatar agent="occupant" size={36} />}
         </li>
