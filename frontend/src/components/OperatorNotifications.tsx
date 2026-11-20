@@ -36,7 +36,7 @@ export default function OperatorNotifications() {
   }
 
   const d = q.data
-  return <Card className="mb-6">
+  return <Card flat className="mb-6">
     <CardHeader title="건물 관리자 이메일 알림" sub="승인이 필요하거나 점검할 문제가 생기면 관리자에게 메일로 알려 드립니다." />
     {q.error && <ErrorBox error={q.error} onRetry={q.reload} />}
     {d && <>

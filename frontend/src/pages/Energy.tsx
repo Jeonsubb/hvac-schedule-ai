@@ -64,17 +64,11 @@ export default function Energy() {
       ? rawA
       : undefined
   const attrBroken = !!rawA && !A && !attr.computing
-  const vs30 = A ? pctSaving(A.variants.rule30.kwh, A.variants.ai.kwh) : null
 
   return (
     <div>
       <PageHeader
         title="절감 효과"
-        desc={
-          vs30 != null
-            ? `지금의 운영 방식(현재 운영)과 시간표·날씨에 맞춘 AI 운전을 같은 조건으로 비교했습니다. 쾌적도를 똑같이 맞춘 규칙 운전(30분 전 켜기)과 비교해도 AI가 전력을 ${vs30 >= 0 ? '덜' : '더'} 씁니다.`
-            : '지금의 운영 방식(현재 운영)과 시간표·날씨에 맞춘 AI 운전을 같은 시간표, 같은 날씨로 비교했습니다.'
-        }
         right={
           <Segmented
             label="집계 범위"
@@ -82,36 +76,36 @@ export default function Energy() {
             onChange={setScope}
             options={[
               { value: 'to_date', label: `오늘까지 (9/1–${fmtDateShort(S.today)})` },
-              { value: 'all', label: '학기 전체 (예상 포함)' },
+              { value: 'all', label: '학기 전체' },
             ]}
           />
         }
       />
 
-      <section data-tour="energy-hero" className="rounded-[16px] border border-line bg-surface" aria-label="절감 요약">
+      <section data-tour="energy-hero" className="border-y border-line" aria-label="절감 요약">
         <Hero T={T} A={A} cold={cold} scope={scope} computing={attr.computing} />
-        <div className="border-t border-line px-8 pt-7 pb-6">
+        <div className="border-t border-line pt-7 pb-6">
           <WaterfallSection A={A} attr={attr} broken={attrBroken} />
         </div>
       </section>
 
       <DisclosureList className="mt-6" title="자세히 보기" hideTitle>
-        <Disclosure icon={<ArrowLeftRight size={16} aria-hidden />} title="운전 방식 4가지 비교" summary={`AI ${fmtNum(T.ai.kwh)} kWh, 고정 ${fmtNum(T.fixed.kwh)} kWh`}>
+        <Disclosure icon={<ArrowLeftRight size={16} aria-hidden />} title="운전 방식 비교" summary={`AI ${fmtNum(T.ai.kwh)} kWh, 고정 ${fmtNum(T.fixed.kwh)} kWh`}>
           <StrategyTable T={T} cold={cold} />
         </Disclosure>
-        <Disclosure icon={<CalendarDays size={16} aria-hidden />} title="일별 전력량과 외기온도" summary={`강의일 ${S.days.filter((d) => d.sessions > 0).length}일`}>
+        <Disclosure icon={<CalendarDays size={16} aria-hidden />} title="일별 전력" summary={`강의일 ${S.days.filter((d) => d.sessions > 0).length}일`}>
           <DailyChart S={S} />
         </Disclosure>
-        <Disclosure icon={<TrendingDown size={16} aria-hidden />} title="AI 누적 절감량" summary={`학기 말 고정 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh 예상`}>
+        <Disclosure icon={<TrendingDown size={16} aria-hidden />} title="누적 절감" summary={`학기 말 현재 운영 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh 예상`}>
           <CumulativeChart S={S} />
         </Disclosure>
-        <Disclosure icon={<ScatterIcon size={16} aria-hidden />} title="전기를 아끼느라 쾌적을 포기했는가" summary={`AI 쾌적 유지율 ${fmtPct(T.ai.comfort_pct, 2)}`}>
+        <Disclosure icon={<ScatterIcon size={16} aria-hidden />} title="전력과 쾌적" summary={`AI 쾌적 유지율 ${fmtPct(T.ai.comfort_pct, 2)}`}>
           <ScatterChart T={T} A={A} scope={scope} />
         </Disclosure>
-        <Disclosure icon={<ListChecks size={16} aria-hidden />} title="AI 판단 유형별 횟수" summary={`학기 ${fmtNum(Object.values(S.decisions).reduce((a, v) => a + v, 0))}회`}>
+        <Disclosure icon={<ListChecks size={16} aria-hidden />} title="AI 판단 횟수" summary={`학기 ${fmtNum(Object.values(S.decisions).reduce((a, v) => a + v, 0))}회`}>
           <DecisionChart S={S} />
         </Disclosure>
-        <Disclosure icon={<MoveRight size={16} aria-hidden />} title="강의실 재배치 권고" summary="학사 부서 검토용">
+        <Disclosure icon={<MoveRight size={16} aria-hidden />} title="강의실 재배치">
           <ConsolidationReport />
         </Disclosure>
       </DisclosureList>
@@ -175,11 +169,11 @@ function Hero({
     </div>
   )
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 px-8 pt-8 pb-7">
+    <div className="flex flex-wrap items-end justify-between gap-x-12 gap-y-8 pt-8 pb-8">
       <div className="min-w-0">
-        <span className="flex items-center gap-1.5 text-[14px] font-medium text-ink-2">
+        <span className="flex items-center gap-1.5 text-[15px] font-medium text-ink-2">
           <span className="inline-block h-2 w-2 rounded-full bg-s-ai" aria-hidden />
-          현재 운영(중앙 제어) 대비 전력
+          현재 운영 대비
           {scope === 'all' && <Badge tone="info">학기 전체 예상</Badge>}
         </span>
         <span className="mt-2 flex items-baseline gap-1.5">
@@ -187,16 +181,16 @@ function Hero({
           <span className="text-[26px] font-semibold text-ink-3">%</span>
         </span>
         <span className="tnum mt-3 block text-[15px] text-ink-2">
-          이전 운영 {fmtNum(T.fixed.kwh)} kWh → AI <b className="font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b> · 아낀 요금 <b className="font-semibold text-ink">{fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원</b> (시뮬레이션)
+          {fmtNum(T.fixed.kwh)} → <b className="font-semibold text-ink">{fmtNum(T.ai.kwh)} kWh</b> <span className="mx-1.5 text-ink-4">/</span> <b className="font-semibold text-ink">{fmtNum((T.fixed.cost_krw - T.ai.cost_krw) / 10000, 1)}만원</b> 절감
         </span>
       </div>
       <div className="flex flex-wrap gap-x-12 gap-y-5 pb-1">
         {sameComfort ? (
           <Figure
-            label="같은 쾌적도의 규칙 기반 대비"
+            label="규칙 기반 대비"
             value={`${vs30! >= 0 ? '−' : '+'}${Math.abs(vs30!).toFixed(1)}`}
             unit="%"
-            sub={`규칙 30분 전 ${fmtNum(r30!.kwh, 1)} → AI ${fmtNum(ai!.kwh, 1)} kWh`}
+            sub="같은 쾌적도 기준"
             infoTitle="같은 쾌적도 비교의 근거"
             info={sameComfort}
           />
@@ -204,13 +198,13 @@ function Hero({
           <div className="min-w-[200px]" role="status">
             <div className="flex items-center gap-2 text-[13px] font-medium text-ink-3">
               {computing && <Spinner size={13} />}
-              {computing ? '같은 쾌적도 비교 계산 중…' : '같은 쾌적도 비교를 불러오지 못했습니다'}
+              {computing ? '계산 중…' : '비교 불가'}
             </div>
             {computing && <Skeleton className="mt-2 h-[34px] w-[120px]" />}
           </div>
         )}
         <Figure
-          label="강의 중 쾌적 유지율"
+          label="쾌적 유지"
           value={T.ai.comfort_pct != null ? T.ai.comfort_pct.toFixed(1) : '–'}
           unit="%"
           info={
@@ -220,7 +214,7 @@ function Hero({
           }
         />
         <Figure
-          label="줄인 탄소"
+          label="탄소 감축"
           value={((T.fixed.co2_kg - T.ai.co2_kg) / 1000).toFixed(2)}
           unit="tCO₂"
           align="right"
@@ -237,8 +231,8 @@ function WaterfallSection({ A, attr, broken }: { A: AttributionScope | undefined
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[17px] font-[650] tracking-[-0.01em] text-ink">
-          AI 절감은 어디서 오는가
+        <h2 className="flex items-center gap-2.5 text-[22px] font-semibold tracking-[-0.02em] text-ink">
+          절감 구성
           {attr.stale && (
             <span className="inline-flex items-center gap-1.5 text-[13px] font-normal text-ink-3" title="이전 결과를 보여 주면서 최신 입력으로 다시 계산하고 있습니다">
               <Spinner size={13} /> 갱신 중
@@ -258,7 +252,7 @@ function WaterfallSection({ A, attr, broken }: { A: AttributionScope | undefined
             <div className={cx('transition-opacity duration-200', attr.stale && 'opacity-70')}>
               <Waterfall A={A} note={attr.data.note ?? ''} detail={detail} />
             </div>
-            <Disclosure variant="inline" className="mt-4" title={detail ? '단계별 쾌적 지표 접기' : '단계별 쾌적 지표와 계산 방법 보기'} open={detail} onOpenChange={setDetail}>
+            <Disclosure variant="inline" className="mt-4" title={detail ? '계산 방법 접기' : '계산 방법'} open={detail} onOpenChange={setDetail}>
               <p className="max-w-[90ch] text-[13.5px] leading-relaxed text-ink-2">{splitNote(attr.data.note ?? '').method} 막대 위 숫자는 앞 단계 대비 전력 변화입니다.</p>
             </Disclosure>
           </>
@@ -268,7 +262,7 @@ function WaterfallSection({ A, attr, broken }: { A: AttributionScope | undefined
       ) : (
         <div className="space-y-3" role="status">
           <div className="flex items-center gap-2 text-[14px] text-ink-2">
-            <Spinner size={15} /> 학기 전체를 기능별로 다시 시뮬레이션하는 중입니다. 처음 한 번은 1분 정도 걸리고, 10초마다 확인합니다.
+            <Spinner size={15} /> 기능별 재계산 중…
           </div>
           <Skeleton className="h-[300px]" />
         </div>
@@ -306,7 +300,6 @@ function StrategyTable({ T, cold }: { T: Record<StrategyKey, TotalsRow>; cold: R
   ]
   return (
     <div>
-      <More className="mb-4"><p>같은 시간표와 날씨로 네 가지 방식을 시뮬레이션했습니다. 굵은 값이 그 항목에서 가장 좋은 방식입니다.</p></More>
       <div className="overflow-x-auto rounded-[12px] border border-line">
         <table className="tnum w-full min-w-[760px] table-fixed text-[14px]">
           <colgroup>
@@ -472,7 +465,7 @@ function DailyChart({ S }: { S: Summary }) {
         </>
       }
       table={{
-        columns: ['날짜', 'AI', '규칙', '수동', '고정', '외기 평균℃'],
+        columns: ['날짜', 'AI', '규칙', '수동', '현재', '외기 평균℃'],
         rows: days.map((d) => [
           `${d.date}${d.date > S.today ? ' (예상)' : ''}`,
           d.strategies.ai.kwh.toFixed(1),
@@ -572,7 +565,7 @@ function CumulativeChart({ S }: { S: Summary }) {
       }}
       footer={
         <div className="mt-2 text-[13px] text-ink-3">
-          {S.days[last] && `학기 말(${fmtDateShort(S.days[last].date)})까지 고정 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh, 규칙 대비 ${fmtNum(S.totals.all.rule.kwh - S.totals.all.ai.kwh)} kWh 절감 예상`}
+          {S.days[last] && `학기 말(${fmtDateShort(S.days[last].date)})까지 현재 운영 대비 ${fmtNum(S.totals.all.fixed.kwh - S.totals.all.ai.kwh)} kWh, 규칙 대비 ${fmtNum(S.totals.all.rule.kwh - S.totals.all.ai.kwh)} kWh 절감 예상`}
         </div>
       }
     >

@@ -253,7 +253,7 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="space-y-6">
           {SECTIONS.map((sec) => (
-            <Card key={sec.key}>
+            <Card key={sec.key} flat>
               <CardHeader title={sec.title} sub={sec.desc} />
               {fields(sec)}
             </Card>
@@ -349,7 +349,7 @@ export default function SettingsPage() {
           </DisclosureList>
         </div>
 
-        <Card className="xl:sticky xl:top-[88px]">
+        <Card flat className="xl:sticky xl:top-[88px]">
           <CardHeader title="시뮬레이션으로 미리보기" sub="바꾼 값으로 실제 시간표와 날씨를 다시 돌려 지금 규칙과 비교합니다. 저장 전이라 운영에는 영향이 없습니다." />
           {nChanged > 0 ? (
             <div className="mb-4 flex flex-wrap gap-1.5">
@@ -849,7 +849,7 @@ function BuildingAndPolicy() {
 
   return (
     <section className="mb-6 space-y-4" aria-label="건물 연결과 정책">
-      <Card>
+      <Card flat>
         <CardHeader
           title="건물 연결과 정책"
           sub="온보딩에서 연결한 중앙 제어 시스템과, AI가 스케줄을 바꿀 때 넘지 않는 운전 정책입니다."

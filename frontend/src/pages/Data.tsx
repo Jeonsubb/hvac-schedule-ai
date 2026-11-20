@@ -199,7 +199,7 @@ function CoursesTab() {
               ))}
             </tbody>
           </table>
-          {rows.length === 0 && <Empty title="조건에 맞는 강의가 없습니다" desc="검색어를 지우거나 강의실·요일 필터를 전체로 바꿔 보세요." />}
+          {rows.length === 0 && <Empty title="검색 결과 없음" />}
         </div>
       ) : (
         <WeekGrid courses={rows} roomFilter={room} />
@@ -383,7 +383,7 @@ function ImportTab() {
           aria-label="시간표 파일 선택"
           onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !busy && (e.preventDefault(), fileRef.current?.click())}
           className={cx(
-            'flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-[14px] border-[1.5px] border-dashed px-6 py-12 text-center transition-colors duration-150',
+            'flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-[10px] border border-dashed px-6 py-12 text-center transition-colors duration-200',
             drag ? 'border-ink bg-well' : 'border-line-strong hover:border-ink-4 hover:bg-[#fafbfc]',
             busy && 'pointer-events-none opacity-60',
           )}
@@ -392,7 +392,7 @@ function ImportTab() {
             <FileSpreadsheet size={28} />
             <FileImage size={28} />
           </div>
-          <div className="text-[15px] font-semibold text-ink">파일을 끌어 놓거나 눌러서 고르세요</div>
+          <div className="text-[15px] font-semibold text-ink">파일 선택</div>
           <div className="text-[13.5px] text-ink-3">CSV, XLSX, JSON, PNG, JPG, PDF</div>
           <input
             ref={fileRef}
@@ -435,7 +435,7 @@ function ImportTab() {
           </div>
         )}
         {err && <ErrorBox error={err} />}
-        {!busy && !res && !err && <Empty title="아직 올린 파일이 없습니다" desc="왼쪽에 시간표 파일을 올리면 추가, 삭제, 유지되는 강의를 여기에 보여 줍니다." icon={<Upload size={18} />} />}
+        {!busy && !res && !err && <Empty title="올린 파일 없음" icon={<Upload size={18} />} />}
         {res && (
           <div className="space-y-4">
             <div className="text-[13.5px] text-ink-2">
@@ -556,13 +556,6 @@ function DiffTable({ title, rows, tone }: { title: string; rows: Course[]; tone:
 
 // ---------------------------------------------------------------- events
 
-const EXAMPLES = [
-  '27일 금 14~17시 405호 졸업작품 발표 80명',
-  '다음 주 수요일 405호 18~21시 특강 40명',
-  '12월 3일 컴퓨터구조 휴강',
-  '11월 26일 IT관 전체 휴관',
-]
-
 const emptyDraft = (date: string): EventDraft => ({ type: 'add', date, room: '405', start: '18:00', end: '20:00', title: '', expected_people: 40 })
 
 export function EventsTab({ events, reload }: { events: EventRec[] | undefined; reload: () => void }) {
@@ -638,15 +631,6 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
     }
   }
 
-  const trySample = async () => {
-    try {
-      const b = await (await fetch('/samples/lms-cancel-notice.png')).blob()
-      await parseImage(new File([b], 'LMS 휴강 공지(예시).png', { type: 'image/png' }))
-    } catch {
-      setImgErr({ msg: '예시 이미지를 불러오지 못했습니다. 직접 캡처한 공지를 올려 주세요.', fallback: false })
-    }
-  }
-
   const save = async () => {
     if (!draft) return
     setSaving(true)
@@ -692,7 +676,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <Card>
+        <Card flat className="xl:border-t-0 xl:pt-0">
           <CardHeader title="무슨 일정이 생겼나요?" sub="말로 적거나 LMS 공지 캡처를 올리면 AI가 양식으로 바꾸고, 겹치는 일정을 먼저 확인합니다." />
           <form
             onSubmit={(e) => {
@@ -707,31 +691,15 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
               autoComplete="off"
               className={cx(inputCls, 'h-12 flex-1 text-[15px]')}
               aria-label="일정 설명"
-              placeholder="예: 27일 금 14~17시 405호 졸업작품 발표 80명…"
+              placeholder="예: 27일 금 14~17시 405호 발표 80명"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
             <Button type="submit" variant="primary" disabled={parsing || !text.trim()} className="h-12 px-5">
-              {parsing ? <Spinner className="text-white" /> : <Sparkles size={16} aria-hidden />}
-              AI로 해석
+              {parsing && <Spinner className="text-white" />}
+              해석
             </Button>
           </form>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[13px] text-ink-3">예시</span>
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex}
-                type="button"
-                onClick={() => {
-                  setText(ex)
-                  parse(ex)
-                }}
-                className="rounded-[8px] bg-well px-2.5 py-1 text-[13px] text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
           {err && (
             <div className="mt-3">
               <ErrorBox error={err} />
@@ -762,17 +730,17 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
               if (f) parseImage(f)
             }}
             className={cx(
-              'flex cursor-pointer items-center gap-3.5 rounded-[14px] border-[1.5px] border-dashed px-5 py-4 transition-colors duration-150',
+              'flex cursor-pointer items-center gap-3.5 rounded-[10px] border border-dashed px-5 py-4 transition-colors duration-200',
               dragImg ? 'border-ink bg-well' : 'border-line-strong hover:border-ink-4 hover:bg-[#fafbfc]',
               reading && 'pointer-events-none opacity-70',
             )}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-well text-ink-3" aria-hidden>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-3" aria-hidden>
               {reading ? <Spinner size={17} /> : <FileImage size={18} />}
             </span>
             <span className="min-w-0">
-              <span className="block text-[14.5px] font-semibold text-ink">{reading ? 'AI가 공지를 읽는 중…' : '휴강·보강 공지 캡처 올리기'}</span>
-              <span className="block text-[13px] text-ink-3">끌어 놓거나 눌러서 고르세요. PNG, JPG, WEBP 4MB 이하</span>
+              <span className="block text-[14.5px] font-semibold text-ink">{reading ? '읽는 중…' : '공지 캡처 올리기'}</span>
+              <span className="block text-[12.5px] text-ink-3">PNG · JPG · WEBP, 4MB</span>
             </span>
             <input
               ref={imgRef}
@@ -800,19 +768,16 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
             </div>
           )}
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <button type="button" className={btnCls('link', 'sm')} onClick={trySample} disabled={reading}>
-              예시 휴강 공지로 해 보기
-            </button>
             <button type="button" className={btnCls('link', 'sm')} onClick={startManual}>
               양식 직접 입력
             </button>
           </div>
         </Card>
 
-        <Card className={cx(!draft && !result && 'border-dashed bg-transparent')}>
+        <Card flat className="xl:border-t-0 xl:border-l xl:pt-0 xl:pl-8">
           {draft ? (
             <div className="space-y-4">
-              <CardHeader className="mb-1" title="일정 확인" sub="내용을 확인하고, 필요하면 고친 뒤 등록하세요." />
+              <CardHeader className="mb-1" title="일정 확인" />
               {origin && origin.kind !== 'manual' && (
                 <div className="flex items-start gap-3 rounded-[12px] bg-well px-3.5 py-2.5 text-[13.5px] text-ink-2">
                   {origin.url && <img src={origin.url} alt="올린 공지 이미지" width={80} height={56} className="h-14 w-20 shrink-0 rounded-[8px] object-cover object-top ring-1 ring-line" />}
@@ -821,7 +786,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
                     <span className="block truncate text-ink-3">{origin.label}</span>
                     {draft.from_cache && (
                       <span className="mt-0.5 block text-ink-2">
-                        AI 연결이 불안정해 {draft.cached_at ? fmtTs(draft.cached_at) : '오늘 앞서'} 같은 내용을 해석한 결과를 썼습니다. 내용을 한 번 더 확인하세요.
+                        AI 연결 불안정 · {draft.cached_at ? fmtTs(draft.cached_at) : '이전'} 해석 결과
                       </span>
                     )}
                   </span>
@@ -833,7 +798,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
           ) : result ? (
             <BeforeAfter r={result} />
           ) : (
-            <Empty title="확인할 일정이 없습니다" desc="왼쪽에 일정을 적거나 예시를 눌러 보세요. AI가 해석한 양식과 겹침 확인 결과가 여기에 나옵니다." icon={<CalendarPlus size={18} />} />
+            <Empty title="입력된 일정 없음" icon={<CalendarPlus size={18} />} />
           )}
         </Card>
       </div>
@@ -849,7 +814,7 @@ export function EventsTab({ events, reload }: { events: EventRec[] | undefined; 
           {!events ? (
             <Loading />
           ) : events.length === 0 ? (
-            <Empty title="등록된 일정이 없습니다" desc="보강, 특강, 휴강, 강의실 변경이 생기면 위에서 말로 등록하세요." icon={<CalendarPlus size={18} />} />
+            <Empty title="등록된 일정 없음" icon={<CalendarPlus size={18} />} />
           ) : (
             <div className={tbl.frame}>
               <table className={tbl.table}>
@@ -1166,7 +1131,7 @@ function AuditTab() {
       ) : !audit.data ? (
         <Loading />
       ) : audit.data.length === 0 ? (
-        <Empty title="아직 변경 기록이 없습니다" desc="일정 등록, 시간표 반영, 운영 규칙 변경이 생기면 여기에 시간순으로 남습니다." icon={<History size={18} />} />
+        <Empty title="변경 기록 없음" icon={<History size={18} />} />
       ) : (
         <ol className="relative ml-2 border-l border-line">
           {audit.data.map((a) => {

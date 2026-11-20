@@ -9,7 +9,7 @@ import { NEG_STATE, changedLabel, mergeIntervals, samePlan, signed } from '../li
 import EChart, { axisCommon, type EChartsOption } from './EChart'
 import DayTimeline from './DayTimeline'
 import { DebateEvidence } from './AgentDebate'
-import { Badge, Button, Disclosure, DisclosureList, ErrorBox, Note, Skeleton, Spinner, btnCls, toast, More, HeadMore } from './ui'
+import { Badge, Button, Disclosure, DisclosureList, ErrorBox, Note, Skeleton, Spinner, btnCls, toast } from './ui'
 
 /**
  * AI 최적화: the day's base plan, one button that runs the real two-agent negotiation, and — as soon as the
@@ -111,36 +111,37 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
   const has = !!cmp && cmp.state !== 'none'
 
   return (
-    <div className="space-y-5">
+    <div className="plan-flow">
       {/* 1. the base plan the negotiation starts from */}
-      <section className="rounded-[16px] border border-line bg-surface p-6" aria-labelledby="opt-base">
+      <section className="plan-step" aria-labelledby="opt-base">
         <StepTitle n={1} id="opt-base" title="협의 전 기본 운전계획" sub={`${fmtDateK(date)} · 물리 계산 엔진이 시간표와 예보로 만든 계획입니다 (시뮬레이션)`} />
-        <dl className="tnum mt-4 grid grid-cols-2 gap-x-8 gap-y-3 text-[13.5px] lg:grid-cols-4">
-          <Fact k="수업 일정" v={noClass ? '없음' : `${D.sessions.length}건${events.length ? ` (특별 일정 ${events.length}건 포함)` : ''}`} />
-          <Fact k="기상 자료" v={D.weather.src_forecast} />
-          <Fact k="운전 모드" v={mode === 'auto' ? '자동 운전' : mode === 'recommend' ? '추천 모드' : '—'} />
-          <Fact k="AI 협의 적용 상태" v={has ? (NEG_STATE[cmp!.state]?.label ?? '—') : '협의 기록 없음'} />
-        </dl>
+        <p className="tnum mt-2 pl-[38px] text-[14.5px] text-ink-2">
+          {[
+            noClass ? '수업 없음' : `수업 ${D.sessions.length}건${events.length ? ` · 특별 ${events.length}` : ''}`,
+            D.weather.src_forecast,
+            mode === 'auto' ? '자동 운전' : mode === 'recommend' ? '추천 모드' : null,
+            `AI 협의 ${has ? (NEG_STATE[cmp!.state]?.label ?? '—') : '기록 없음'}`,
+          ].filter(Boolean).join('  ·  ')}
+        </p>
         {fx && ai ? (
-          <div className="mt-5 border-t border-line pt-4">
-            <div className="text-[13.5px] font-semibold text-ink">첫 번째 비교 · 현재 운영 vs 기본 예측 제어</div>
-            <More className="mt-0.5"><p>물리 계산 엔진의 효과입니다. AI Agent 협의와는 별개이며, 같은 시간표·날씨·초기 조건으로 계산했습니다.</p></More>
-            <div className="mt-3 space-y-2">
-              <HBar label={`현재 운영 (첫 수업에 켜고 ${meta.settings.fixed_off} 일괄 정지)`} kwh={fx.kwh} max={Math.max(fx.kwh, ai.kwh)} color={GREY} comfort={fx.comfort_pct} />
-              <HBar label={`기본 예측 제어${cmp?.state === 'applied' ? ' (AI 협의 설정온도 적용 중)' : ''}`} kwh={ai.kwh} max={Math.max(fx.kwh, ai.kwh)} color={INK} comfort={ai.comfort_pct} />
+          <div className="mt-6 pl-[38px]">
+            <div className="text-[16px] font-semibold text-ink">현재 운영 vs 예측 제어</div>
+            <div className="mt-4 space-y-3">
+              <HBar label="현재 운영" kwh={fx.kwh} max={Math.max(fx.kwh, ai.kwh)} color={GREY} comfort={fx.comfort_pct} />
+              <HBar label="예측 제어" kwh={ai.kwh} max={Math.max(fx.kwh, ai.kwh)} color={INK} comfort={ai.comfort_pct} />
             </div>
-            <p className="tnum mt-2 text-[13px] text-ink-2">
-              {fx.kwh > 0 ? `예상 소비량 ${signed(ai.kwh - fx.kwh, 1)} kWh (${signed(((ai.kwh - fx.kwh) / fx.kwh) * 100, 1)}%)` : '현재 운영도 가동하지 않는 날입니다'} · 하루 전체 · 시뮬레이션
+            <p className="tnum mt-3 text-[15px] font-semibold text-ink">
+              {fx.kwh > 0 ? `${signed(ai.kwh - fx.kwh, 1)} kWh (${signed(((ai.kwh - fx.kwh) / fx.kwh) * 100, 1)}%)` : '현재 운영 가동 없음'}
             </p>
           </div>
         ) : (
-          <p className="mt-4 text-[13.5px] text-ink-3">이 날짜의 기준 전략 계산 결과가 없습니다.</p>
+          <p className="mt-4 pl-[38px] text-[15px] text-ink-3">계산 결과 없음</p>
         )}
       </section>
 
       {/* 2. the one button that calls Bedrock */}
-      <section className="rounded-[16px] border border-line bg-surface p-6" aria-labelledby="opt-run">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <section className="plan-step" aria-labelledby="opt-run">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <StepTitle
             n={2}
             id="opt-run"
@@ -151,26 +152,23 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
             type="button"
             onClick={start}
             disabled={running || noClass}
-            className="ond-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[8px] px-4 text-[14px] font-bold text-white hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50"
+            className="ond-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-[8px] px-5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: BRAND }}
           >
             {running ? <Spinner size={15} className="text-white" /> : has ? <RotateCw size={15} aria-hidden /> : <Play size={15} aria-hidden />}
-            {running ? '협의 실행 중…' : has ? '비용·쾌적 Agent 다시 협의' : '비용·쾌적 Agent 협의 실행'}
+            {running ? '협의 중…' : has ? '다시 협의' : '협의 실행'}
           </button>
         </div>
-        <More label="실행 조건" className="mt-3"><p>
-          실행 대상: {fmtDateK(date)} 하루 · 협의 대상은 설정온도뿐이며 켜고 끄는 시각은 엔진이 다시 계산합니다 · 다시 협의하면 이전 협의안 위에 쌓이지 않고 새 결과로 바뀝니다 · 설정온도는 쾌적 범위 아래로 내려가지 않습니다 ·{' '}
-          {mode === 'auto'
-            ? '자동 운전 모드: 0.5℃ 이내 변경은 바로 적용되고, 그보다 큰 변경은 승인을 기다립니다.'
-            : '추천 모드: 결과는 승인 대기 추천안으로만 저장되고, 승인하기 전에는 운영계획이 바뀌지 않습니다.'}
-        </p></More>
-        {noClass && <Note tone="warn">이 날짜에는 수업이 없어 협의할 대상이 없습니다. 상단에서 수업이 있는 평일을 고르세요.</Note>}
+        <p className="mt-1.5 pl-[38px] text-[14px] text-ink-3">
+          {fmtDateK(date)} · 설정온도만 협의 · {mode === 'auto' ? '0.5℃ 이내 자동 적용' : '승인 후 적용'}
+        </p>
+        {noClass && <Note tone="warn">수업 없음 · 협의 대상 없음</Note>}
         {running && (
-          <div className="mt-4 rounded-[12px] bg-well px-4 py-3" role="status" aria-live="polite">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-ink">
+          <div className="mt-4 ml-[38px] border-l-2 border-brand pl-4" role="status" aria-live="polite">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-ink">
               <Spinner size={14} />
               <span className="font-semibold">{phase ? progressLabel(phase) : 'Bedrock 협의 실행 중'}</span>
-              <span className="tnum text-ink-3">경과 {elapsed}초 · 보통 1분 안팎 걸립니다</span>
+              <span className="tnum text-ink-3">{elapsed}초</span>
             </div>
             {liveTurns.length > 0 && (
               <ol className="mt-2 space-y-1 text-[13px] text-ink-2">
@@ -189,7 +187,7 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
         )}
         {error && !running && (
           <div className="mt-4">
-            <ErrorBox title="협의를 끝내지 못했습니다. 운영계획은 바뀌지 않았습니다." error={error} onRetry={start} />
+            <ErrorBox title="협의 실패 · 계획 변경 없음" error={error} onRetry={start} />
           </div>
         )}
       </section>
@@ -200,8 +198,9 @@ export default function AgentOptimize({ date, meta }: { date: string; meta: Meta
       ) : !cmp ? (
         <Skeleton className="h-[120px]" />
       ) : !has ? (
-        <section className="rounded-[16px] border border-dashed border-line-strong bg-surface p-6 text-[13.5px] text-ink-3">
-          <StepTitle n={3} title="협의 결과" sub="아직 이 날짜의 협의 기록이 없습니다. 협의를 실행하면 같은 조건의 전후 비교가 이곳에 바로 표시됩니다." />
+        <section className="plan-step text-[15px] text-ink-3">
+          <StepTitle n={3} title="협의 결과" />
+          <p className="mt-2 pl-[38px]">기록 없음</p>
         </section>
       ) : (
         <Result cmp={cmp} day={D} meta={meta} justRan={!!ranAt && ranAt === cmp.created_at} sectionRef={resultRef} onChanged={() => invalidateAll()} />
@@ -216,54 +215,31 @@ function progressLabel(phase: string): string {
 
 function StepTitle({ n, title, sub, id }: { n: number; title: string; sub?: string; id?: string }) {
   const h = (
-    <h2 id={id} className="flex items-center gap-2.5 text-[17px] leading-[1.35] font-bold tracking-[-0.015em] text-ink">
-      <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12.5px] font-bold text-white">{n}</span>
+    <h2 id={id} className="flex items-center gap-3 text-[22px] leading-[1.3] font-bold tracking-[-0.02em] text-ink">
+      <span className="tnum flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-ink text-[13px] font-semibold text-ink">{n}</span>
       {title}
     </h2>
   )
-  return <div className="min-w-0 flex-1">{sub ? <HeadMore heading={h}>{sub}</HeadMore> : h}</div>
-}
-
-function Fact({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-ink-3">{k}</dt>
-      <dd className="mt-0.5 font-medium text-ink">{v}</dd>
-    </div>
-  )
+  void sub // step titles stay one line; explanations were dropped
+  return <div className="min-w-0 flex-1">{h}</div>
 }
 
 function HBar({ label, kwh, max, color, comfort }: { label: string; kwh: number; max: number; color: string; comfort: number | null }) {
   return (
-    <div className="grid grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
+    <div className="grid grid-cols-[minmax(0,96px)_minmax(0,1fr)_auto] items-center gap-4 text-[15px]">
       <span className="truncate text-ink-2">{label}</span>
-      <span className="h-3 rounded-[3px] bg-well">
-        <span className="block h-3 rounded-[3px]" style={{ width: `${max > 0 ? Math.max(1, (kwh / max) * 100) : 0}%`, background: color }} />
+      <span className="h-3.5 rounded-[3px] bg-well">
+        <span className="block h-3.5 rounded-[3px]" style={{ width: `${max > 0 ? Math.max(1, (kwh / max) * 100) : 0}%`, background: color }} />
       </span>
       <span className="tnum whitespace-nowrap text-ink">
         <b className="font-semibold">{fmtKwh(kwh)} kWh</b>
-        <span className="text-ink-3"> · 쾌적 범위 {comfort != null ? `${comfort.toFixed(0)}%` : '—'}</span>
+        <span className="text-ink-3"> · 쾌적 {comfort != null ? `${comfort.toFixed(0)}%` : '—'}</span>
       </span>
     </div>
   )
 }
 
 // ---------------------------------------------------------------- result
-
-/** What changed, said as it is: no "improved" unless the numbers say so. */
-function verdict(b: PlanView, a: PlanView, changedRooms: number): { text: string; tone: 'neutral' | 'warn' } {
-  const dk = a.kwh - b.kwh
-  const same = Math.abs(dk) < 0.05
-  const pb = b.pmv_mean
-  const pa = a.pmv_mean
-  const dp = pb != null && pa != null ? Math.abs(pb) - Math.abs(pa) : 0 // > 0: closer to neutral
-  const outUp = a.out_band_min > b.out_band_min
-  if (!changedRooms || (same && Math.abs(dp) < 0.005 && !outUp)) return { text: 'AI 협의로 추가 변경 없음', tone: 'neutral' }
-  const comfort = outUp ? '쾌적 범위 밖 시간 증가' : dp > 0.005 ? '쾌적 지표(PMV) 개선' : dp < -0.005 ? '쾌적 지표(PMV) 하락' : '쾌적 지표 변화 없음'
-  if (same) return { text: `예상 소비량 변화 없음 · ${comfort}`, tone: 'neutral' }
-  if (dk > 0) return { text: dp > 0.005 && !outUp ? '쾌적성 조건 우선으로 예상 소비량 증가' : `예상 소비량 증가 · ${comfort}`, tone: 'warn' }
-  return { text: `예상 소비량 감소 · ${comfort}`, tone: dp < -0.005 || outUp ? 'warn' : 'neutral' }
-}
 
 function Result({
   cmp,
@@ -298,82 +274,80 @@ function Result({
   const created = cmp.created_at ? cmp.created_at.slice(5, 16).replace('T', ' ') : ''
 
   return (
-    <section ref={sectionRef} tabIndex={-1} className="scroll-mt-24 rounded-[16px] border border-line bg-surface p-6 outline-none" aria-labelledby="opt-result">
+    <section ref={sectionRef} tabIndex={-1} className="plan-step scroll-mt-24 outline-none" aria-labelledby="opt-result">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <StepTitle n={3} id="opt-result" title="협의 결과 · AI 협의 설정온도를 반영한 운전계획" sub={`${fmtDateK(cmp.date)} · 협의 전과 후를 같은 시간표·예보·초기 조건으로 계산했습니다 (시뮬레이션)`} />
+        <StepTitle n={3} id="opt-result" title="협의 결과" />
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge tone={cmp.ai ? 'outline' : 'warn'}>{cmp.ai ? 'Bedrock 두 Agent 협의 완료' : '규칙 기반 대체 실행 (Bedrock 응답 아님)'}</Badge>
+          <Badge tone={cmp.ai ? 'outline' : 'warn'}>{cmp.ai ? 'Bedrock 협의' : '규칙 기반 대체'}</Badge>
           <Badge tone={st.tone === 'good' ? 'good' : st.tone === 'warn' ? 'warn' : 'neutral'}>{st.label}</Badge>
-          <Badge tone="outline">{justRan ? `방금 실행 ${created}` : `이전 실행 기록 ${created}`}</Badge>
+          <Badge tone="outline">{justRan ? `방금 ${created}` : created}</Badge>
         </div>
       </div>
 
       {!cmp.ai && (
         <div className="mt-4">
           <Note tone="warn" icon={<TriangleAlert size={15} aria-hidden />}>
-            Bedrock 호출이 실패해 두 Agent 대신 규칙 기반 로직이 같은 절차를 실행했습니다. 아래 수치는 같은 시뮬레이터로 검증한 값이지만 Bedrock AI 협의 결과는 아닙니다. 다시 실행해 보세요.
+            Bedrock 호출 실패 · 규칙 기반으로 대체 실행
           </Note>
         </div>
       )}
       {stale && (
         <div className="mt-4">
           <Note tone="crit" icon={<TriangleAlert size={15} aria-hidden />}>
-            이 협의 이후 {changedLabel(cmp)}이(가) 바뀌었습니다. 아래는 바뀌기 전 조건에서 계산한 기록이라 현재 운전계획과는 비교할 수 없습니다. 위 버튼으로 다시 협의하세요.
+            {changedLabel(cmp)} 변경 이전 기록 · 현재 계획과 비교 불가
           </Note>
         </div>
       )}
 
       {!b || !a ? (
         <div className="mt-4">
-          <Note tone="warn">이 기록에는 협의 전후 운전계획 자료가 없어 그래프를 그릴 수 없습니다(이전 버전에서 실행한 협의). 다시 협의하면 표시됩니다.</Note>
+          <Note tone="warn">전후 비교 자료 없음 · 다시 협의하면 표시</Note>
           {cmp.baseline && cmp.final && (
-            <p className="tnum mt-3 text-[13.5px] text-ink-2">
-              기록된 수치: 예상 소비량 {cmp.baseline.kwh.toFixed(1)} → {cmp.final.kwh.toFixed(1)} kWh, 평균 PMV {cmp.baseline.pmv_mean ?? '—'} → {cmp.final.pmv_mean ?? '—'}
+            <p className="tnum mt-3 text-[15px] text-ink-2">
+              기록된 수치: 사용량 {cmp.baseline.kwh.toFixed(1)} → {cmp.final.kwh.toFixed(1)} kWh, 평균 PMV {cmp.baseline.pmv_mean ?? '—'} → {cmp.final.pmv_mean ?? '—'}
             </p>
           )}
         </div>
       ) : (
         <>
-          {(() => {
-            const v = verdict(b, a, changed.length)
-            return (
-              <p className={cx('mt-4 text-[18px] leading-[1.45] font-bold tracking-[-0.015em]', v.tone === 'warn' ? 'text-warn-ink' : 'text-ink')}>
-                {v.text}
-                {stale && <span className="ml-2 text-[13px] font-medium text-crit-ink">(이전 조건 기준)</span>}
-              </p>
-            )
-          })()}
-          {cmp.summary && <p className="mt-1.5 max-w-[90ch] text-[13.5px] leading-[1.6] text-ink-2">{cmp.summary.replace(/현재 계획 대비/g, '협의 전 대비')}</p>}
-
-          <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            <div className="rounded-[12px] border border-line p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-[14px] font-semibold text-ink">예상 소비전력 (kWh)</h3>
-                <span className="tnum text-[13.5px] font-semibold text-ink">
-                  {signed(a.kwh - b.kwh, 2)} kWh{b.kwh > 0 ? ` (${signed(((a.kwh - b.kwh) / b.kwh) * 100, 1)}%)` : ''}
-                </span>
-              </div>
-              <EChart height={210} option={kwhOption(b.kwh, a.kwh)} />
-              <p className="text-[12px] text-ink-3">{fmtDateK(cmp.date)} 하루 · 같은 시간표·예보·초기 조건 · 시뮬레이션 값</p>
+          <div className="plan-kpis mt-6 pl-[38px]">
+            <div>
+              <span>협의 후 사용량</span>
+              <strong className="tnum">{signed(a.kwh - b.kwh, 2)}<small>kWh</small></strong>
+              <em className="tnum">{fmtKwh(b.kwh)} → {fmtKwh(a.kwh)} kWh{b.kwh > 0 ? ` · ${signed(((a.kwh - b.kwh) / b.kwh) * 100, 1)}%` : ''}</em>
             </div>
-            <div className="rounded-[12px] border border-line p-4">
-              <h3 className="text-[14px] font-semibold text-ink">쾌적성 (수업 중)</h3>
-              <dl className="tnum mt-3 space-y-3 text-[13.5px]">
+            <div>
+              <span>쾌적 이탈</span>
+              <strong className="tnum">{a.out_band_min}<small>분</small></strong>
+              <em className="tnum">협의 전 {b.out_band_min}분 · PMV {b.pmv_mean != null ? signed(b.pmv_mean, 2) : '—'} → {a.pmv_mean != null ? signed(a.pmv_mean, 2) : '—'}</em>
+            </div>
+            <div>
+              <span>설정온도 조정</span>
+              <strong className="tnum">{changed.length}<small>개실</small></strong>
+              <em className="tnum">{changed.length ? changed.map(([r, v]) => `${r}호 ${(cmp.base_sp?.[r] as number).toFixed(1)}→${v.toFixed(1)}℃`).join(', ') : '변경 없음'}</em>
+            </div>
+            {stale && <p className="col-span-full text-[13px] font-medium text-crit-ink">이전 조건 기준</p>}
+          </div>
+
+          <div className="plan-split mt-6 ml-[38px]">
+            <div>
+              <h3 className="text-[17px] font-semibold text-ink">사용량</h3>
+              <EChart height={220} option={kwhOption(b.kwh, a.kwh)} />
+            </div>
+            <div>
+              <h3 className="text-[17px] font-semibold text-ink">쾌적</h3>
+              <dl className="tnum mt-4 space-y-4 text-[15px]">
                 <Cmp
-                  k="쾌적 범위를 벗어난 수업 시간"
+                  k="쾌적 이탈"
                   before={`${b.out_band_min}분`}
                   after={`${a.out_band_min}분`}
-                  note={`수업 ${a.class_min}분 중 예측 실내온도가 ${meta.settings.comfort_low}~${meta.settings.comfort_high}℃를 벗어난 시간입니다. 운영 기준으로 보는 값입니다.`}
+                  note={`${meta.settings.comfort_low}–${meta.settings.comfort_high}℃ 기준`}
                 />
                 <Cmp
-                  k="체감 지표 (PMV)"
+                  k="PMV"
                   before={b.pmv_mean != null ? signed(b.pmv_mean, 2) : '—'}
                   after={a.pmv_mean != null ? signed(a.pmv_mean, 2) : '—'}
-                  note={
-                    b.pmv_mean == null
-                      ? '수업 중 PMV 산출값이 없습니다'
-                      : '0에 가까울수록 쾌적합니다. 난방을 수업 때만 켜면 벽과 바닥이 차가워 같은 실내온도에서도 서늘한 쪽으로 계산됩니다. 그래서 춥다는 의견이 반복된 강의실은 쾌적 Agent가 온도를 올립니다.'
-                  }
+                  note={b.pmv_mean == null ? '산출값 없음' : '0에 가까울수록 쾌적'}
                 />
                 {b.pmv_mean != null && a.pmv_mean != null && <PmvScale before={b.pmv_mean} after={a.pmv_mean} />}
               </dl>
@@ -381,10 +355,10 @@ function Result({
           </div>
 
           {/* ON/OFF: same rooms, before under after */}
-          <div className="mt-5 rounded-[12px] border border-line p-4">
+          <div className="mt-6 ml-[38px] border-t border-line pt-5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-[14px] font-semibold text-ink">냉난방 ON/OFF 계획 변화 (엔진 계산 결과)</h3>
-              <div className="inline-flex rounded-full bg-well p-1 text-[13px]" role="radiogroup" aria-label="위에 그릴 계획">
+              <h3 className="text-[17px] font-semibold text-ink">운전 시각 변화</h3>
+              <div className="inline-flex gap-0.5 rounded-[9px] border border-line p-[3px] text-[14px]" role="radiogroup" aria-label="위에 그릴 계획">
                 {(['after', 'before'] as const).map((k) => (
                   <button
                     key={k}
@@ -392,9 +366,9 @@ function Result({
                     role="radio"
                     aria-checked={show === k}
                     onClick={() => setShow(k)}
-                    className={cx('h-7 rounded-full px-3 whitespace-nowrap', show === k ? 'bg-surface font-semibold text-ink shadow-[0_0_0_1px_rgb(12_14_19/0.08)]' : 'font-medium text-ink-3')}
+                    className={cx('h-7 rounded-[6px] px-3 whitespace-nowrap transition-colors duration-200', show === k ? 'bg-[#eef0f3] font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[#f6f7f8] hover:text-ink')}
                   >
-                    {k === 'after' ? '협의 후를 위에' : '협의 전을 위에'}
+                    {k === 'after' ? '협의 후' : '협의 전'}
                   </button>
                 ))}
               </div>
@@ -417,15 +391,15 @@ function Result({
           </div>
 
           {/* per-room table */}
-          <div className="thin-scroll mt-5 overflow-x-auto">
-            <table className="tnum w-full min-w-[720px] text-[13.5px]">
+          <div className="thin-scroll mt-6 ml-[38px] overflow-x-auto border-t border-line pt-2">
+            <table className="tnum w-full min-w-[720px] text-[15px]">
               <thead>
-                <tr className="border-b border-line text-left text-[12.5px] text-ink-3">
+                <tr className="border-b border-line text-left text-[13px] text-ink-3">
                   <th className="py-2 pr-3 font-medium">강의실</th>
                   <th className="py-2 pr-3 text-right font-medium">{lab} 설정온도</th>
                   <th className="py-2 pr-3 text-right font-medium">예상 kWh</th>
-                  <th className="py-2 pr-3 text-right font-medium">평균 예측 PMV</th>
-                  <th className="py-2 text-right font-medium">운전 구간 (협의 전 → 후)</th>
+                  <th className="py-2 pr-3 text-right font-medium">PMV</th>
+                  <th className="py-2 text-right font-medium">운전 구간</th>
                 </tr>
               </thead>
               <tbody>
@@ -450,7 +424,7 @@ function Result({
                         <td className="py-2 pr-3 text-right text-ink-2">
                           {x.pmv != null ? signed(x.pmv, 2) : '—'} → <span className="text-ink">{y.pmv != null ? signed(y.pmv, 2) : '—'}</span>
                         </td>
-                        <td className="py-2 text-right text-ink-2">{same ? `${fmt(x)} (변화 없음)` : `${fmt(x)} → ${fmt(y)}`}</td>
+                        <td className="py-2 text-right text-ink-2">{same ? fmt(x) : `${fmt(x)} → ${fmt(y)}`}</td>
                       </tr>
                     )
                   })}
@@ -464,7 +438,7 @@ function Result({
 
       <div id="evidence" className="mt-5 scroll-mt-24">
         <DisclosureList title="근거" hideTitle>
-          <Disclosure title="협의 근거 자세히 보기" summary={`${cmp.rounds ?? 0}라운드 · 실제 발언, 제안 온도, 확인한 자료, 재시뮬레이션 결과`} defaultOpen={typeof window !== 'undefined' && window.location.hash === '#evidence'}>
+          <Disclosure title="협의 근거" summary={`${cmp.rounds ?? 0}라운드`} defaultOpen={typeof window !== 'undefined' && window.location.hash === '#evidence'}>
             <Evidence cmp={cmp} />
           </Disclosure>
         </DisclosureList>
@@ -478,7 +452,7 @@ function Cmp({ k, before, after, note }: { k: string; before: string; after: str
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <dt className="text-ink-3">{k}</dt>
-        <dd className="text-[15px] font-semibold text-ink">
+        <dd className="text-[16px] font-semibold text-ink">
           <span className="font-medium text-ink-3">협의 전 </span>
           {before}
           <span className="mx-1.5 text-ink-4">→</span>
@@ -486,7 +460,7 @@ function Cmp({ k, before, after, note }: { k: string; before: string; after: str
           {after}
         </dd>
       </div>
-      {note && <div className="mt-0.5 text-[12px] text-ink-3">{note}</div>}
+      {note && <div className="mt-0.5 text-[13px] text-ink-3">{note}</div>}
     </div>
   )
 }
@@ -543,10 +517,10 @@ function kwhOption(before: number, after: number): EChartsOption {
 function RunDiff({ rooms, b, a }: { rooms: string[]; b: PlanView; a: PlanView }) {
   const diff = rooms.filter((r) => !samePlan(b.rooms[r]?.plan, a.rooms[r]?.plan))
   const d = a.plan_minutes - b.plan_minutes
-  if (!diff.length) return <p className="text-[13.5px] text-ink-2">운전시간 변화 없음: 설정온도가 달라져도 엔진이 계산한 켜고 끄는 시각은 그대로입니다.</p>
+  if (!diff.length) return <p className="text-[15px] text-ink-2">운전 시각 변화 없음</p>
   return (
-    <p className="tnum text-[13.5px] text-ink-2">
-      켜고 끄는 시각이 달라진 강의실: {diff.map((r) => `${r}호`).join(', ')} · 전체 계획 운전시간 {b.plan_minutes}분 → {a.plan_minutes}분 ({signed(d, 0)}분). 시각은 AI가 아니라 물리 계산 엔진이 새 설정온도로 다시 계산했습니다.
+    <p className="tnum text-[15px] text-ink-2">
+      {diff.map((r) => `${r}호`).join(', ')} <span className="mx-1 text-ink-4">·</span> 운전 {b.plan_minutes} → {a.plan_minutes}분 ({signed(d, 0)})
     </p>
   )
 }
@@ -558,7 +532,7 @@ function Adjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolea
     setBusy(a.id)
     try {
       await apiSend('POST', `/api/adjustments/${encodeURIComponent(a.id)}/${action}`)
-      toast(action === 'approve' ? `${a.title}: 승인해 운영계획에 반영했습니다.` : `${a.title}: 거절했습니다.`, action === 'approve' ? 'good' : 'neutral')
+      toast(action === 'approve' ? `${a.title}: 승인` : `${a.title}: 거절`, action === 'approve' ? 'good' : 'neutral')
       onChanged()
     } catch (e) {
       toast(`처리하지 못했습니다. ${(e as Error).message}`, 'crit')
@@ -567,34 +541,26 @@ function Adjustments({ cmp, stale, onChanged }: { cmp: NegCompare; stale: boolea
     }
   }
   return (
-    <div className="mt-5 border-t border-line pt-4">
-      <h3 className="text-[14px] font-semibold text-ink">적용 상태</h3>
+    <div className="mt-6 ml-[38px] border-t border-line pt-5">
+      <h3 className="text-[17px] font-semibold text-ink">설정온도 변경</h3>
       {list.length === 0 ? (
-        <p className="mt-1 text-[13.5px] text-ink-2">바꿀 설정온도가 없어 조정안을 만들지 않았습니다. 운영계획은 그대로입니다.</p>
+        <p className="mt-1 text-[15px] text-ink-2">변경 없음</p>
       ) : (
         <>
-          <p className="mt-1 text-[13px] text-ink-3">
-            {cmp.state === 'pending'
-              ? '추천안 시뮬레이션입니다. 승인하기 전에는 현재 운영계획이 바뀌지 않습니다.'
-              : cmp.state === 'applied'
-                ? '승인되어 현재 운영계획에 반영되어 있습니다.'
-                : cmp.state === 'partial'
-                  ? '일부만 반영되어 있습니다. 위 그래프의 ‘협의 후’는 모든 조정안을 반영했을 때의 값입니다.'
-                  : '거절되어 운영계획에 반영되지 않았습니다.'}
-          </p>
+          {cmp.state === 'partial' && <p className="mt-1 text-[12.5px] text-ink-3">일부 적용 · 그래프의 협의 후는 전체 적용 기준</p>}
           <ul className="mt-3 space-y-2">
             {list.map((a) => {
               const s = a.status === 'applied' ? { l: '적용됨', t: 'good' as const } : a.status === 'rejected' ? { l: '거절됨', t: 'neutral' as const } : { l: '승인 대기', t: 'warn' as const }
               return (
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-line px-4 py-2.5">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-semibold text-ink">
+                    <div className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
                       {a.title.replace(' (에이전트 합의)', '')}
                       <Badge tone={s.t}>{s.l}</Badge>
-                      {a.status === 'pending' && a.auto_ok === false && <Badge tone="outline">0.5℃ 초과 변경 · 자동 운전에서도 승인 필요</Badge>}
+                      {a.status === 'pending' && a.auto_ok === false && <Badge tone="outline">0.5℃ 초과 · 승인 필요</Badge>}
                     </div>
                     {a.decided_at && a.status !== 'pending' && (
-                      <div className="tnum mt-0.5 text-[12.5px] text-ink-3">
+                      <div className="tnum mt-0.5 text-[13px] text-ink-3">
                         {a.decided_by ? `${a.decided_by} · ` : ''}
                         {a.decided_at.slice(5, 16).replace('T', ' ')}
                       </div>
@@ -680,7 +646,7 @@ function Evidence({ cmp }: { cmp: NegCompare }) {
                 : `실제 접수 ${src.real}건`}
           </p>
         )}
-        <More className="mt-1.5"><p>실제 실내 센서 값은 쓰이지 않았습니다. Agent의 말과 수치가 다르면 시뮬레이터 수치를 따릅니다.</p></More>
+        <p className="mt-1.5 text-[12px] text-ink-3">센서 실측 미사용 · 수치는 시뮬레이터 기준</p>
       </div>
       {neg === undefined ? (
         <Skeleton className="h-[160px]" />

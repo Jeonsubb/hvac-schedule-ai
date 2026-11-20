@@ -12,19 +12,22 @@ export function Card({
   className,
   pad = true,
   as: As = 'section',
+  flat = false,
   ...rest
 }: {
   children: ReactNode
   className?: string
   pad?: boolean | 'dense' | 'lg'
   as?: 'section' | 'div'
+  /** a settings-style section: a top hairline and spacing instead of a framed panel */
+  flat?: boolean
   'aria-label'?: string
   'aria-labelledby'?: string
   /** chapter tour anchor */
   'data-tour'?: string
 }) {
   return (
-    <As className={cx('rounded-[22px] border border-line bg-surface', pad === true && 'p-7', pad === 'dense' && 'p-5', pad === 'lg' && 'p-9', className)} {...rest}>
+    <As className={cx(flat ? 'border-t border-line pt-6 pb-2' : cx('rounded-[12px] border border-line bg-surface', pad === true && 'p-6', pad === 'dense' && 'p-5', pad === 'lg' && 'p-8'), className)} {...rest}>
       {children}
     </As>
   )
@@ -106,13 +109,13 @@ export function CardHeader({
       <div className="min-w-0 flex-1">
         {(() => {
           const h = (
-            <h2 id={id} className="flex items-center gap-2 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">
+            <h2 id={id} className="flex items-center gap-2 text-[20px] leading-[1.3] font-semibold tracking-[-0.02em] text-ink">
               {icon && <span className="flex text-ink-3">{icon}</span>}
               {title}
             </h2>
           )
-          // a long sentence under the title is an explanation: folded behind "자세히 보기"; short facts stay
-          if (typeof sub === 'string' && sub.length > 34) return <HeadMore heading={h}>{sub}</HeadMore>
+          // a long sentence under the title is an explanation: dropped; short facts stay
+          if (typeof sub === 'string' && sub.length > 34) return h
           return (
             <>
               {h}
@@ -132,14 +135,9 @@ export function PageHeader({ title, desc, right, className, showDesc = false }: 
     <div className={cx('mb-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-4', className)}>
       <div className="min-w-0 flex-[1_1_20rem]">
         {/* SEED screen-title scale (t9 bold); the breadcrumb above already says where we are */}
-        {desc && !showDesc ? (
-          <HeadMore heading={<h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>}>{desc}</HeadMore>
-        ) : (
-          <>
-            <h1 className="balance text-[24px] leading-[32px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
-            {desc && <p className="pretty mt-1.5 max-w-[72ch] text-[14px] leading-[1.6] text-ink-2">{desc}</p>}
-          </>
-        )}
+        {/* only an answer (numbers) is worth a sentence under the title; explanations are dropped, not folded */}
+        <h1 className="balance text-[38px] leading-[1.15] font-bold tracking-[-0.03em] text-ink max-sm:text-[30px]">{title}</h1>
+        {desc && showDesc && <p className="pretty mt-1.5 max-w-[72ch] text-[14px] leading-[1.6] text-ink-2">{desc}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -192,7 +190,7 @@ export function Figure({
 }) {
   const body = (
     <>
-      <span className={cx('flex items-center gap-1.5 text-[13px] font-medium text-ink-3', align === 'right' && 'justify-end')}>
+      <span className={cx('flex items-center gap-1.5 text-[14px] font-medium text-ink-3', align === 'right' && 'justify-end')}>
         {accent && <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />}
         <span className="truncate">{label}</span>
         {info && <Info size={13} className="shrink-0 text-ink-4 transition-colors group-hover:text-ink-2" aria-hidden />}
@@ -253,7 +251,7 @@ export function StatTile({
 }) {
   return (
     <div className={cx('relative bg-surface px-6 py-5', className)}>
-      <div className="flex items-center gap-1.5 text-[13px] font-medium text-ink-3">
+      <div className="flex items-center gap-1.5 text-[14px] font-medium text-ink-3">
         {accent && <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} />}
         {icon && <span className="flex shrink-0">{icon}</span>}
         <span className="truncate">{label}</span>
@@ -273,19 +271,19 @@ type Tone = 'neutral' | 'brand' | 'ai' | 'good' | 'warn' | 'crit' | 'info' | 'ev
 
 export function Badge({ children, tone = 'neutral', className, title }: { children: ReactNode; tone?: Tone; className?: string; title?: string }) {
   const tones: Record<Tone, string> = {
-    neutral: 'bg-well text-ink-2',
-    brand: 'bg-[#e6f5ee] text-s-ai-ink',
-    ai: 'bg-[#e6f5ee] text-s-ai-ink',
-    good: 'bg-good-bg text-good-ink',
-    warn: 'bg-warn-bg text-warn-ink',
-    crit: 'bg-crit-bg text-crit-ink',
-    info: 'bg-info-bg text-info-ink',
-    event: 'bg-event-bg text-event-ink',
+    neutral: 'text-ink-2',
+    brand: 'text-s-ai-ink',
+    ai: 'text-s-ai-ink',
+    good: 'text-good-ink',
+    warn: 'text-warn-ink',
+    crit: 'text-crit-ink',
+    info: 'text-info-ink',
+    event: 'text-event-ink',
     outline: 'text-ink-3 ring-1 ring-inset ring-line-strong',
-    heat: 'bg-[#fdeee6] text-heat-ink',
+    heat: 'text-heat-ink',
   }
   return (
-    <span title={title} className={cx('inline-flex min-h-6 items-center gap-1 rounded-[6px] px-2 text-[12px] leading-[16px] font-semibold whitespace-nowrap', tones[tone], className)}>
+    <span title={title} className={cx('inline-flex min-h-6 items-center gap-1.5 text-[13px] leading-[16px] font-semibold whitespace-nowrap', tone === 'outline' ? 'rounded-[6px] px-2' : 'badge-dot', tones[tone], className)}>
       {children}
     </span>
   )
@@ -302,8 +300,8 @@ export function StatusBadge({ group, label }: { group: StatusGroup; label?: stri
   const m = GROUP_META[group]
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-[1px] text-[13px] leading-[20px] font-semibold whitespace-nowrap"
-      style={{ background: m.bg, color: m.ink }}
+      className="inline-flex items-center gap-1.5 text-[13px] leading-[20px] font-semibold whitespace-nowrap"
+      style={{ color: m.ink }}
     >
       <GroupIcon group={group} size={13} />
       {label ?? m.label}
@@ -342,7 +340,7 @@ export function btnCls(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md',
     link: 'bg-transparent text-brand-ink border border-transparent underline-offset-4 hover:underline !px-0',
   }
   // SEED sizes: xsmall 32px (pill) and medium 40px (r2)
-  const s = size === 'sm' ? 'h-8 px-3.5 text-[13px] gap-1 rounded-full' : 'h-10 px-4 text-[14px] gap-1.5 rounded-[8px]'
+  const s = size === 'sm' ? 'h-8 px-3 text-[13.5px] gap-1 rounded-[7px]' : 'h-10 px-4 text-[14.5px] gap-1.5 rounded-[8px]'
   return cx(
     'ond-press inline-flex shrink-0 items-center justify-center leading-none font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:bg-bg-disabled disabled:text-fg-disabled disabled:border-transparent',
     v[variant],
@@ -431,7 +429,7 @@ export function Segmented<T extends string>({
   label?: string
 }) {
   return (
-    <div className="inline-flex rounded-full bg-well p-1" role="radiogroup" aria-label={label}>
+    <div className="inline-flex gap-0.5 rounded-[9px] border border-line bg-surface p-[3px]" role="radiogroup" aria-label={label}>
       {options.map((o, index) => {
         const on = o.value === value
         return (
@@ -454,9 +452,9 @@ export function Segmented<T extends string>({
             }}
             onClick={() => onChange(o.value)}
             className={cx(
-              'inline-flex items-center gap-1.5 rounded-full whitespace-nowrap transition-[background-color,color,box-shadow] duration-200',
-              size === 'sm' ? 'h-7 px-3 text-[13px]' : 'h-8 px-3.5 text-[13.5px]',
-              on ? 'bg-surface font-semibold text-ink shadow-[0_1px_2px_rgb(12_14_19/0.1),0_0_0_1px_rgb(12_14_19/0.06)]' : 'font-medium text-ink-3 hover:text-ink',
+              'inline-flex items-center gap-1.5 rounded-[6px] whitespace-nowrap transition-[background-color,color] duration-200',
+              size === 'sm' ? 'h-7 px-2.5 text-[13px]' : 'h-8 px-3 text-[14px]',
+              on ? 'bg-[#eef0f3] font-semibold text-ink' : 'font-medium text-ink-3 hover:bg-[#f6f7f8] hover:text-ink',
             )}
           >
             {o.label}
@@ -477,7 +475,7 @@ export function Tabs<T extends string>({
   tabs: { value: T; label: string; icon?: ReactNode; count?: number }[]
 }) {
   return (
-    <div className="flex gap-6 overflow-x-auto border-b border-line" role="tablist">
+    <div className="flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-line)]" role="tablist">
       {tabs.map((t) => {
         const on = t.value === value
         return (
@@ -488,7 +486,7 @@ export function Tabs<T extends string>({
             aria-selected={on}
             onClick={() => onChange(t.value)}
             className={cx(
-              '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 pt-1 pb-3 text-[14.5px] transition-colors duration-150',
+              'inline-flex shrink-0 items-center gap-2 border-b-2 pt-1 pb-3 text-[15px] transition-colors duration-200',
               on ? 'border-ink font-semibold text-ink' : 'border-transparent font-medium text-ink-3 hover:text-ink',
             )}
           >
@@ -505,7 +503,7 @@ export function Tabs<T extends string>({
 export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-2 block text-[13px] font-semibold text-ink-2">{label}</span>
+      <span className="mb-2 block text-[14px] font-semibold text-ink-2">{label}</span>
       {children}
       {hint && <span className="mt-1.5 block text-[13px] leading-snug text-ink-3">{hint}</span>}
     </label>
@@ -513,7 +511,7 @@ export function Field({ label, hint, children, className }: { label: string; hin
 }
 
 export const inputBase =
-  'h-11 rounded-[12px] border border-line-strong bg-surface px-3.5 text-[14.5px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-3 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_4px_rgb(47_111_222/0.14)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
+  'h-11 rounded-[8px] border border-line-strong bg-surface px-3.5 text-[15px] text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-ink-3 hover:border-ink-4 focus:border-focus focus:shadow-[0_0_0_4px_rgb(47_111_222/0.14)] focus-visible:outline-none disabled:bg-well disabled:text-ink-3'
 
 export const inputCls = `${inputBase} w-full`
 
@@ -579,9 +577,9 @@ export function Disclosure({
         aria-expanded={open}
         aria-controls={id}
         onClick={toggle}
-        className="group flex min-h-[64px] w-full items-center gap-3 px-7 py-3 text-left transition-colors duration-150 hover:bg-[#fafafb]"
+        className="group flex min-h-[60px] w-full items-center gap-3 px-6 py-3 text-left transition-colors duration-200 hover:bg-[#f7f8f9]"
       >
-        {icon && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-well text-ink-2">{icon}</span>}
+        {icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-3 transition-colors duration-200 group-hover:text-ink">{icon}</span>}
         <span className="min-w-0 flex-1 text-[15px] leading-[1.35] font-semibold text-ink">{title}</span>
         {summary != null && <span className="tnum hidden shrink-0 text-[14px] text-ink-3 sm:inline">{summary}</span>}
         <ChevronDown size={18} className={cx('shrink-0 text-ink-4 transition-transform duration-200 group-hover:text-ink-2', open && 'rotate-180')} aria-hidden />
@@ -600,7 +598,7 @@ export function DisclosureList({ children, title, hideTitle = false, className }
   return (
     <section className={className} aria-label={title}>
       {title && !hideTitle && <h2 className="mb-3 px-1 text-[17px] leading-[1.35] font-[650] tracking-[-0.015em] text-ink">{title}</h2>}
-      <div className="divide-y divide-line overflow-hidden rounded-[22px] border border-line bg-surface">{children}</div>
+      <div className="divide-y divide-line overflow-hidden rounded-[12px] border border-line bg-surface">{children}</div>
     </section>
   )
 }
@@ -942,9 +940,9 @@ export interface TableSpec {
 /** The "표로 보기 / 차트로 보기" switch every major chart carries. */
 export function TableToggle({ asTable, onToggle }: { asTable: boolean; onToggle: () => void }) {
   return (
-    <button onClick={onToggle} type="button" className={btnCls('ghost', 'sm')} aria-pressed={asTable} title={asTable ? '차트로 보기' : '같은 데이터를 표로 보기'}>
-      {asTable ? <BarChart3 size={14} aria-hidden /> : <Table2 size={14} aria-hidden />}
-      {asTable ? '차트로 보기' : '표로 보기'}
+    <button onClick={onToggle} type="button" className="inline-flex h-7 items-center gap-1 rounded-[6px] px-1.5 text-[12px] font-medium text-ink-3 hover:bg-hover hover:text-ink" aria-pressed={asTable} title={asTable ? '차트' : '표'}>
+      {asTable ? <BarChart3 size={13} aria-hidden /> : <Table2 size={13} aria-hidden />}
+      {asTable ? '차트' : '표'}
     </button>
   )
 }
@@ -1041,10 +1039,10 @@ export function LegendItem({ color, label, kind = 'rect' }: { color: string; lab
 
 /** Standard table frame + header cell classes, so every table reads the same. */
 export const tbl = {
-  frame: 'overflow-hidden rounded-[14px] border border-line',
-  table: 'tnum w-full text-[13.5px]',
-  thead: 'bg-well text-ink-3',
-  th: 'border-b border-line px-3.5 py-2.5 text-left text-[13px] font-semibold whitespace-nowrap',
-  thR: 'border-b border-line px-3.5 py-2.5 text-right text-[13px] font-semibold whitespace-nowrap',
-  tr: 'border-t border-line first:border-t-0',
+  frame: 'overflow-x-auto border-t border-line',
+  table: 'tnum w-full text-[14.5px]',
+  thead: 'text-ink-3',
+  th: 'border-b border-line px-3.5 py-2.5 text-left text-[13px] font-medium whitespace-nowrap',
+  thR: 'border-b border-line px-3.5 py-2.5 text-right text-[13px] font-medium whitespace-nowrap',
+  tr: 'border-b border-line',
 }
