@@ -543,7 +543,8 @@ export default function Layout() {
         <TopBar />
         <MobileNav />
         {/* the sidebar lists every screen of every section, so the pages need no tab strip of their own */}
-        <main id="main" className="mx-auto max-w-[1320px] px-[clamp(16px,2.4vw,32px)] pt-7 pb-24">
+        {/* 온디 (voice) fills the whole area under the top bar; the other screens keep a readable width */}
+        <main id="main" className={loc.pathname === '/' ? 'min-w-0' : 'mx-auto max-w-[1320px] px-[clamp(16px,2.4vw,32px)] pt-7 pb-24'}>
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />

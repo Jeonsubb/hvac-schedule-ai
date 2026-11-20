@@ -88,8 +88,9 @@ export default function Home() {
   const quiet = !v.say && v.phase !== 'listening' && v.phase !== 'thinking'
 
   return (
-    <div className="voice-stage relative overflow-hidden rounded-[16px] border border-line bg-surface text-ink">
-      <div className="relative flex min-h-[calc(100dvh-152px)] flex-col px-[clamp(18px,3vw,40px)] pt-6 pb-6">
+    <div className="voice-stage relative overflow-hidden bg-surface text-ink">
+      {/* edge to edge under the 64px top bar (plus the chip menu on narrow screens) */}
+      <div className="relative flex min-h-[calc(100dvh-113px)] flex-col px-[clamp(18px,3vw,40px)] pt-5 pb-2 lg:min-h-[calc(100dvh-65px)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <Pipeline />
           <div className="flex items-center gap-1.5">
