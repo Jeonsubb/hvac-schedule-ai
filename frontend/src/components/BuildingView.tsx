@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useId, type ReactNode } from 'react'
 import { Flame, Snowflake, Wind, Fan, Users, CloudSun, Play, Pause, AlertTriangle } from 'lucide-react'
 import type { Day, Meta } from '../lib/types'
 import { MODE, shade, thermalFill, thermalGradient, type BuildingState, type Mode, type RoomState } from '../lib/thermal'
@@ -43,16 +43,16 @@ const SLOTS: Record<number, Slot[]> = {
 }
 
 // projection (px): plan laid back, height stood up. P(x, d, z) = (X0 + x + d·K, Yb − d − z)
-const GUT = 56 // floor label gutter
-const K = 0.58 // horizontal shift per px of projected depth
-const HR = 84 // room depth
-const HC = 34 // corridor depth (behind rooms)
-const H = 16 // room height (facade)
-const SLAB = 7
+const GUT = 84 // floor label gutter
+const K = 0.42 // horizontal shift per px of projected depth
+const HR = 112 // room depth
+const HC = 68 // corridor depth (behind rooms)
+const H = 17 // room height (facade)
+const SLAB = 13
 const CHIP = 26
 const CHIP_GAP = 12
 const GAP = 8 // wall gap between rooms
-const FLOOR_GAP = 22
+const FLOOR_GAP = 46
 const DP = HR + H + (HC - H) / 2 // pipe depth, on the visible corridor strip
 
 type Pt = [number, number]
@@ -77,6 +77,7 @@ export default function BuildingView({
   showOdus?: boolean
 }) {
   const [wrapRef, measured] = useWidth<HTMLDivElement>()
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const W = Math.max(minWidth, measured || 1000)
   const [hover, setHover] = useState<string | null>(null)
   const [focus, setFocus] = useState<string | null>(null)
@@ -86,22 +87,34 @@ export default function BuildingView({
 
   const L = W - GUT - (HR + HC) * K - 10
   const floors = [4, 3].filter((f) => Object.values(meta.rooms).some((r) => r.floor === f))
-  const TOP = showOdus ? CHIP + CHIP_GAP : 0
+  const TOP = showOdus ? CHIP + CHIP_GAP : 18
   const BLOCK = TOP + HC + HR + SLAB
-  const totalH = floors.length * BLOCK + (floors.length - 1) * FLOOR_GAP + 8
+  const totalH = floors.length * BLOCK + Math.max(0, floors.length - 1) * FLOOR_GAP + 32
 
   const tipRoom = hover ?? focus
   const tipData = tipRoom ? byRoom[tipRoom] : undefined
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-x-auto">
+    <div ref={wrapRef} className="tp-building relative w-full overflow-x-auto">
       <svg width={W} height={totalH} role="group" aria-label="IT관 3층·4층 단면도: 방 바닥색은 실내온도, 앞면 색과 아이콘은 운전 모드" className="block select-none">
         <defs>
-          <pattern id="bv-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <linearGradient id={`${uid}-slab`} x1="0" y1="0" x2="0.2" y2="1">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="1" stopColor="#e8eef7" />
+          </linearGradient>
+          <linearGradient id={`${uid}-glass`} x1="0" y1="0" x2="0.7" y2="1">
+            <stop offset="0" stopColor="#ffffff" stopOpacity="0.62" />
+            <stop offset="0.5" stopColor="#ffffff" stopOpacity="0.17" />
+            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
+          <filter id={`${uid}-shadow`} x="-20%" y="-50%" width="150%" height="230%">
+            <feDropShadow dx="0" dy="9" stdDeviation="7" floodColor="#59759d" floodOpacity="0.18" />
+          </filter>
+          <pattern id={`${uid}-hatch`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="6" stroke="#e1e5ea" strokeWidth="1.2" />
           </pattern>
           {(['heat', 'cool', 'air'] as Mode[]).map((m) => (
-            <linearGradient key={m} id={`bv-rise-${m}`} x1="0" y1="1" x2="0" y2="0">
+            <linearGradient key={m} id={`${uid}-rise-${m}`} x1="0" y1="1" x2="0" y2="0">
               <stop offset="0" stopColor={MODE[m].color} stopOpacity="0.34" />
               <stop offset="0.75" stopColor={MODE[m].color} stopOpacity="0" />
             </linearGradient>
@@ -124,13 +137,17 @@ export default function BuildingView({
           return (
             <g key={floor}>
               {/* floor marker */}
-              <text x={4} y={Yb - H - HR / 2 + 6} fontSize="24" fontWeight="400" fill="#8a94a3" style={{ letterSpacing: '-0.02em' }}>
+              <text x={0} y={T + TOP + 52} fontSize="48" fontWeight="750" fill="#343b52" style={{ letterSpacing: '-0.02em' }}>
                 {floor}F
               </text>
               {/* slab: top (corridor surface), front lip, right side */}
-              <polygon points={poly([P(-6, -6, 0), P(L + 6, -6, 0), P(L + 6, HR + HC, 0), P(-6, HR + HC, 0)])} fill="#eceff3" />
-              <polygon points={poly([P(-6, -6, -SLAB), P(L + 6, -6, -SLAB), P(L + 6, -6, 0), P(-6, -6, 0)])} fill="#d6dbe2" />
-              <polygon points={poly([P(L + 6, -6, -SLAB), P(L + 6, HR + HC, -SLAB), P(L + 6, HR + HC, 0), P(L + 6, -6, 0)])} fill="#c3cad4" />
+              <polygon points={poly([P(-6, -6, 0), P(L + 6, -6, 0), P(L + 6, HR + HC, 0), P(-6, HR + HC, 0)])} fill={`url(#${uid}-slab)`} stroke="#e2e9f3" strokeWidth="2" filter={`url(#${uid}-shadow)`} />
+              {/* Low rear wall and corridor lines add depth without inventing rooms. */}
+              <polygon points={poly([P(-6, HR + HC, 0), P(L + 6, HR + HC, 0), P(L + 6, HR + HC, 9), P(-6, HR + HC, 9)])} fill="#dce5f1" />
+              <polyline points={poly([P(-6, HR + HC, 10), P(L + 6, HR + HC, 10), P(L + 6, -6, 10)])} fill="none" stroke="#fdfefe" strokeWidth="3" />
+              <line x1={P(0, HR + 23, 0)[0]} y1={P(0, HR + 23, 0)[1]} x2={P(L, HR + 23, 0)[0]} y2={P(L, HR + 23, 0)[1]} stroke="#e0e8f3" strokeWidth="1" />
+              <polygon points={poly([P(-6, -6, -SLAB), P(L + 6, -6, -SLAB), P(L + 6, -6, 0), P(-6, -6, 0)])} fill="#bccbdc" />
+              <polygon points={poly([P(L + 6, -6, -SLAB), P(L + 6, HR + HC, -SLAB), P(L + 6, HR + HC, 0), P(L + 6, -6, 0)])} fill="#c9d5e5" />
 
               {/* refrigerant lines along the corridor, one per outdoor unit (opt-in layer) */}
               {showOdus && odus.map((o) => {
@@ -183,7 +200,7 @@ export default function BuildingView({
                     <g key={si} aria-hidden>
                       <polygon points={side} fill="#d8dde4" />
                       <polygon points={top} fill="#f4f6f8" />
-                      <polygon points={top} fill="url(#bv-hatch)" />
+                      <polygon points={top} fill={`url(#${uid}-hatch)`} />
                       <polygon points={front} fill="#e2e6eb" />
                       <text x={lx} y={ly + 4} textAnchor="middle" fontSize="12" fill="#8a94a3">
                         {s.label}
@@ -218,7 +235,9 @@ export default function BuildingView({
                     role={onRoomClick ? 'button' : undefined}
                     tabIndex={onRoomClick ? 0 : undefined}
                     aria-label={label}
-                    className={cx('outline-none', onRoomClick && 'cursor-pointer')}
+                    className={cx('tp-room-tile outline-none', onRoomClick && 'cursor-pointer')}
+                    data-room={s.room}
+                    style={{ filter: `url(#${uid}-shadow)` }}
                     onClick={() => onRoomClick?.(s.room!)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -232,9 +251,11 @@ export default function BuildingView({
                     onBlur={() => setFocus(null)}
                   >
                     <polygon points={side} fill={shade(fill, 0.18)} />
-                    <polygon points={top} fill={isHover && !isSel ? shade(fill, 0.03) : fill} />
-                    {run && <polygon points={top} fill={`url(#bv-rise-${r.mode})`} />}
-                    <polygon points={front} fill={run ? MODE[r.mode].deep : shade(fill, 0.1)} />
+                    <polygon points={top} fill={fill} stroke="#dceaff" strokeWidth="2" strokeLinejoin="round" />
+                    <polygon points={top} fill={`url(#${uid}-glass)`} />
+                    {run && <polygon points={top} fill={`url(#${uid}-rise-${r.mode})`} />}
+                    <polygon points={front} fill={run ? MODE[r.mode].color : shade(fill, 0.06)} />
+                    <polyline points={poly([P(s.x0, HR, H), P(s.x0, 0, H), P(s.x1, 0, H)])} fill="none" stroke="#ffffff" strokeOpacity="0.8" strokeWidth="2" />
                     {/* top face: number, temperature, mode icon. Nothing else. */}
                     <text x={tx(HR - 22)} y={ty(HR - 22)} fontSize="15" fontWeight="700" fill="#142033" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {s.room}
@@ -259,7 +280,7 @@ export default function BuildingView({
                       </g>
                     )}
                     {/* hit area, selection, hover and keyboard focus outlines */}
-                    <polygon points={silhouette} fill="transparent" stroke={isFocus ? '#2f6fde' : isSel ? '#142033' : isHover ? '#667183' : 'none'} strokeWidth={isFocus ? 2.5 : isSel ? 2 : 1.25} strokeLinejoin="round" />
+                    <polygon points={silhouette} fill="transparent" stroke={isFocus ? '#2f6fde' : isSel ? '#347dff' : isHover ? '#347dff' : 'none'} strokeWidth={isFocus ? 2.5 : isSel ? 2 : 1.25} strokeLinejoin="round" />
                   </g>
                 )
               })}
@@ -494,6 +515,7 @@ export function TimeScrubber({
   onChange,
   range = [420, 1410],
   refLabel = '지금',
+  active = true,
 }: {
   day: Day | undefined
   meta: Meta
@@ -503,6 +525,7 @@ export function TimeScrubber({
   range?: [number, number]
   /** '지금' when live, '기준 시각' when replaying another time */
   refLabel?: string
+  active?: boolean
 }) {
   const [r0, r1] = range
   const trackRef = useRef<HTMLDivElement>(null)
@@ -537,7 +560,7 @@ export function TimeScrubber({
   }, [day, meta, r0, r1])
 
   useEffect(() => {
-    if (!playing) return
+    if (!playing || !active) return
     const id = window.setInterval(() => {
       const next = minuteRef.current + 5
       if (next > r1) {
@@ -547,7 +570,11 @@ export function TimeScrubber({
       onChange(next)
     }, 90)
     return () => window.clearInterval(id)
-  }, [playing, onChange, r1])
+  }, [playing, onChange, r1, active])
+
+  useEffect(() => {
+    if (!active) setPlaying(false)
+  }, [active])
 
   const pct = (m: number) => ((Math.min(Math.max(m, r0), r1) - r0) / (r1 - r0)) * 100
   const fromX = (clientX: number) => {
@@ -651,5 +678,38 @@ export function TimeScrubber({
         </p>
       </div>
     </div>
+  )
+}
+
+
+/** A single enlarged tile uses the same temperature and mode semantics as the map. */
+export function RoomScene({ room, meta, now }: { room: string; meta: Meta; now?: RoomState }) {
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  const fill = now && Number.isFinite(now.ta) ? thermalFill(now.ta, meta.settings.comfort_low, meta.settings.comfort_high) : '#c9e0ff'
+  const run = now && now.mode !== 'off'
+  return (
+    <svg className="tp-room-scene" viewBox="0 0 500 320" role="img" aria-label={`${room}호 확대 모습${now && Number.isFinite(now.ta) ? `, 실내온도 ${now.ta.toFixed(1)}도` : ''}`}>
+      <defs>
+        <linearGradient id={`${uid}-room-light`} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.6" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0.08" />
+        </linearGradient>
+        <filter id={`${uid}-room-shadow`} x="-30%" y="-40%" width="170%" height="200%">
+          <feDropShadow dx="0" dy="20" stdDeviation="13" floodColor="#7594ba" floodOpacity="0.22" />
+        </filter>
+      </defs>
+      <g filter={`url(#${uid}-room-shadow)`}>
+        <path d="M62 242 L378 242 L436 67 L120 67Z" fill={fill} />
+        <path d="M62 242 L378 242 L378 262 L62 262Z" fill={run ? MODE[now.mode].color : shade(fill, 0.12)} />
+        <path d="M378 242 L436 67 L436 87 L378 262Z" fill={shade(fill, 0.18)} />
+        <path d="M62 242 L378 242 L436 67 L120 67Z" fill={`url(#${uid}-room-light)`} stroke="#eef6ff" strokeWidth="3" />
+        <path d="M120 67 L436 67" fill="none" stroke="#ffffff" strokeWidth="4" />
+      </g>
+      <text x="250" y="137" textAnchor="middle" fill="#344969" fontSize="18" fontWeight="600">{room}호</text>
+      <text x="250" y="188" textAnchor="middle" fill="#173765" fontSize="42" fontWeight="700">
+        {now && Number.isFinite(now.ta) ? now.ta.toFixed(1) : '–'}<tspan fontSize="20" dx="5">℃</tspan>
+      </text>
+      {now && run && <g transform="translate(373 88)"><circle cx="0" cy="0" r="17" fill={MODE[now.mode].color} /><g transform="translate(-8 -8)"><ModeIcon mode={now.mode} size={16} className="text-white" /></g></g>}
+    </svg>
   )
 }

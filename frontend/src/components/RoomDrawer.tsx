@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Download, Fan, Users } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { ArrowLeft, CalendarRange, Download, Fan, Users } from 'lucide-react'
 import type { Day, Meta, StrategyKey } from '../lib/types'
 import { CHART, STRATEGY, STRATEGY_KEYS, statusInfo, decisionLabel } from '../lib/constants'
 import { cx, fmtDateK, fmtDuration, fmtKwh, fmtMin, hm } from '../lib/format'
@@ -7,7 +7,7 @@ import { MODE, type Mode, type RoomState } from '../lib/thermal'
 import EChart, { axisCommon, baseTooltip, ttRow, ttTitle, type EChartsOption } from './EChart'
 import { Badge, DataTable, Disclosure, DisclosureList, Drawer, Empty, Figure, StatusBadge, btnCls, tbl } from './ui'
 import { DecisionIcon } from './Gantt'
-import { ModeIcon } from './BuildingView'
+import { ModeIcon, RoomScene } from './BuildingView'
 
 /** The room's state at the minute the overview shows, with its outdoor unit (opened from the building view). */
 export type RoomNow = RoomState & { minute: number; label: string; odu?: { id: string; on: boolean; power_w: number; mode: Mode } }
@@ -20,6 +20,7 @@ export default function RoomDrawer({
   room,
   initial = ['ai', 'rule'],
   now,
+  presentation = 'drawer',
 }: {
   open: boolean
   onClose: () => void
@@ -28,6 +29,7 @@ export default function RoomDrawer({
   room: string | null
   initial?: StrategyKey[]
   now?: RoomNow
+  presentation?: 'drawer' | 'page'
 }) {
   const [sel, setSel] = useState<StrategyKey[]>(initial)
   const [showOdu, setShowOdu] = useState(false)
@@ -177,7 +179,8 @@ export default function RoomDrawer({
   const issues = vals.filter((v) => statusInfo(v.status).group !== 'normal').length
 
   return (
-    <Drawer
+    <RoomFrame
+      presentation={presentation}
       open={open}
       onClose={onClose}
       width={860}
@@ -201,17 +204,31 @@ export default function RoomDrawer({
           <div className="skeleton h-[420px]" />
         </div>
       ) : (
-        <div className="space-y-8">
-          {now && <NowBlock now={now} />}
+        <div className={presentation === 'page' ? 'tp-room-grid' : 'space-y-8'}>
+          {presentation === 'page' && (
+            <section className="tp-room-hero tp-card" aria-labelledby="room-page-title">
+              <div className="tp-eyebrow">{rm.type_label} · 정원 {rm.capacity}명</div>
+              <h2 id="room-page-title">{rm.floor}F <span>–</span> {room}</h2>
+              <div data-room-scene={room} className="tp-room-scene-wrap">
+                <RoomScene room={room} meta={meta} now={now} />
+              </div>
+              <div className="tp-occupancy">
+                <span><Users size={18} aria-hidden /> 예상 재실 인원</span>
+                <div>{now?.session?.expected_people != null ? <><small>약</small> <strong>{now.session.expected_people}</strong> <small>명</small></> : <strong>–</strong>}</div>
+                <p>{now?.session ? (now.session.expected_people != null ? '진행 중인 강의의 시간표 기준 예상 인원' : '진행 중인 강의의 예상 인원 정보가 없습니다.') : '현재 진행 중인 강의 정보가 없습니다.'}</p>
+              </div>
+            </section>
+          )}
+          {now ? <NowBlock now={now} /> : presentation === 'page' ? <section className="tp-room-status tp-card"><p className="text-ink-3">현재 상태를 확인하는 중입니다.</p></section> : null}
 
-          <div className="flex flex-wrap gap-x-12 gap-y-5">
+          <div className="tp-room-metrics flex flex-wrap gap-x-12 gap-y-5">
             <Figure label="AI 전력 (하루)" value={fmtKwh(aiRd?.kwh ?? 0)} unit="kWh" accent={STRATEGY.ai.color} size="sm" />
             <Figure label="AI 가동 시간" value={fmtDuration(aiRd?.on_minutes ?? 0)} size="sm" />
             <Figure label="강의 중 쾌적" value={occ ? ((inb / occ) * 100).toFixed(0) : '–'} unit={occ ? '%' : undefined} size="sm" />
             <Figure label="강의" value={String(sessions.length)} unit="건" size="sm" />
           </div>
 
-          <section aria-labelledby="rd-chart">
+          <section className="tp-room-chart" aria-labelledby="rd-chart">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h3 id="rd-chart" className="text-[17px] font-[650] text-ink">
                 실내온도와 전력
@@ -258,6 +275,7 @@ export default function RoomDrawer({
             {option && <EChart option={option} height={400} />}
           </section>
 
+          <div className="tp-room-records">
           <DisclosureList>
             <Disclosure title="강의별 검증 결과" summary={vals.length ? `${vals.length}건${issues ? `, 이상 ${issues}` : ', 모두 정상'}` : '강의 없음'}>
               {vals.length === 0 ? (
@@ -382,16 +400,17 @@ export default function RoomDrawer({
               {rm.assumption && <p className="mt-3 text-[13px] text-ink-3">현장 설비 대장과 대조하기 전의 가정값입니다.</p>}
             </Disclosure>
           </DisclosureList>
+          </div>
         </div>
       )}
-    </Drawer>
+    </RoomFrame>
   )
 }
 
 function NowBlock({ now }: { now: RoomNow }) {
   const run = now.mode !== 'off'
   return (
-    <section className="rounded-[14px] bg-well px-6 py-5" aria-label={`${fmtMin(now.minute)} ${now.label} 상태`}>
+    <section className="tp-room-status rounded-[14px] bg-well px-6 py-5" aria-label={`${fmtMin(now.minute)} ${now.label} 상태`}>
       <div className="text-[13px] font-medium text-ink-3">
         <span className="tnum">{fmtMin(now.minute)}</span> {now.label}
       </div>
@@ -418,6 +437,12 @@ function NowBlock({ now }: { now: RoomNow }) {
           </span>
         )}
       </div>
+      {now.session && now.next && (
+        <div className="mt-3 flex items-start gap-2 text-[14px] text-ink-2">
+          <CalendarRange size={16} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+          <span>다음 강의 <b>{now.next.title}</b> <span className="tnum">{now.next.start}–{now.next.end}</span></span>
+        </div>
+      )}
       <div className="mt-3 text-[14px] text-ink-2">
         {now.session ? (
           <span className="inline-flex items-center gap-1.5">
@@ -435,6 +460,41 @@ function NowBlock({ now }: { now: RoomNow }) {
           '오늘 남은 강의가 없습니다.'
         )}
       </div>
+    </section>
+  )
+}
+
+
+/** Page mode lives in the existing Outlet; other pages keep the accessible Drawer. */
+function RoomFrame({ presentation, ...props }: ComponentProps<typeof Drawer> & { presentation: 'drawer' | 'page' }) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  const onCloseRef = useRef(props.onClose)
+  onCloseRef.current = props.onClose
+  useEffect(() => {
+    if (!props.open || presentation !== 'page') return
+    heading.current?.focus({ preventScroll: true })
+    const onKey = (event: KeyboardEvent) => {
+      // A nested popover/dialog gets first use of Escape.
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('[aria-modal="true"]')) return
+      event.preventDefault()
+      onCloseRef.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [props.open, presentation])
+  if (presentation === 'drawer') return <Drawer {...props} />
+  if (!props.open) return null
+  return (
+    <section className="tp-room-page" aria-labelledby="room-detail-heading">
+      <header className="tp-room-page-heading">
+        <div>
+          <button type="button" className="tp-back" onClick={props.onClose}><ArrowLeft size={17} aria-hidden /> 전체 강의실</button>
+          <h1 ref={heading} id="room-detail-heading" tabIndex={-1}>운영 현황 <span>/ 강의실 상세</span></h1>
+          <div className="tp-room-page-sub">{props.title} <span>{props.sub}</span></div>
+        </div>
+        <div>{props.right}</div>
+      </header>
+      {props.children}
     </section>
   )
 }

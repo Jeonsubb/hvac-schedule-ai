@@ -1,3 +1,4 @@
+import './thermoplan-design.css'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary'
@@ -23,11 +24,11 @@ const NAV = [
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="7" fill="#142033" />
-      <path d="M6 21.5h13.5l6.5-5H12.5z" fill="#7ea7e0" />
-      <path d="M6 21.5h13.5v2.2H6z" fill="#4f7fc4" />
-      <path d="M6 13h13.5l6.5-5H12.5z" fill="#f2915c" />
-      <path d="M6 13h13.5v2.2H6z" fill="#dc5a2a" />
+      <rect width="32" height="32" rx="16" fill="#347dff" />
+      <path d="M6 21.5h13.5l6.5-5H12.5z" fill="#ffffff" />
+      <path d="M6 21.5h13.5v2.2H6z" fill="#cce0ff" />
+      <path d="M6 13h13.5l6.5-5H12.5z" fill="#e4efff" />
+      <path d="M6 13h13.5v2.2H6z" fill="#b6d4ff" />
     </svg>
   )
 }
@@ -49,7 +50,7 @@ export function Logo() {
 function Sidebar() {
   const { meta } = useMeta()
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col bg-paper lg:flex">
+    <aside className="tp-sidebar fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col bg-paper lg:flex">
       <div className="px-6 pt-6 pb-8">
         <Logo />
       </div>
@@ -62,7 +63,7 @@ function Sidebar() {
             title={n.desc}
             className={({ isActive }) =>
               cx(
-                'flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14.5px] transition-colors duration-150',
+                'tp-nav-link flex h-10 items-center gap-3 rounded-[10px] px-3 text-[14.5px] transition-colors duration-150',
                 isActive ? 'bg-surface font-semibold text-ink shadow-[0_0_0_1px_var(--color-line)]' : 'font-medium text-ink-2 hover:bg-hover hover:text-ink',
               )
             }
@@ -90,7 +91,7 @@ function TopBar() {
   const live = useApi<Live>('/api/live', { maxAgeMs: 60_000, refreshMs: 60_000 })
   const now = meta?.now
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-line/70 bg-paper/85 px-8 backdrop-blur-md">
+    <header className="tp-topbar sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line/70 bg-paper/85 px-8 backdrop-blur-md">
       <div className="flex min-w-0 items-center gap-5">
         <span className="lg:hidden">
           <LogoMark size={28} />
@@ -246,15 +247,15 @@ export default function Layout() {
     if (open) setLoaded(true)
   }, [open])
   return (
-    <div className="min-h-full">
+    <div className="tp-app min-h-full">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[80] focus:rounded-[10px] focus:bg-ink focus:px-3 focus:py-2 focus:text-white">
         본문으로 건너뛰기
       </a>
       <Sidebar />
-      <div className={cx('min-h-full lg:pl-[232px]', open && '2xl:pr-[440px]')}>
+      <div className={cx('tp-main-shell min-h-full lg:pl-[232px]', open && '2xl:pr-[440px]')}>
         <TopBar />
         <MobileNav />
-        <main id="main" className="mx-auto max-w-[1480px] px-8 pt-8 pb-20">
+        <main id="main" className="tp-main mx-auto max-w-[1480px] px-8 pt-8 pb-20">
           {/* keyed by route: moving to another screen clears a crashed page */}
           <ErrorBoundary key={loc.pathname} area="이 화면">
             <Outlet />

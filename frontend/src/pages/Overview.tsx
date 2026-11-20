@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { transitionRoom } from '../components/roomTransition'
 import { Link, useSearchParams } from 'react-router-dom'
 import { RotateCcw, CloudSun, Cloud, CloudRain, CloudSnow, Sun, Droplets, WindIcon, Wrench, History, Info, Fan, Clock3, CalendarRange, Sparkles } from 'lucide-react'
 import { useApi } from '../lib/api'
@@ -41,6 +42,25 @@ export default function Overview() {
   const [viewMinute, setViewMinute] = useState<number | null>(null)
   const [viewKey, setViewKey] = useState<string | null>(null)
   const [showOdus, setShowOdus] = useState(false)
+  const returnPosition = useRef({ x: 0, y: 0 })
+  const returnFocus = useRef<Element | null>(null)
+  const openRoom = useCallback((room: string) => {
+    returnPosition.current = { x: window.scrollX, y: window.scrollY }
+    returnFocus.current = document.activeElement
+    transitionRoom(() => {
+      setDrawerRoom(room)
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    }, undefined, room)
+  }, [])
+  const closeRoom = useCallback(() => {
+    transitionRoom(() => {
+      setDrawerRoom(null)
+    }, () => {
+      window.scrollTo({ left: returnPosition.current.x, top: returnPosition.current.y, behavior: 'instant' })
+      const target = returnFocus.current
+      if (target instanceof HTMLElement || target instanceof SVGElement) target.focus({ preventScroll: true })
+    }, drawerRoom ?? undefined)
+  }, [drawerRoom])
 
   // scrubbed minute belongs to one reference date; reset when the date changes
   const key = `${date}|${at ?? ''}`
@@ -64,9 +84,10 @@ export default function Overview() {
   const drawerNow = drawerRoom ? roomNow(shown, meta, drawerRoom, minute, scrubbing ? (minute > now.minute ? '계획' : '기록') : at ? '재현' : '현재') : undefined
 
   return (
-    <div>
+    <div className="tp-overview">
+      <div hidden={!!drawerRoom}>
       {/* the page's answer: one sentence from the data + three key numbers */}
-      <header className="mb-7 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+      <header className="tp-overview-heading mb-7 grid grid-cols-1 items-end gap-x-12 gap-y-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[28px] leading-[1.2] font-bold tracking-[-0.025em] text-ink">운영 현황</h1>
@@ -87,7 +108,7 @@ export default function Overview() {
       </header>
 
       {/* hero: the building */}
-      <section className="rounded-[16px] border border-line bg-surface" aria-labelledby="bv-title">
+      <section className="tp-building-card rounded-[16px] border border-line bg-surface" aria-labelledby="bv-title">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-7 pt-6">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <h2 id="bv-title" className="text-[17px] font-[650] tracking-[-0.01em] text-ink">
@@ -114,12 +135,12 @@ export default function Overview() {
             <ReplayControl now={now} at={at} semester={meta.semester} onSet={(v) => setParams(v ? { at: v } : {})} />
           </div>
         </div>
-        <div className="px-7 pt-5 pb-2">
-          <BuildingView meta={meta} state={shown} onRoomClick={setDrawerRoom} selected={drawerRoom} showOdus={showOdus} />
+        <div className="tp-building-viewport px-7 pt-5 pb-2">
+          <BuildingView meta={meta} state={shown} onRoomClick={openRoom} selected={drawerRoom} showOdus={showOdus} />
         </div>
         <div className="border-t border-line px-7 pt-9 pb-6">
           {D ? (
-            <TimeScrubber day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
+            <TimeScrubber active={!drawerRoom} day={D} meta={meta} minute={minute} nowMinute={now.minute} onChange={onScrub} refLabel={at ? '기준 시각' : '지금'} />
           ) : day.error ? (
             <ErrorBox error={day.error} onRetry={day.reload} />
           ) : (
@@ -143,7 +164,7 @@ export default function Overview() {
                   스케줄 화면에서 보기
                 </Link>
               </div>
-              <Gantt day={D} meta={meta} primary="ai" compact nowMinute={minute} onRoomClick={setDrawerRoom} selectedRoom={drawerRoom} />
+              <Gantt day={D} meta={meta} primary="ai" compact nowMinute={minute} onRoomClick={openRoom} selectedRoom={drawerRoom} />
               <HourlyEnergy day={D} nowMinute={now.minute} />
             </div>
           ) : day.error ? (
@@ -153,14 +174,15 @@ export default function Overview() {
           )}
         </Disclosure>
         <Disclosure icon={<Sparkles size={16} aria-hidden />} title={at ? 'AI 판단과 자동 조치' : '오늘 AI 판단과 자동 조치'} summary={D ? `${feedCount(D)}건` : undefined}>
-          <Feed day={D} nowMinute={now.minute} onOpen={setDrawerRoom} />
+          <Feed day={D} nowMinute={now.minute} onOpen={openRoom} />
         </Disclosure>
         <Disclosure icon={<CloudSun size={16} aria-hidden />} title={at ? '재현 시각 외기와 예보' : '외기와 예보'} summary={`${L.outdoor.t.toFixed(1)}℃, 습도 ${Math.round(L.outdoor.rh)}%`}>
           <WeatherDetail live={L} weather={weather.data} day={D} replay={!!at} />
         </Disclosure>
       </DisclosureList>
 
-      <RoomDrawer open={!!drawerRoom} onClose={() => setDrawerRoom(null)} day={D} meta={meta} room={drawerRoom} now={drawerNow} />
+      </div>
+      <RoomDrawer presentation="page" open={!!drawerRoom} onClose={closeRoom} day={D} meta={meta} room={drawerRoom} now={drawerNow} />
     </div>
   )
 }
