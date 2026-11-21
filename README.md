@@ -10,6 +10,12 @@
 
 가입부터 중앙 제어 연결, 운영 규칙까지 한 화면에 한 가지만 묻는 단계형 흐름입니다. 흰 바탕에 큰 제목·큰 입력·하단 고정 버튼을 쓰고, 단계 전환(페이드·슬라이드), 선택 카드, 진행 막대, 완료 체크 애니메이션은 CSS만으로 구현했습니다. 화면 코드는 [Signup.tsx](frontend/src/pages/Signup.tsx), [Setup.tsx](frontend/src/pages/Setup.tsx), 공용 부품은 [Onboarding.tsx](frontend/src/components/Onboarding.tsx)에 있습니다.
 
+| 회원가입 (12초) | 건물 등록과 중앙 제어 연결 (31초) |
+|---|---|
+| ![회원가입 흐름](frontend/screenshots/onboarding/onboarding-signup.gif) | ![건물 등록과 중앙 제어 연결 흐름](frontend/screenshots/onboarding/onboarding-building.gif) |
+
+로컬 실행 화면을 그대로 녹화했습니다. 연결 테스트는 가상 중앙제어기(시뮬레이터)를 상대로 했고, 백엔드가 Bedrock 없이 떠 있어 건물 설명은 규칙으로 정리됐습니다.
+
 **회원가입** (`/signup`): 계정 → 소속·하는 일 → 시작 방식(새 건물 등록 / 기존 건물에 참여) → 완료
 
 | 1. 계정 | 2. 소속 | 3. 시작 방식 | 4. 완료 |
