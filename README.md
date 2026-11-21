@@ -1,40 +1,12 @@
 # ON:D: 스케줄 기반 HVAC 자동 운전 AI
 
+![ON:D 소개 화면](frontend/screenshots/onboarding/ond-welcome.gif)
+
 2026 AWS x PNU AI 해커톤 과제 3 (Cloud). 부산대학교 IT관 강의 시간표와 기상청·Open-Meteo 날씨로 강의실별 냉난방 운전 계획을 자동으로 만들고, 실내기(IDU)·실외기(ODU) 시뮬레이터로 실행 이력을 남기고, 강의 시간과 맞았는지 검증하고, 기존 방식 대비 절감 효과를 보여주는 시설 담당자용 웹 서비스입니다. 서비스 이름은 ON:D이며, 저장소와 일부 식별자에는 이전 이름 ThermoPlan이 남아 있습니다.
 
 - 배포 주소: ~~https://d32ggz3cj7s7bx.cloudfront.net~~ 해커톤이 끝나 2026-11-22에 AWS 리소스를 모두 내렸습니다. 아래 [로컬 실행](#로컬-실행)으로 띄우거나 `infra/deploy.sh`로 다시 배포할 수 있습니다.
 - 배포 당시 클라우드 데이터 백업(S3 데이터 버킷 전체, DynamoDB 테이블, 배포 템플릿): [`backup/aws-2026-11-21` 브랜치](https://github.com/Jeonsubb/hvac-schedule-ai/tree/backup/aws-2026-11-21)
 - 전체 시나리오와 동작 원리를 한 문서로 정리한 설명서: [docs/service_guide.html](docs/service_guide.html)
-
-## 온보딩 화면
-
-가입부터 중앙 제어 연결, 운영 규칙까지 한 화면에 한 가지만 묻는 단계형 흐름입니다. 흰 바탕에 큰 제목·큰 입력·하단 고정 버튼을 쓰고, 단계 전환(페이드·슬라이드), 선택 카드, 진행 막대, 완료 체크 애니메이션은 CSS만으로 구현했습니다. 화면 코드는 [Signup.tsx](frontend/src/pages/Signup.tsx), [Setup.tsx](frontend/src/pages/Setup.tsx), 공용 부품은 [Onboarding.tsx](frontend/src/components/Onboarding.tsx)에 있습니다.
-
-| 회원가입 (12초) | 건물 등록과 중앙 제어 연결 (31초) |
-|---|---|
-| ![회원가입 흐름](frontend/screenshots/onboarding/onboarding-signup.gif) | ![건물 등록과 중앙 제어 연결 흐름](frontend/screenshots/onboarding/onboarding-building.gif) |
-
-로컬 실행 화면을 그대로 녹화했습니다. 연결 테스트는 가상 중앙제어기(시뮬레이터)를 상대로 했고, 백엔드가 Bedrock 없이 떠 있어 건물 설명은 규칙으로 정리됐습니다.
-
-**회원가입** (`/signup`): 계정 → 소속·하는 일 → 시작 방식(새 건물 등록 / 기존 건물에 참여) → 완료
-
-| 1. 계정 | 2. 소속 | 3. 시작 방식 | 4. 완료 |
-|---|---|---|---|
-| ![계정](frontend/screenshots/onboarding/after-signup-1-account.jpg) | ![소속](frontend/screenshots/onboarding/after-signup-2-org.jpg) | ![시작 방식](frontend/screenshots/onboarding/after-signup-3-start.jpg) | ![완료](frontend/screenshots/onboarding/after-signup-4-done.jpg) |
-
-**건물 등록과 중앙 제어 연결** (`/setup`): 건물 설명(AI 정리) → 확인 → 연결 시작 → 연결 방식 → 접속 정보 → 구조 확인·연결 테스트 → 연결 완료 → 운영 규칙(한 화면에 한 질문) → 완료
-
-| 건물 설명 | AI 정리 확인 | 연결 시작 |
-|---|---|---|
-| ![건물 설명](frontend/screenshots/onboarding/after-setup-1-describe.jpg) | ![확인](frontend/screenshots/onboarding/after-setup-2-confirm.jpg) | ![연결 시작](frontend/screenshots/onboarding/after-setup-3-connect-intro.jpg) |
-
-| 연결 방식 | 접속 정보 | 구조 확인 |
-|---|---|---|
-| ![연결 방식](frontend/screenshots/onboarding/after-setup-4-method.jpg) | ![접속 정보](frontend/screenshots/onboarding/after-setup-5-details.jpg) | ![구조 확인](frontend/screenshots/onboarding/after-setup-6b-verify-result.jpg) |
-
-| 연결 완료 | 운영 규칙 | 완료 |
-|---|---|---|
-| ![연결 완료](frontend/screenshots/onboarding/after-setup-7-connected.jpg) | ![운영 규칙](frontend/screenshots/onboarding/after-setup-8-rule.jpg) | ![완료](frontend/screenshots/onboarding/after-setup-9-done.jpg) |
 
 ## 현재 구성 (2026-11-21 기준)
 
