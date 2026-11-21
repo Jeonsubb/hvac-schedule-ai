@@ -2,15 +2,41 @@
 
 2026 AWS x PNU AI 해커톤 과제 3 (Cloud). 부산대학교 IT관 강의 시간표와 기상청·Open-Meteo 날씨로 강의실별 냉난방 운전 계획을 자동으로 만들고, 실내기(IDU)·실외기(ODU) 시뮬레이터로 실행 이력을 남기고, 강의 시간과 맞았는지 검증하고, 기존 방식 대비 절감 효과를 보여주는 시설 담당자용 웹 서비스입니다. 서비스 이름은 ON:D이며, 저장소와 일부 식별자에는 이전 이름 ThermoPlan이 남아 있습니다.
 
-- 배포 주소: https://d32ggz3cj7s7bx.cloudfront.net
+- 배포 주소: ~~https://d32ggz3cj7s7bx.cloudfront.net~~ 해커톤이 끝나 2026-11-22에 AWS 리소스를 모두 내렸습니다. 아래 [로컬 실행](#로컬-실행)으로 띄우거나 `infra/deploy.sh`로 다시 배포할 수 있습니다.
+- 배포 당시 클라우드 데이터 백업(S3 데이터 버킷 전체, DynamoDB 테이블, 배포 템플릿): [`backup/aws-2026-11-21` 브랜치](https://github.com/Jeonsubb/hvac-schedule-ai/tree/backup/aws-2026-11-21)
 - 전체 시나리오와 동작 원리를 한 문서로 정리한 설명서: [docs/service_guide.html](docs/service_guide.html)
+
+## 온보딩 화면
+
+가입부터 중앙 제어 연결, 운영 규칙까지 한 화면에 한 가지만 묻는 단계형 흐름입니다. 흰 바탕에 큰 제목·큰 입력·하단 고정 버튼을 쓰고, 단계 전환(페이드·슬라이드), 선택 카드, 진행 막대, 완료 체크 애니메이션은 CSS만으로 구현했습니다. 화면 코드는 [Signup.tsx](frontend/src/pages/Signup.tsx), [Setup.tsx](frontend/src/pages/Setup.tsx), 공용 부품은 [Onboarding.tsx](frontend/src/components/Onboarding.tsx)에 있습니다.
+
+**회원가입** (`/signup`): 계정 → 소속·하는 일 → 시작 방식(새 건물 등록 / 기존 건물에 참여) → 완료
+
+| 1. 계정 | 2. 소속 | 3. 시작 방식 | 4. 완료 |
+|---|---|---|---|
+| ![계정](frontend/screenshots/onboarding/after-signup-1-account.jpg) | ![소속](frontend/screenshots/onboarding/after-signup-2-org.jpg) | ![시작 방식](frontend/screenshots/onboarding/after-signup-3-start.jpg) | ![완료](frontend/screenshots/onboarding/after-signup-4-done.jpg) |
+
+**건물 등록과 중앙 제어 연결** (`/setup`): 건물 설명(AI 정리) → 확인 → 연결 시작 → 연결 방식 → 접속 정보 → 구조 확인·연결 테스트 → 연결 완료 → 운영 규칙(한 화면에 한 질문) → 완료
+
+| 건물 설명 | AI 정리 확인 | 연결 시작 |
+|---|---|---|
+| ![건물 설명](frontend/screenshots/onboarding/after-setup-1-describe.jpg) | ![확인](frontend/screenshots/onboarding/after-setup-2-confirm.jpg) | ![연결 시작](frontend/screenshots/onboarding/after-setup-3-connect-intro.jpg) |
+
+| 연결 방식 | 접속 정보 | 구조 확인 |
+|---|---|---|
+| ![연결 방식](frontend/screenshots/onboarding/after-setup-4-method.jpg) | ![접속 정보](frontend/screenshots/onboarding/after-setup-5-details.jpg) | ![구조 확인](frontend/screenshots/onboarding/after-setup-6b-verify-result.jpg) |
+
+| 연결 완료 | 운영 규칙 | 완료 |
+|---|---|---|
+| ![연결 완료](frontend/screenshots/onboarding/after-setup-7-connected.jpg) | ![운영 규칙](frontend/screenshots/onboarding/after-setup-8-rule.jpg) | ![완료](frontend/screenshots/onboarding/after-setup-9-done.jpg) |
 
 ## 현재 구성 (2026-11-21 기준)
 
 설계 배경은 [docs/design_v5.md](docs/design_v5.md), API는 [docs/api_v5.md](docs/api_v5.md), 시연 대본은 [docs/demo_script.md](docs/demo_script.md)에 있습니다.
 
 - **진입**: 랜딩(`/welcome`) → 목업 로그인·가입. 데모 계정 `부산대학교 / 부산대학교`는 건물 설정을 마친 IT관 운영 화면으로 바로 들어갑니다.
-- **건물 설정 3단계**(새 계정, `/setup`): 건물을 말로 설명(AI가 프로필로 정리) → 중앙 제어 연결(현장 게이트웨이·직접 연결·파일 업로드 중 선택, 주소·프로토콜 입력, 연결 테스트) → 설비·운영 정보(허용 온도 범위, 현재 운전 시간). 시간표는 설정을 마친 뒤 운영 화면에서 등록합니다.
+- **회원가입**(`/signup`): 계정 → 소속·하는 일 → 새 건물 등록 또는 기존 건물에 참여. 참여를 고르면 등록된 건물의 운영 화면으로 바로 들어갑니다.
+- **건물 설정**(새 계정, `/setup`): 건물을 말로 설명(AI가 프로필로 정리) → 중앙 제어 연결(현장 게이트웨이·직접 연결·파일 업로드 중 선택, 주소·프로토콜 입력, PC → 게이트웨이 → ON:D 구조 확인과 연결 테스트) → 운영 규칙(허용 온도 범위, 현재 운전 시간을 한 화면에 하나씩). 시간표는 설정을 마친 뒤 운영 화면에서 등록합니다.
 - **메뉴 네 개와 온디**: 운영 현황(현황·절감 효과·쾌적 의견), 일정 관리(시간표·일정, 달력, 정합성 검증), AI 최적화, 설정. 로고를 누르면 음성 비서 온디(`/`)가 열립니다.
 - **운영 현황**: 핵심 지표 세 개(하루 예상 전기 사용, 고정 운전 대비 절감, 수업 중 쾌적 비율), 전체 강의실 타임라인, 강의실별 예측 실내온도와 판단 근거, 승인 대기 조정안.
 - **AI 최적화**: 비용을 대변하는 관리자 온디와 쾌적을 대변하는 사용자 온디가 설정온도를 협의합니다. 두 에이전트는 답하기 전에 시뮬레이터를 도구로 직접 호출하고, 결과는 협의 전후를 같은 조건으로 비교해서 보여 줍니다. 담당자가 승인해야 운영 계획에 반영됩니다. "단계별 계획 검증"으로 전환하면 1·2·3차 계획을 볼 수 있습니다.
@@ -121,6 +147,8 @@ cd ../frontend && npm install && npm run dev   # http://localhost:5173 (/api →
 ```
 
 ## 배포
+
+> 2026-11-22에 배포 리소스(CloudFormation 스택 `hvac-ai`, S3 버킷 3개, DynamoDB 테이블, Lambda, CloudFront, 스케줄러, SNS, SSM 파라미터, IAM 역할)를 모두 삭제했습니다. 다시 배포하려면 아래 순서를 처음부터 진행하고, 기상청 키를 새로 넘겨야 합니다. 이전 데이터는 백업 브랜치의 `s3-data/`를 데이터 버킷에 올리면 됩니다.
 
 | 모드 | 구성 | 명령 |
 |---|---|---|

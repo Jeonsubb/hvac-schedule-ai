@@ -10,6 +10,8 @@ export interface Account {
   password: string
   name: string
   org: string
+  /** what the person does at the building (sign-up step 2) */
+  role?: string
   onboarded: boolean
   building?: string
   created_at: string
@@ -49,6 +51,11 @@ function writeAccounts(a: Record<string, Account>) {
   }
 }
 
+/** Sign-up checks the address before the last step (accounts are local to this browser). */
+export function accountExists(id: string): boolean {
+  return !!readAccounts()[id.trim()]
+}
+
 function readSession(): string | null {
   try {
     return localStorage.getItem(SESSION_KEY)
@@ -60,7 +67,8 @@ function readSession(): string | null {
 interface AuthCtx {
   user: Account | null
   login: (id: string, password: string) => { ok: true } | { ok: false; error: string }
-  signup: (a: { id: string; password: string; name: string; org: string }) => { ok: true } | { ok: false; error: string }
+  /** `join`: join a building that is already registered instead of registering a new one */
+  signup: (a: { id: string; password: string; name: string; org: string; role?: string; join?: string }) => { ok: true } | { ok: false; error: string }
   logout: () => void
   completeOnboarding: (building: string) => void
   /** restart the setup wizard for the current account (demo) */
@@ -103,11 +111,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signup = useCallback<AuthCtx['signup']>(
-    ({ id, password, name, org }) => {
+    ({ id, password, name, org, role, join }) => {
       const key = id.trim()
       if (!key || !password) return { ok: false, error: '아이디와 비밀번호를 입력하세요.' }
       if (accounts[key]) return { ok: false, error: '이미 사용 중인 아이디입니다.' }
-      const acc: Account = { id: key, password, name: name.trim() || key, org: org.trim() || name.trim() || key, onboarded: false, created_at: new Date().toISOString(), applied: false }
+      // a member who joins a running building sees it the way the account that runs it does
+      const owner = join ? Object.values(accounts).find((a) => a.onboarded && a.building === join) : undefined
+      const acc: Account = {
+        id: key,
+        password,
+        name: name.trim() || key,
+        org: org.trim() || name.trim() || key,
+        role,
+        onboarded: !!join,
+        building: join,
+        created_at: new Date().toISOString(),
+        applied: join ? (owner?.applied ?? false) : false,
+      }
       save({ ...accounts, [key]: acc })
       setSession(key)
       return { ok: true }

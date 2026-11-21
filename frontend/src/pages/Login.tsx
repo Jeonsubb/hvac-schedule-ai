@@ -46,14 +46,14 @@ export default function Login() {
   return (
     <AuthLayout title="로그인" desc="시설 담당자 계정으로 로그인하세요. 건물 연결을 마친 계정은 바로 운전 현황으로 이동합니다.">
       <form onSubmit={submit} className="space-y-5" noValidate>
-        <Field label="아이디">
+        <Field label="이메일 또는 아이디">
           <input
             className={inputCls}
             name="username"
             autoComplete="username"
             value={id}
             onChange={(e) => setId(e.target.value)}
-            placeholder="아이디를 입력하세요…"
+            placeholder="name@company.com"
             autoFocus
             required
           />
